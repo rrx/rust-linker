@@ -82,7 +82,7 @@ impl LinkRelocation {
             RelocationKind::Absolute => DoNothing,
             RelocationKind::Relative => DoNothing,
             RelocationKind::PltRelative => AddToPlt,
-            _ => unimplemented!(),
+            _ => unimplemented!("{:?}", self.kind),
         }
     }
 }

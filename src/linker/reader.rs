@@ -218,7 +218,7 @@ impl ReadSymbol {
     }
 
     pub fn get_static_symbol(&self, data: &Data) -> object::write::elf::Sym {
-        let name = Some(data.statics.string_get(&self.name));
+        let name = data.statics.string_get(&self.name);
         let st_value = {
             if let Some(addr) = self.pointer.resolve(data) {
                 addr
@@ -303,7 +303,7 @@ impl ReadBlock {
 
     pub fn build_strings(&mut self, data: &mut Data, w: &mut Writer) {
         // add libraries if they are configured
-        for mut lib in data.libs.iter_mut() {
+        for lib in data.libs.iter_mut() {
             unsafe {
                 let buf = extend_lifetime(lib.name.as_bytes());
                 lib.string_id = Some(w.add_dynamic_string(buf));
@@ -392,7 +392,8 @@ impl ReadBlock {
 
                 if s.source == SymbolSource::Dynamic {
                     log::debug!("reloc {}", &r);
-                    data.statics.symbol_add(&s, None, w);
+                    //data.statics.symbol_add(&s, None, w);
+                    //data.dynamics.symbol_add(&s, None, w);
                     data.dynamics.relocation_add(&s, assign, r, w);
                 } else if def != CodeSymbolDefinition::Local {
                     log::debug!("reloc2 {}", &r);
@@ -569,7 +570,9 @@ impl ReadBlock {
             _ => unimplemented!(),
         } as u64;
 
+        let mut count = 0;
         for symbol in b.symbols() {
+            count += 1;
             // skip the null symbol
             if symbol.kind() == object::SymbolKind::Null {
                 continue;
@@ -595,6 +598,7 @@ impl ReadBlock {
                 }
             }
         }
+        eprintln!("{} symbols read from {}", count, section.name()?);
 
         match kind {
             ReadSectionKind::Bss => {
@@ -737,6 +741,32 @@ impl Reader {
         Ok(())
     }
 
+    pub fn add_archive(&mut self, path: &std::path::Path) -> Result<(), Box<dyn Error>> {
+        let buf = std::fs::read(path)?;
+        self.add_archive_buf(path.to_str().unwrap(), &buf)?;
+        Ok(())
+    }
+
+    pub fn add_archive_buf(&mut self, archive_name: &str, buf: &[u8]) -> Result<(), Box<dyn Error>> {
+        log::debug!("Archive: {}", archive_name);
+        let archive = object::read::archive::ArchiveFile::parse(buf)?;
+        log::debug!(
+            "Archive: {}, size: {}, kind: {:?}",
+            archive_name,
+            buf.len(),
+            archive.kind()
+        );
+        for result in archive.members() {
+            let m = result?;
+            let name = std::str::from_utf8(&m.name())?;
+            let (offset, size) = m.file_range();
+            let obj_buf = &buf[offset as usize..(offset + size) as usize];
+            log::debug!("Member: {}, {:?}", &name, &m);
+            self.elf_read(name, &obj_buf)?;
+        }
+        Ok(())
+    }
+
     /*
     pub fn merge_export(&mut self, s: ReadSymbol) {
         // if we have two strong symbols, favor the first
@@ -803,16 +833,19 @@ impl Reader {
         name: &str,
     ) -> Result<ReadBlock, Box<dyn Error>> {
         let mut block = ReadBlock::new(name);
+        let mut count = 0;
         for symbol in b.dynamic_symbols() {
             let mut s = read_symbol(&b, 0, &symbol)?;
             s.pointer = ResolvePointer::Resolved(0);
             s.source = SymbolSource::Dynamic;
             s.size = 0;
             //eprintln!("s: {:#08x}, {:?}", 0, &s);
+            count += 1;
             if s.kind != SymbolKind::Unknown {
                 block.insert_dynamic(s);
             }
         }
+        eprintln!("{} symbols read from {}", count, name);
         block.libs.insert(name.to_string());
         Ok(block)
     }

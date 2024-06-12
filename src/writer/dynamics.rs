@@ -5,7 +5,7 @@ use object::write::StringId;
 use std::collections::HashMap;
 
 struct TrackStringIndex {
-    index: usize,
+    //index: usize,
     string_id: StringId,
 }
 
@@ -18,7 +18,7 @@ pub enum GotPltAssign {
 }
 
 struct TrackSymbolIndex {
-    index: usize,
+    //index: usize,
     string_id: Option<StringId>,
     symbol_index: Option<SymbolIndex>,
     symbol: ReadSymbol,
@@ -125,10 +125,10 @@ impl Dynamics {
             unsafe {
                 let buf = extend_lifetime(name.as_bytes());
                 // save the string
-                let index = self.strings.len();
+                //let index = self.strings.len();
                 self.strings.push(name);
                 let string_id = w.add_dynamic_string(buf);
-                let string_index = TrackStringIndex { index, string_id };
+                let string_index = TrackStringIndex { string_id };
                 self.string_hash.insert(cloned_name, string_index);
                 string_id
             }
@@ -196,8 +196,8 @@ impl Dynamics {
         }
     }
 
-    fn symbol_add(&mut self, symbol: ReadSymbol, w: &mut Writer) -> Option<SymbolIndex> {
-        let index = self.symbols.len();
+    pub fn symbol_add(&mut self, symbol: ReadSymbol, w: &mut Writer) -> Option<SymbolIndex> {
+        //let index = self.symbols.len();
         self.symbols.push(symbol.name.clone());
 
         let string_id;
@@ -213,7 +213,7 @@ impl Dynamics {
         let symbol = symbol.clone();
         let name = symbol.name.clone();
         let track = TrackSymbolIndex {
-            index,
+            //index,
             string_id,
             symbol_index,
             pointer: symbol.pointer.clone(),

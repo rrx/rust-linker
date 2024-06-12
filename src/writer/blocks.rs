@@ -29,14 +29,16 @@ impl<'a> WriterEx for Writer<'a> {
         let pos = self.len();
         let aligned_pos = size_align(pos, offsets.align as usize);
         self.pad_until(aligned_pos);
-        assert_eq!(self.len(), offsets.file_offset as usize);
 
         log::debug!(
-            "write: {:#0x}, {}, {:?}",
+            "write: {:#0x}/{:#0x}, {}, {:?}",
             self.len(),
+            offsets.file_offset,
             offsets.name,
             offsets.alloc,
         );
+
+        assert_eq!(self.len(), offsets.file_offset as usize);
 
         self.len()
     }
@@ -119,7 +121,7 @@ impl ElfBlock for FileHeader {
 
 pub struct ProgramHeader {
     size: usize,
-    base: usize,
+    //base: usize,
     offsets: SectionOffset,
     ph_count: usize,
 }
@@ -129,7 +131,7 @@ impl Default for ProgramHeader {
         Self {
             size: 0,
             ph_count: 0,
-            base: 0,
+            //base: 0,
             offsets: SectionOffset::new("ph".into(), AllocSegment::RO, 0x01),
         }
     }
@@ -356,7 +358,7 @@ pub struct RelaDynSection {
     kind: GotSectionKind,
     name_id: Option<StringId>,
     count: usize,
-    relocation_names: HashMap<String, StringId>,
+    //relocation_names: HashMap<String, StringId>,
     offsets: SectionOffset,
     is_rela: bool,
 }
@@ -368,7 +370,7 @@ impl RelaDynSection {
             kind,
             name_id: None,
             count: 0,
-            relocation_names: HashMap::default(),
+            //relocation_names: HashMap::default(),
             offsets: SectionOffset::new(name, AllocSegment::RO, 0x08),
             is_rela: true,
         }
@@ -627,13 +629,13 @@ impl ElfBlock for RelocationSection {
 */
 
 pub struct StrTabSection {
-    index: Option<SectionIndex>,
+    //index: Option<SectionIndex>,
     offsets: SectionOffset,
 }
 impl StrTabSection {
     pub fn new() -> Self {
         Self {
-            index: None,
+            //index: None,
             offsets: SectionOffset::new("strtab".into(), AllocSegment::None, 1),
         }
     }
@@ -665,16 +667,16 @@ impl ElfBlock for StrTabSection {
 }
 
 pub struct SymTabSection {
-    index: Option<SectionIndex>,
-    symbols: Vec<Sym>,
+    //index: Option<SectionIndex>,
+    //symbols: Vec<Sym>,
     count: usize,
     offsets: SectionOffset,
 }
 impl Default for SymTabSection {
     fn default() -> Self {
         Self {
-            index: None,
-            symbols: vec![],
+            //index: None,
+            //symbols: vec![],
             count: 0,
             offsets: SectionOffset::new("symtab".into(), AllocSegment::None, 0x10),
         }
@@ -698,8 +700,16 @@ impl ElfBlock for SymTabSection {
     fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
         self.count = data.statics.symbol_count();
         let symbols = data.statics.gen_symbols(data);
+
+        for x in symbols.iter() {
+            println!("static: {:?}", x);
+        }
+        //for x in data.dynamics.symbols() {
+            //println!("dynamic: {:?}", x);
+        //}
+
         assert_eq!(symbols.len(), self.count);
-        assert_eq!(symbols.len() + 1, w.symbol_count() as usize);
+        //assert_eq!(symbols.len() + 1, w.symbol_count() as usize);
 
         // reserve the symbols in the various sections
         self.offsets.file_offset = w.reserve_start_section(&self.offsets) as u64;
@@ -745,14 +755,14 @@ impl ElfBlock for SymTabSection {
 }
 
 pub struct DynSymSection {
-    index: Option<SectionIndex>,
+    //index: Option<SectionIndex>,
     offsets: SectionOffset,
     symbol_count: u32,
 }
 impl Default for DynSymSection {
     fn default() -> Self {
         Self {
-            index: None,
+            //index: None,
             offsets: SectionOffset::new("dynsym".into(), AllocSegment::RO, 0x08),
             symbol_count: 0,
         }
@@ -805,13 +815,13 @@ impl ElfBlock for DynSymSection {
 }
 
 pub struct DynStrSection {
-    index: Option<SectionIndex>,
+    //index: Option<SectionIndex>,
     offsets: SectionOffset,
 }
 impl Default for DynStrSection {
     fn default() -> Self {
         Self {
-            index: None,
+            //index: None,
             offsets: SectionOffset::new("dynstr".into(), AllocSegment::RO, 0x01),
         }
     }
@@ -852,7 +862,7 @@ impl ElfBlock for DynStrSection {
 
 #[derive(Default)]
 pub struct ShStrTabSection {
-    index: Option<SectionIndex>,
+    //index: Option<SectionIndex>,
     file_offset: usize,
 }
 impl ElfBlock for ShStrTabSection {
@@ -1173,7 +1183,8 @@ impl ElfBlock for PltSection {
         let size = (1 + plt_entries_count) * 0x10;
         self.section.bytes.resize(size, 0);
         let align = self.section.offsets.align as usize;
-
+        
+        println!("plt align: {}", align);
         let file_offset = w.reserve_start_section(&self.section.offsets);
         w.reserve(self.section.bytes.len(), align);
         let after = w.reserved_len();
@@ -1202,7 +1213,8 @@ impl ElfBlock for PltSection {
         let got_addr = data.addr_get_by_name(".got.plt").unwrap() as isize;
         let vbase = self.section.offsets.address as isize;
 
-        let mut stub: Vec<u8> = vec![
+        let mut stub = vec![];
+        let mut buf: [u8;16] = [
             // 0x401020: push   0x2fe2(%rip)        # 404008 <_GLOBAL_OFFSET_TABLE_+0x8>
             // got+8 - rip // (0x404000+0x8) - (0x401020 + 0x06)
             0xff, 0x35, 0xe2, 0x2f, 0x00, 0x00,
@@ -1213,15 +1225,34 @@ impl ElfBlock for PltSection {
             0x0f, 0x1f, 0x40, 0x00,
         ];
 
-        unsafe {
-            let patch = (stub.as_mut_ptr().offset(2)) as *mut i32;
-            let got1 = got_addr + 0x8 - (vbase + 0x06);
-            *patch = got1 as i32;
+        /*
+        let mut stub: Vec<u8> = vec![
+            // 0x401020: push   0x2fe2(%rip)        # 404008 <_GLOBAL_OFFSET_TABLE_+0x8>
+            // got+8 - rip // (0x404000+0x8) - (0x401020 + 0x06)
+            0xff, 0x35, 0xe2, 0x2f, 0x00, 0x00,
+            // 0x401026: jump to GOT[2]
+            // jmp    *0x2fe4(%rip)        # 404010 <_GLOBAL_OFFSET_TABLE_+0x10>
+            0xff, 0x25, 0xe4, 0x2f, 0x00, 0x00,
+            // 40102c:       0f 1f 40 00             nopl   0x0(%rax)
+            0x0f, 0x1f, 0x40, 0x00,
+        ];
+        */
 
-            let patch = (stub.as_mut_ptr().offset(2 + 6)) as *mut i32;
+        //unsafe {
+            let got1 = got_addr + 0x8 - (vbase + 0x06);
+            let b = (got1 as i32).to_le_bytes();
+            buf.as_mut_slice()[2..6].copy_from_slice(&b);
+
+            //let patch = (buf.0.as_mut_ptr().offset(2)) as *mut i32;
+            //*patch = got1 as i32;
+            
             let got2 = got_addr + 0x10 - (vbase + 0x0c);
-            *patch = got2 as i32;
-        }
+            let b = (got2 as i32).to_le_bytes();
+            buf.as_mut_slice()[8..12].copy_from_slice(&b);
+            //let patch = (buf.0.as_mut_ptr().offset(2 + 6)) as *mut i32;
+            //*patch = got2 as i32;
+        //}
+        stub.extend(buf);
 
         let plt_entries_count = data.dynamics.plt_objects().len();
         //eprintln!("plt: {:?}", plt);

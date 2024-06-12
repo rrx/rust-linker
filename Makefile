@@ -1,7 +1,6 @@
 CLANG=clang-13
-MUSL=/home/rrx/src/musl-1.2.3/target
 
-default:
+default: functions examples
 
 empty:
 	cargo run -- \
@@ -29,15 +28,6 @@ sdl:
 		/usr/lib/x86_64-linux-gnu/crt1.o
 	@echo RUN
 	exec tmp/out.exe ./testfiles/grumpy-cat.bmp
-
-musl2:
-	cargo run -- \
-		--interp $(MUSL)/bin/ld-musl-x86_64.so.1 \
-		-o tmp/out.exe \
-		build/clang-musl/empty_main.o \
-		$(MUSL)/lib/crt1.o \
-		$(MUSL)/lib/libc.so
-	exec tmp/out.exe
 
 musl:
 	cargo run -- \

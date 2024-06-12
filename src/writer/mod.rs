@@ -479,7 +479,7 @@ mod tests {
     #[test]
     fn write_empty_main() {
         let mut b = Link::new();
-        b.add_obj_file("test", Path::new("../tmp/empty_main.o"))
+        b.add_obj_file("test", Path::new("./build/clang-glibc/empty_main.o"))
             .unwrap();
         //b.write(Path::new("../tmp/out.exe")).unwrap();
     }

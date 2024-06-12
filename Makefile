@@ -1,11 +1,11 @@
 CLANG=clang-13
 
-default: functions examples test
+default: test
 
 fmt:
 	cargo fmt
 
-test:
+test: functions examples
 	cargo test -- --nocapture
 
 empty:
@@ -81,14 +81,6 @@ static: #functions
 
 dynamic: #functions
 	RUST_LOG=debug cargo run --example write_dynamic
-	#objdump -D tmp/dynamic.exe
-	#readelf -sW tmp/dynamic.exe
-	#objdump -t tmp/dynamic.exe
-	#objdump -d -j .text tmp/dynamic.exe
-	#objdump -d -j .plt tmp/dynamic.exe
-	#objdump -s -j .got -j .got.plt tmp/dynamic.exe
-	readelf -aW tmp/dynamic.exe
-	LD_LIBRARY_PATH=tmp tmp/dynamic.exe
 
 read2:
 	elfcat tmp/out.exe
@@ -152,7 +144,7 @@ functions:
 	#$(CLANG) ${CFLAGS} -c -nostdlib testfiles/start.c -o ./tmp/start.o
 	#$(CLANG) -nostdlib testfiles/globals.c testfiles/start.c -o ./tmp/start
 	$(CLANG) ${CFLAGS} -shared testfiles/live.c -o ./build/clang-glibc/live.so
-	#$(CLANG) ${CFLAGS} -nostdlib -shared testfiles/globals.c -o ./tmp/globals.so
+	$(CLANG) ${CFLAGS} -nostdlib -shared testfiles/globals.c -o ./build/clang-glibc/globals.so
 
 	$(CLANG) ${CFLAGS} -g testfiles/invoke_print.c -o ./build/clang-glibc/invoke_print
 

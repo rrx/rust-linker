@@ -9,7 +9,7 @@ This project is a proof-of-concept linker built in Rust.  The purpose of this pr
 # Limitations
 
 - Only compiles for Linux on x86_64
-- No linker options, only the simplest were used for implementation
+- Limited linker options, only the simplest were used for implementation
 - Hot-reloading is very primitive and not yet usable
 
 # Developing
@@ -17,8 +17,11 @@ This project is a proof-of-concept linker built in Rust.  The purpose of this pr
 You will need a few libraries to build the test functions.  On ubuntu you will need:
 
 ```
-sudo apt install libsigsegv-dev libsdl2-dev libuv1-dev
-make functions
+# install dependencies
+sudo apt install libsigsegv-dev libsdl2-dev libuv1-dev musl-dev
+
+# run test-suite
+make test
 ```
 
 See the Makefile for examples of usage.

@@ -206,20 +206,6 @@ impl Link {
         self.add_segments(segments);
         Ok(())
     }
-
-    /*
-    pub fn write(&mut self, path: &Path) -> Result<(), Box<dyn Error>> {
-        use object::elf;
-        use object::Endianness;
-        let data = crate::writer::Data::new(self.libs.iter().cloned().collect());
-        //data.add_section_headers = true;
-        //data.add_symbols = true;
-
-        let out_data = crate::writer::write_file::<elf::FileHeader64<Endianness>>(self, data)?;
-        std::fs::write(path, out_data)?;
-        Ok(())
-    }
-    */
 }
 
 #[cfg(test)]

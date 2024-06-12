@@ -771,46 +771,6 @@ impl Reader {
         Ok(())
     }
 
-    /*
-    pub fn merge_export(&mut self, s: ReadSymbol) {
-        // if we have two strong symbols, favor the first
-        // if we have two weak symbols, favor the first
-        // if we already have a weak symbol, and a strong one comes next, override
-        // if we have a strong, and a weak follows, we ignore the weak
-
-        // if it's defined, and undefined follows, it's defined
-        // if its undefined, and defined follows, it's defined
-        if let Some(existing) = self.block.lookup(&s.name) {
-            use SymbolBind::*;
-            match (&existing.bind, &s.bind) {
-                (Weak, Weak) => (),
-
-                // this might indicate a duplicate symbol
-                (Global, Global) => (),
-
-                // weak override
-                (Weak, Global) => {
-                    self.block.insert_export(s.clone());
-                }
-
-                // drop weak if we alredy have a global
-                (Global, Weak) => (),
-                (Local, _) => unreachable!(),
-                (_, Local) => unreachable!(),
-            }
-
-            match (&existing.section, &s.section) {
-                (ReadSectionKind::Undefined, _) => {
-                    self.block.insert_unknown(s);
-                }
-                _ => (),
-            }
-        } else {
-            self.block.insert_export(s);
-        }
-    }
-    */
-
     fn elf_read(&mut self, name: &str, buf: &[u8]) -> Result<(), Box<dyn Error>> {
         let block = self.read(name, buf)?;
         self.block.add_block(block);
@@ -887,27 +847,6 @@ impl Reader {
         for b in self.blocks.into_iter() {
             self.block.add_block(b);
         }
-
-        /*
-        // make sure everything resolves
-        let iter = self
-            .block
-            .rx
-            .section
-            .relocations
-            .iter()
-            .chain(self.block.ro.section.relocations.iter())
-            .chain(self.block.rw.section.relocations.iter())
-            .chain(self.block.bss.relocations.iter());
-
-        for r in iter {
-            if let Some(_symbol) = self.block.lookup(&r.name) {
-                //eprintln!(" R: {:?}", (r, symbol));
-            } else {
-                self.block.unresolved.insert(r.name.clone());
-            }
-        }
-        */
 
         self.block
     }
@@ -1043,80 +982,3 @@ pub fn dump_header<'a>(
     }
     Ok(())
 }
-
-/*
-pub fn from_section<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
-    &mut self,
-    b: &elf::ElfFile<'a, A, B>,
-    section: &elf::ElfSection<'a, 'b, A, B>,
-    ) -> Result<(), Box<dyn Error>> {
-pub fn elf_read2(buf: &[u8]) -> Result<(), Box<dyn Error>> {
-
-    for section in b.sections() {
-        let name = section.name()?;
-        let section_addr = section.address();
-        eprintln!("Section: {}", name);
-        eprintln!("  kind:   {:?}", section.kind());
-        eprintln!("  addr:   {:#0x}", section_addr);
-
-        let mut symbols = vec![];
-        let mut relocations = vec![];
-
-        for (r_offset, r) in section.relocations() {
-            relocations.push(CodeRelocation {
-                name: "".to_string(),
-                name_id: None,
-                offset: r_offset,
-                r: r.into(),
-            });
-        }
-
-        for symbol in b.symbols() {
-            if let Some(index) = symbol.section_index() {
-                if index == section.index() {
-                    if section_addr <= symbol.address() {
-                        let addr = symbol.address() - section_addr;
-                        let name = symbol.name()?;
-                        symbols.push(Symbol::new(section_addr, addr, name));
-                    }
-                }
-            }
-        }
-
-        let buf = section.data()?;
-        if name == ".got" {
-            for (offset, r) in b.dynamic_relocations().unwrap() {
-                relocations.push(CodeRelocation {
-                    name: "".to_string(),
-                    name_id: None,
-                    offset: offset - section_addr,
-                    r: r.into(),
-                });
-            }
-            disassemble_code_with_symbols(buf, &symbols, &relocations);
-        } else if name == ".text" {
-            disassemble_code_with_symbols(buf, &symbols, &relocations);
-        }
-    }
-
-    /*
-    for seg in b.segments() {
-    eprintln!("Segment: {:?}", seg.name()?);
-    eprintln!("  flags: {:?}", seg.flags());
-    eprintln!("  addr:  {:#0x}", seg.address());
-    eprintln!("  size:  {:#0x}", seg.size());
-    eprintln!("  align:  {:#0x}", seg.align());
-    }
-    */
-    //.program_headers()?;
-    //b.raw_header().e_ident;
-    //let obj_file = object::File::parse(buf)?;
-    //obj_file.format()
-    //let mut symbols = HashMap::new();
-    //let mut symbols_by_id = HashMap::new();
-    //let mut segments = vec![];
-    //let mut externs = HashSet::new();
-    //let mut internal = im::HashMap::new();
-    Ok(())
-}
-*/

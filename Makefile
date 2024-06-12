@@ -11,6 +11,14 @@ empty:
 		/usr/lib/x86_64-linux-gnu/crt1.o
 	exec tmp/out.exe
 
+gcc:
+	cargo run -- \
+		-o tmp/out.exe \
+		build/clang-glibc/print_main.o \
+		/usr/lib/x86_64-linux-gnu/libc.so.6 \
+		/usr/lib/x86_64-linux-gnu/crt1.o 
+	exec tmp/out.exe
+
 
 sdl:
 	cargo run -- \
@@ -19,15 +27,8 @@ sdl:
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/libSDL2.so \
 		/usr/lib/x86_64-linux-gnu/crt1.o
-	exec tmp/out.exe
-
-gcc:
-	cargo run -- \
-		-o tmp/out.exe \
-		build/clang-glibc/print_main.o \
-		/usr/lib/x86_64-linux-gnu/libc.so.6 \
-		/usr/lib/x86_64-linux-gnu/crt1.o 
-	exec tmp/out.exe
+	@echo RUN
+	exec tmp/out.exe ./testfiles/grumpy-cat.bmp
 
 musl2:
 	cargo run -- \

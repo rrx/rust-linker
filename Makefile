@@ -1,6 +1,12 @@
 CLANG=clang-13
 
-default: functions examples
+default: functions examples test
+
+fmt:
+	cargo fmt
+
+test:
+	cargo test -- --nocapture
 
 empty:
 	cargo run -- \
@@ -40,7 +46,7 @@ musl:
 		/usr/lib/x86_64-linux-musl/crtn.o
 	exec tmp/out.exe
 
-examples: sdl gcc empty musl
+examples: gcc empty musl
 
 dump:
 	readelf -aW tmp/out.exe
@@ -96,10 +102,6 @@ build:
 
 doc:
 	cargo doc --all --no-deps
-
-
-test:
-	cargo test -- --nocapture
 
 deps:
 	cargo modules generate graph --package link --with-traits --with-orphans | dot -Tpng > modules.png ; open modules.png

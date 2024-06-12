@@ -218,7 +218,7 @@ impl ReadSymbol {
     }
 
     pub fn get_static_symbol(&self, data: &Data) -> object::write::elf::Sym {
-        let name = Some(data.statics.string_get(&self.name));
+        let name = data.statics.string_get(&self.name);
         let st_value = {
             if let Some(addr) = self.pointer.resolve(data) {
                 addr
@@ -303,7 +303,7 @@ impl ReadBlock {
 
     pub fn build_strings(&mut self, data: &mut Data, w: &mut Writer) {
         // add libraries if they are configured
-        for mut lib in data.libs.iter_mut() {
+        for lib in data.libs.iter_mut() {
             unsafe {
                 let buf = extend_lifetime(lib.name.as_bytes());
                 lib.string_id = Some(w.add_dynamic_string(buf));
@@ -392,7 +392,8 @@ impl ReadBlock {
 
                 if s.source == SymbolSource::Dynamic {
                     log::debug!("reloc {}", &r);
-                    data.statics.symbol_add(&s, None, w);
+                    //data.statics.symbol_add(&s, None, w);
+                    //data.dynamics.symbol_add(&s, None, w);
                     data.dynamics.relocation_add(&s, assign, r, w);
                 } else if def != CodeSymbolDefinition::Local {
                     log::debug!("reloc2 {}", &r);
@@ -569,7 +570,9 @@ impl ReadBlock {
             _ => unimplemented!(),
         } as u64;
 
+        let mut count = 0;
         for symbol in b.symbols() {
+            count += 1;
             // skip the null symbol
             if symbol.kind() == object::SymbolKind::Null {
                 continue;
@@ -595,6 +598,7 @@ impl ReadBlock {
                 }
             }
         }
+        eprintln!("{} symbols read from {}", count, section.name()?);
 
         match kind {
             ReadSectionKind::Bss => {
@@ -737,45 +741,35 @@ impl Reader {
         Ok(())
     }
 
-    /*
-    pub fn merge_export(&mut self, s: ReadSymbol) {
-        // if we have two strong symbols, favor the first
-        // if we have two weak symbols, favor the first
-        // if we already have a weak symbol, and a strong one comes next, override
-        // if we have a strong, and a weak follows, we ignore the weak
-
-        // if it's defined, and undefined follows, it's defined
-        // if its undefined, and defined follows, it's defined
-        if let Some(existing) = self.block.lookup(&s.name) {
-            use SymbolBind::*;
-            match (&existing.bind, &s.bind) {
-                (Weak, Weak) => (),
-
-                // this might indicate a duplicate symbol
-                (Global, Global) => (),
-
-                // weak override
-                (Weak, Global) => {
-                    self.block.insert_export(s.clone());
-                }
-
-                // drop weak if we alredy have a global
-                (Global, Weak) => (),
-                (Local, _) => unreachable!(),
-                (_, Local) => unreachable!(),
-            }
-
-            match (&existing.section, &s.section) {
-                (ReadSectionKind::Undefined, _) => {
-                    self.block.insert_unknown(s);
-                }
-                _ => (),
-            }
-        } else {
-            self.block.insert_export(s);
-        }
+    pub fn add_archive(&mut self, path: &std::path::Path) -> Result<(), Box<dyn Error>> {
+        let buf = std::fs::read(path)?;
+        self.add_archive_buf(path.to_str().unwrap(), &buf)?;
+        Ok(())
     }
-    */
+
+    pub fn add_archive_buf(
+        &mut self,
+        archive_name: &str,
+        buf: &[u8],
+    ) -> Result<(), Box<dyn Error>> {
+        log::debug!("Archive: {}", archive_name);
+        let archive = object::read::archive::ArchiveFile::parse(buf)?;
+        log::debug!(
+            "Archive: {}, size: {}, kind: {:?}",
+            archive_name,
+            buf.len(),
+            archive.kind()
+        );
+        for result in archive.members() {
+            let m = result?;
+            let name = std::str::from_utf8(&m.name())?;
+            let (offset, size) = m.file_range();
+            let obj_buf = &buf[offset as usize..(offset + size) as usize];
+            log::debug!("Member: {}, {:?}", &name, &m);
+            self.elf_read(name, &obj_buf)?;
+        }
+        Ok(())
+    }
 
     fn elf_read(&mut self, name: &str, buf: &[u8]) -> Result<(), Box<dyn Error>> {
         let block = self.read(name, buf)?;
@@ -803,16 +797,19 @@ impl Reader {
         name: &str,
     ) -> Result<ReadBlock, Box<dyn Error>> {
         let mut block = ReadBlock::new(name);
+        let mut count = 0;
         for symbol in b.dynamic_symbols() {
             let mut s = read_symbol(&b, 0, &symbol)?;
             s.pointer = ResolvePointer::Resolved(0);
             s.source = SymbolSource::Dynamic;
             s.size = 0;
             //eprintln!("s: {:#08x}, {:?}", 0, &s);
+            count += 1;
             if s.kind != SymbolKind::Unknown {
                 block.insert_dynamic(s);
             }
         }
+        eprintln!("{} symbols read from {}", count, name);
         block.libs.insert(name.to_string());
         Ok(block)
     }
@@ -850,27 +847,6 @@ impl Reader {
         for b in self.blocks.into_iter() {
             self.block.add_block(b);
         }
-
-        /*
-        // make sure everything resolves
-        let iter = self
-            .block
-            .rx
-            .section
-            .relocations
-            .iter()
-            .chain(self.block.ro.section.relocations.iter())
-            .chain(self.block.rw.section.relocations.iter())
-            .chain(self.block.bss.relocations.iter());
-
-        for r in iter {
-            if let Some(_symbol) = self.block.lookup(&r.name) {
-                //eprintln!(" R: {:?}", (r, symbol));
-            } else {
-                self.block.unresolved.insert(r.name.clone());
-            }
-        }
-        */
 
         self.block
     }
@@ -1006,80 +982,3 @@ pub fn dump_header<'a>(
     }
     Ok(())
 }
-
-/*
-pub fn from_section<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
-    &mut self,
-    b: &elf::ElfFile<'a, A, B>,
-    section: &elf::ElfSection<'a, 'b, A, B>,
-    ) -> Result<(), Box<dyn Error>> {
-pub fn elf_read2(buf: &[u8]) -> Result<(), Box<dyn Error>> {
-
-    for section in b.sections() {
-        let name = section.name()?;
-        let section_addr = section.address();
-        eprintln!("Section: {}", name);
-        eprintln!("  kind:   {:?}", section.kind());
-        eprintln!("  addr:   {:#0x}", section_addr);
-
-        let mut symbols = vec![];
-        let mut relocations = vec![];
-
-        for (r_offset, r) in section.relocations() {
-            relocations.push(CodeRelocation {
-                name: "".to_string(),
-                name_id: None,
-                offset: r_offset,
-                r: r.into(),
-            });
-        }
-
-        for symbol in b.symbols() {
-            if let Some(index) = symbol.section_index() {
-                if index == section.index() {
-                    if section_addr <= symbol.address() {
-                        let addr = symbol.address() - section_addr;
-                        let name = symbol.name()?;
-                        symbols.push(Symbol::new(section_addr, addr, name));
-                    }
-                }
-            }
-        }
-
-        let buf = section.data()?;
-        if name == ".got" {
-            for (offset, r) in b.dynamic_relocations().unwrap() {
-                relocations.push(CodeRelocation {
-                    name: "".to_string(),
-                    name_id: None,
-                    offset: offset - section_addr,
-                    r: r.into(),
-                });
-            }
-            disassemble_code_with_symbols(buf, &symbols, &relocations);
-        } else if name == ".text" {
-            disassemble_code_with_symbols(buf, &symbols, &relocations);
-        }
-    }
-
-    /*
-    for seg in b.segments() {
-    eprintln!("Segment: {:?}", seg.name()?);
-    eprintln!("  flags: {:?}", seg.flags());
-    eprintln!("  addr:  {:#0x}", seg.address());
-    eprintln!("  size:  {:#0x}", seg.size());
-    eprintln!("  align:  {:#0x}", seg.align());
-    }
-    */
-    //.program_headers()?;
-    //b.raw_header().e_ident;
-    //let obj_file = object::File::parse(buf)?;
-    //obj_file.format()
-    //let mut symbols = HashMap::new();
-    //let mut symbols_by_id = HashMap::new();
-    //let mut segments = vec![];
-    //let mut externs = HashSet::new();
-    //let mut internal = im::HashMap::new();
-    Ok(())
-}
-*/

@@ -284,7 +284,7 @@ fn test_lib_print(version: LinkVersion) {
 
 fn temp_path(filename: &str) -> Box<Path> {
     let mut p = PathBuf::new();
-    p.push("../tmp");
+    p.push("./build/clang-glibc");
     p.push(filename);
     p.into_boxed_path()
 }

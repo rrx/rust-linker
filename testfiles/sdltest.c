@@ -2,8 +2,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main() {
-  fprintf(stderr, "start\n");
+int main(int argc, char **argv) {
+  fprintf("argc: %d\n", argc);
+  if (argc < 2) {
+	  fprintf(stderr, "missing params\n");
+	  exit(1);
+  }
+  char *fname = argv[1];
+
+  fprintf(stderr, "start: %s\n", fname);
 
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
     fprintf(stderr, "SDL_Init Error: %s\n", SDL_GetError());
@@ -26,7 +33,7 @@ int main() {
 		return EXIT_FAILURE;
 	}
 
-	SDL_Surface* bmp = SDL_LoadBMP("link/testfiles/grumpy-cat.bmp");
+	SDL_Surface* bmp = SDL_LoadBMP(fname);
 	if (bmp == NULL) {
     fprintf(stderr, "SDL_LoadBMP Error: %s\n", SDL_GetError());
 		SDL_DestroyRenderer(ren);

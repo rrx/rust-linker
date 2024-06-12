@@ -747,7 +747,11 @@ impl Reader {
         Ok(())
     }
 
-    pub fn add_archive_buf(&mut self, archive_name: &str, buf: &[u8]) -> Result<(), Box<dyn Error>> {
+    pub fn add_archive_buf(
+        &mut self,
+        archive_name: &str,
+        buf: &[u8],
+    ) -> Result<(), Box<dyn Error>> {
         log::debug!("Archive: {}", archive_name);
         let archive = object::read::archive::ArchiveFile::parse(buf)?;
         log::debug!(

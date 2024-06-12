@@ -1,8 +1,16 @@
 CLANG=clang-13
 MUSL=/home/rrx/src/musl-1.2.3/target
-default: gcc
 
-all: read static dynamic
+default:
+
+empty:
+	cargo run -- \
+		-o tmp/out.exe \
+		build/clang-glibc/empty_main.o \
+		/usr/lib/x86_64-linux-gnu/libc.so.6 \
+		/usr/lib/x86_64-linux-gnu/crt1.o
+	exec tmp/out.exe
+
 
 sdl:
 	cargo run -- \
@@ -19,14 +27,6 @@ gcc:
 		build/clang-glibc/print_main.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o 
-	exec tmp/out.exe
-
-empty:
-	cargo run -- \
-		-o tmp/out.exe \
-		build/clang-glibc/empty_main.o \
-		/usr/lib/x86_64-linux-gnu/libc.so.6 \
-		/usr/lib/x86_64-linux-gnu/crt1.o
 	exec tmp/out.exe
 
 musl2:

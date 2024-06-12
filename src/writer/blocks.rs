@@ -705,7 +705,7 @@ impl ElfBlock for SymTabSection {
             println!("static: {:?}", x);
         }
         //for x in data.dynamics.symbols() {
-            //println!("dynamic: {:?}", x);
+        //println!("dynamic: {:?}", x);
         //}
 
         assert_eq!(symbols.len(), self.count);
@@ -1183,7 +1183,7 @@ impl ElfBlock for PltSection {
         let size = (1 + plt_entries_count) * 0x10;
         self.section.bytes.resize(size, 0);
         let align = self.section.offsets.align as usize;
-        
+
         println!("plt align: {}", align);
         let file_offset = w.reserve_start_section(&self.section.offsets);
         w.reserve(self.section.bytes.len(), align);
@@ -1214,7 +1214,7 @@ impl ElfBlock for PltSection {
         let vbase = self.section.offsets.address as isize;
 
         let mut stub = vec![];
-        let mut buf: [u8;16] = [
+        let mut buf: [u8; 16] = [
             // 0x401020: push   0x2fe2(%rip)        # 404008 <_GLOBAL_OFFSET_TABLE_+0x8>
             // got+8 - rip // (0x404000+0x8) - (0x401020 + 0x06)
             0xff, 0x35, 0xe2, 0x2f, 0x00, 0x00,
@@ -1239,18 +1239,18 @@ impl ElfBlock for PltSection {
         */
 
         //unsafe {
-            let got1 = got_addr + 0x8 - (vbase + 0x06);
-            let b = (got1 as i32).to_le_bytes();
-            buf.as_mut_slice()[2..6].copy_from_slice(&b);
+        let got1 = got_addr + 0x8 - (vbase + 0x06);
+        let b = (got1 as i32).to_le_bytes();
+        buf.as_mut_slice()[2..6].copy_from_slice(&b);
 
-            //let patch = (buf.0.as_mut_ptr().offset(2)) as *mut i32;
-            //*patch = got1 as i32;
-            
-            let got2 = got_addr + 0x10 - (vbase + 0x0c);
-            let b = (got2 as i32).to_le_bytes();
-            buf.as_mut_slice()[8..12].copy_from_slice(&b);
-            //let patch = (buf.0.as_mut_ptr().offset(2 + 6)) as *mut i32;
-            //*patch = got2 as i32;
+        //let patch = (buf.0.as_mut_ptr().offset(2)) as *mut i32;
+        //*patch = got1 as i32;
+
+        let got2 = got_addr + 0x10 - (vbase + 0x0c);
+        let b = (got2 as i32).to_le_bytes();
+        buf.as_mut_slice()[8..12].copy_from_slice(&b);
+        //let patch = (buf.0.as_mut_ptr().offset(2 + 6)) as *mut i32;
+        //*patch = got2 as i32;
         //}
         stub.extend(buf);
 
@@ -1282,10 +1282,12 @@ impl ElfBlock for PltSection {
                 let patch = (stub.as_mut_ptr().offset(offset + 2)) as *mut i32;
                 let rip = vbase + offset + 6;
                 let addr = got_addr + (3 + slot_index as isize) * 0x08 - rip;
-                *patch = addr as i32;
+                //*patch = addr as i32;
+                std::ptr::write(patch as *mut i32, addr as i32);
 
                 let patch = (stub.as_mut_ptr().offset(offset + 7)) as *mut i32;
-                *patch = slot_index as i32;
+                //*patch = slot_index as i32;
+                std::ptr::write(patch as *mut i32, slot_index as i32);
 
                 // next instruction
                 let rip = vbase + offset + 0x10;
@@ -1394,7 +1396,8 @@ impl ElfBlock for PltGotSection {
                 let patch = (slot.as_mut_ptr().offset(offset + 2)) as *mut i32;
                 let rip = vbase + offset + 6;
                 let addr = gotplt_addr as isize - rip;
-                *patch = addr as i32;
+                //*patch = addr as i32;
+                std::ptr::write(patch as *mut i32, addr as i32);
             }
             self.section.disassemble_code(data, slot.as_slice());
             w.write(slot.as_slice());

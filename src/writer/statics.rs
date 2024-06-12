@@ -1,8 +1,10 @@
 use super::*;
 use object::write::elf::Sym;
-use object::write::elf::{SectionIndex,
+use object::write::elf::{
+    SectionIndex,
     //SymbolIndex,
-    Writer};
+    Writer,
+};
 use object::write::StringId;
 
 use std::collections::HashMap;
@@ -61,10 +63,9 @@ impl Statics {
     }
 
     pub fn string_get(&self, name: &str) -> Option<StringId> {
-        self.string_hash
-            .get(name).map(|s| s.string_id)
-            //.expect(&format!("String not found: {}", name))
-            //.string_id
+        self.string_hash.get(name).map(|s| s.string_id)
+        //.expect(&format!("String not found: {}", name))
+        //.string_id
     }
 
     pub fn symbol_count(&self) -> usize {

@@ -59,6 +59,24 @@ pub enum ReadSectionKind {
 }
 
 impl ReadSectionKind {
+    pub fn new_section_kind(kind: SectionKind) -> Self {
+        match kind {
+            SectionKind::Text => ReadSectionKind::RX,
+            SectionKind::Data => ReadSectionKind::RW,
+            SectionKind::ReadOnlyData => ReadSectionKind::ROData,
+            SectionKind::ReadOnlyString => ReadSectionKind::ROData,
+            SectionKind::UninitializedData => ReadSectionKind::Bss,
+            SectionKind::Metadata => ReadSectionKind::Other,
+            SectionKind::OtherString => ReadSectionKind::Other,
+            SectionKind::Other => ReadSectionKind::Other,
+            SectionKind::Note => ReadSectionKind::Other,
+            SectionKind::UninitializedTls => ReadSectionKind::Other,
+            SectionKind::Tls => ReadSectionKind::Other,
+            SectionKind::Elf(_) => ReadSectionKind::Other,
+            _ => unimplemented!("{:?}", kind),
+        }
+    }
+
     pub fn block(&self) -> Box<dyn ElfBlock> {
         Box::new(BlockSectionX::new(self.clone()))
     }
@@ -79,26 +97,6 @@ impl ReadSectionKind {
         match self {
             RX | RW | ROData | Bss => data.section_index.get(self.section_name()).cloned(),
             _ => None,
-        }
-    }
-}
-
-impl ReadSectionKind {
-    pub fn new_section_kind(kind: SectionKind) -> Self {
-        match kind {
-            SectionKind::Text => ReadSectionKind::RX,
-            SectionKind::Data => ReadSectionKind::RW,
-            SectionKind::ReadOnlyData => ReadSectionKind::ROData,
-            SectionKind::ReadOnlyString => ReadSectionKind::ROData,
-            SectionKind::UninitializedData => ReadSectionKind::Bss,
-            SectionKind::Metadata => ReadSectionKind::Other,
-            SectionKind::OtherString => ReadSectionKind::Other,
-            SectionKind::Other => ReadSectionKind::Other,
-            SectionKind::Note => ReadSectionKind::Other,
-            SectionKind::UninitializedTls => ReadSectionKind::Other,
-            SectionKind::Tls => ReadSectionKind::Other,
-            SectionKind::Elf(_) => ReadSectionKind::Other,
-            _ => unimplemented!("{:?}", kind),
         }
     }
 
@@ -123,6 +121,7 @@ impl ReadSectionKind {
     }
 }
 
+/*
 #[derive(Debug)]
 pub struct ReadSection {
     kind: ReadSectionKind,
@@ -141,6 +140,7 @@ impl ReadSection {
         }
     }
 }
+*/
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SymbolSource {

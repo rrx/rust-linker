@@ -336,7 +336,6 @@ impl ElfBlock for DynamicSection {
     fn write(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
         let dynamic = data.gen_dynamic();
         w.write_start_section(&self.offsets);
-        //w.write_align_dynamic();
 
         // write out dynamic symbols
         for d in dynamic.iter() {

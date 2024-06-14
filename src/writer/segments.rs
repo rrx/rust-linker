@@ -65,12 +65,13 @@ impl Blocks {
             blocks.push(Box::new(ShStrTabSection::default()));
         }
 
-        Self { blocks, ph: vec![] }
+        let ph = Self::generate_ph(&mut blocks);
+        Self { blocks, ph }
     }
 
     pub fn build(&mut self, data: &mut Data, w: &mut Writer, block: &mut ReadBlock) {
-        // generate the program header
-        data.ph = Self::generate_ph(&mut self.blocks);
+        // copy the program header
+        data.ph = self.ph.clone();
 
         // RESERVE SECTION HEADERS
         // section headers are optional
@@ -82,8 +83,6 @@ impl Blocks {
         Self::reserve_symbols(data, w);
         Self::reserve_export_symbols(data, block, w);
 
-        // RESERVE
-
         // finalize the layout
         self.reserve(data, w);
 
@@ -93,6 +92,7 @@ impl Blocks {
 
         // UPDATE
         data.ph = Self::program_headers(&self.blocks, data);
+        //data.ph = self.ph.clone();
 
         // WRITE
         self.write(data, w);

@@ -91,7 +91,7 @@ impl ElfBlock for GeneralSection {
         self.offsets.alloc
     }
 
-    fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
         self.name_id = Some(w.add_section_name(self.name.as_bytes()));
         let index = w.reserve_section_index();
         self.section_index = Some(index);

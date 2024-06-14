@@ -52,7 +52,7 @@ pub trait ElfBlock {
     fn program_header(&self) -> Vec<ProgramHeaderEntry> {
         vec![]
     }
-    fn reserve_section_index(&mut self, _: &mut Data, _: &mut ReadBlock, _: &mut Writer) {}
+    fn reserve_section_index(&mut self, _: &mut Data, _: &mut Writer) {}
     fn reserve(&mut self, _: &mut Data, _: &mut Writer) {}
     fn write(&self, _: &Data, _: &mut Writer) {}
     fn write_section_header(&self, _: &Data, _: &ReadBlock, _: &mut Writer) {}
@@ -79,7 +79,7 @@ impl ElfBlock for FileHeader {
         self.offsets.alloc
     }
 
-    fn reserve_section_index(&mut self, _data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, _data: &mut Data, w: &mut Writer) {
         let _null_section_index = w.reserve_null_section_index();
     }
 
@@ -244,7 +244,7 @@ impl ElfBlock for InterpSection {
         }]
     }
 
-    fn reserve_section_index(&mut self, _: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, _: &mut Data, w: &mut Writer) {
         self.name_id = Some(w.add_section_name(".interp".as_bytes()));
         let _index = w.reserve_section_index();
     }
@@ -319,7 +319,7 @@ impl ElfBlock for DynamicSection {
         }]
     }
 
-    fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
         let index = w.reserve_dynamic_section_index();
         data.section_dynamic.section_index = Some(index);
         data.section_index_set(".dynamic", index);
@@ -397,7 +397,7 @@ impl ElfBlock for RelaDynSection {
         self.offsets.alloc
     }
 
-    fn reserve_section_index(&mut self, _: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, _: &mut Data, w: &mut Writer) {
         let name = self.kind.rel_section_name();
         self.name_id = Some(w.add_section_name(name.as_bytes()));
         self.offsets.section_index = Some(w.reserve_section_index());
@@ -538,7 +538,7 @@ impl ElfBlock for StrTabSection {
     fn name(&self) -> String {
         return "strtab".to_string();
     }
-    fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
         let index = w.reserve_strtab_section_index();
         self.offsets.section_index = Some(index);
         data.section_index.insert(".strtab".to_string(), index);
@@ -578,7 +578,7 @@ impl ElfBlock for SymTabSection {
         self.offsets.name.clone()
     }
 
-    fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
         let index = w.reserve_symtab_section_index();
         self.offsets.section_index = Some(index);
         data.symtab.section_index = Some(index);
@@ -664,7 +664,7 @@ impl ElfBlock for DynSymSection {
         self.offsets.alloc
     }
 
-    fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
         let index = w.reserve_dynsym_section_index();
         self.offsets.section_index = Some(index);
         data.dynsym.section_index = Some(index);
@@ -725,7 +725,7 @@ impl ElfBlock for DynStrSection {
         self.offsets.alloc
     }
 
-    fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
         let index = w.reserve_dynstr_section_index();
         self.offsets.section_index = Some(index);
         data.dynstr.section_index = Some(index);
@@ -775,7 +775,7 @@ impl ElfBlock for ShStrTabSection {
         self.offsets.alloc
     }
 
-    fn reserve_section_index(&mut self, _data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, _data: &mut Data, w: &mut Writer) {
         let index = w.reserve_shstrtab_section_index();
         self.offsets.section_index = Some(index);
     }
@@ -830,7 +830,7 @@ impl ElfBlock for HashSection {
         self.offsets.alloc
     }
 
-    fn reserve_section_index(&mut self, _data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, _data: &mut Data, w: &mut Writer) {
         self.offsets.section_index = Some(w.reserve_hash_section_index());
     }
 
@@ -902,7 +902,7 @@ impl ElfBlock for GnuHashSection {
         self.offsets.alloc
     }
 
-    fn reserve_section_index(&mut self, _data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, _data: &mut Data, w: &mut Writer) {
         self.offsets.section_index = Some(w.reserve_gnu_hash_section_index());
     }
 
@@ -1017,8 +1017,8 @@ impl ElfBlock for GotSection {
         self.section.alloc()
     }
 
-    fn reserve_section_index(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
-        self.section.reserve_section_index(data, block, w);
+    fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
+        self.section.reserve_section_index(data, w);
     }
 
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
@@ -1087,9 +1087,8 @@ impl ElfBlock for PltSection {
         self.section.alloc()
     }
 
-    fn reserve_section_index(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
-        // TODO: remove use of ReadBlock
-        self.section.reserve_section_index(data, block, w);
+    fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
+        self.section.reserve_section_index(data, w);
     }
 
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
@@ -1221,9 +1220,8 @@ impl ElfBlock for PltGotSection {
         self.section.alloc()
     }
 
-    fn reserve_section_index(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
-        // TODO: remove use of ReadBlock, not used
-        self.section.reserve_section_index(data, block, w);
+    fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
+        self.section.reserve_section_index(data, w);
     }
 
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {

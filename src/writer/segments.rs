@@ -70,12 +70,12 @@ impl Blocks {
 
     pub fn build(&mut self, data: &mut Data, w: &mut Writer, block: &mut ReadBlock) {
         // generate the program header
-        data.ph = self.generate_ph(block);
+        data.ph = self.generate_ph();
 
         // RESERVE SECTION HEADERS
         // section headers are optional
         if data.add_section_headers {
-            self.reserve_section_index(data, block, w);
+            self.reserve_section_index(data, w);
         }
 
         // RESERVE SYMBOLS
@@ -104,7 +104,7 @@ impl Blocks {
     }
 
     /// generate a temporary list of program headers
-    pub fn generate_ph(&mut self, block: &mut ReadBlock) -> Vec<ProgramHeaderEntry> {
+    pub fn generate_ph(&mut self) -> Vec<ProgramHeaderEntry> {
         // build a list of sections that are loaded
         // this is a hack to get tracker to build a correct list of program headers
         // without having to go through the blocks and do reservations
@@ -118,7 +118,7 @@ impl Blocks {
 
         //block.build_strings(&mut data, &mut w);
         for b in self.blocks.iter_mut() {
-            b.reserve_section_index(&mut data, block, &mut w);
+            b.reserve_section_index(&mut data, &mut w);
         }
 
         Self::reserve_symbols(&mut data, &mut w);
@@ -165,14 +165,9 @@ impl Blocks {
         }
     }
 
-    pub fn reserve_section_index(
-        &mut self,
-        data: &mut Data,
-        block: &mut ReadBlock,
-        w: &mut Writer,
-    ) {
+    pub fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
         for b in self.blocks.iter_mut() {
-            b.reserve_section_index(data, block, w);
+            b.reserve_section_index(data, w);
         }
     }
 

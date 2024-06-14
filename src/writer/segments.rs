@@ -402,15 +402,19 @@ impl Segment {
         self.segment_size
     }
 
-    pub fn add_offsets(&mut self, offsets: &mut SectionOffset, size: usize, w: &Writer) {
+    pub fn add_offsets(&mut self, offsets: &mut SectionOffset, _size: usize, w: &Writer) {
+        assert_eq!(_size, offsets.size as usize);
         let aligned = size_align(self.segment_size, offsets.align as usize);
-        self.segment_size = aligned + size;
+        self.segment_size = aligned + offsets.size as usize;
         self.adjusted_file_offset = self.file_offset + aligned as u64;
 
-        assert_eq!(self.adjusted_file_offset as usize + size, w.reserved_len());
+        assert_eq!(
+            self.adjusted_file_offset as usize + offsets.size as usize,
+            w.reserved_len()
+        );
 
         offsets.base = self.base;
-        offsets.size = size as u64;
+        //offsets.size = size as u64;
         offsets.address = self.base + self.adjusted_file_offset;
         offsets.file_offset = self.adjusted_file_offset;
     }

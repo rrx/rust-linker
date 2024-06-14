@@ -1,4 +1,4 @@
-use std::error::Error;
+//use std::error::Error;
 
 use object::elf;
 use object::write::elf::Sym;
@@ -227,6 +227,8 @@ pub struct Data {
 
     add_section_headers: bool,
     add_symbols: bool,
+
+    pub(crate) exports: SymbolMap,
 }
 
 impl Data {
@@ -266,6 +268,8 @@ impl Data {
             // Tables
             dynamics: Dynamics::new(),
             statics: Statics::new(),
+
+            exports: SymbolMap::new(),
         }
     }
 

@@ -279,7 +279,9 @@ impl ReadBlock {
     }
 
     pub fn data(self) -> crate::Data {
-        crate::Data::new(self.libs.iter().cloned().collect())
+        let mut data = crate::Data::new(self.libs.iter().cloned().collect());
+        data.exports = self.exports.clone();
+        data
     }
 
     pub fn update_data(&self, data: &mut Data) {
@@ -420,7 +422,7 @@ impl ReadBlock {
     }
 
     pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
-        mut self,
+        self,
         data: &mut Data,
         path: &Path,
     ) -> Result<(), Box<dyn Error>> {
@@ -429,7 +431,7 @@ impl ReadBlock {
         let mut writer = object::write::elf::Writer::new(endian, data.is_64(), &mut out_data);
         self.build_strings(data, &mut writer);
         let mut blocks = Blocks::new(data, &self, &mut writer);
-        blocks.build(data, &mut writer, &mut self);
+        blocks.build(data, &mut writer);
         let size = out_data.len();
         std::fs::write(path, out_data)?;
         eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());
@@ -717,7 +719,7 @@ impl ReadBlock {
 }
 
 pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
-    mut block: ReadBlock,
+    block: ReadBlock,
     data: &mut Data,
     path: &Path,
 ) -> Result<(), Box<dyn Error>> {
@@ -726,7 +728,7 @@ pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
     let mut writer = object::write::elf::Writer::new(endian, data.is_64(), &mut out_data);
     block.build_strings(data, &mut writer);
     let mut blocks = Blocks::new(data, &block, &mut writer);
-    blocks.build(data, &mut writer, &mut block);
+    blocks.build(data, &mut writer);
     let size = out_data.len();
     std::fs::write(path, out_data)?;
     eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());

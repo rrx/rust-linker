@@ -4,6 +4,10 @@ pub struct Blocks {
     pub blocks: Vec<Box<dyn ElfBlock>>,
     pub ph: Vec<ProgramHeaderEntry>,
     pub(crate) exports: SymbolMap,
+    pub ro: GeneralSection,
+    pub rw: GeneralSection,
+    pub rx: GeneralSection,
+    pub bss: GeneralSection,
 }
 
 impl Blocks {
@@ -71,10 +75,14 @@ impl Blocks {
             blocks,
             ph,
             exports: block.exports.clone(), //SymbolMap::new(),
+            ro: GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
+            rw: GeneralSection::new(AllocSegment::RW, ".data", 0x10),
+            rx: GeneralSection::new(AllocSegment::RX, ".text", 0x10),
+            bss: GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
         }
     }
 
-    pub fn build(&mut self, data: &mut Data, w: &mut Writer, block: &mut ReadBlock) {
+    pub fn build(&mut self, data: &mut Data, w: &mut Writer) {
         // copy the program header
         data.ph = self.ph.clone();
 
@@ -170,7 +178,6 @@ impl Blocks {
         }
 
         Self::reserve_symbols(&mut data, &mut w);
-        //Self::reserve_export_symbols(&mut data, block, &mut w);
 
         for b in blocks.iter_mut() {
             b.reserve(&mut data, &mut w);

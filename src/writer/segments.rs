@@ -75,7 +75,8 @@ impl Blocks {
         }
 
         // RESERVE SYMBOLS
-        Self::reserve_symbols(data, block, w);
+        Self::reserve_symbols(data, w);
+        Self::reserve_export_symbols(data, block, w);
 
         // RESERVE
 
@@ -116,7 +117,8 @@ impl Blocks {
             b.reserve_section_index(&mut data, block, &mut w);
         }
 
-        Self::reserve_symbols(&mut data, block, &mut w);
+        Self::reserve_symbols(&mut data, &mut w);
+        Self::reserve_export_symbols(&mut data, block, &mut w);
 
         for b in self.blocks.iter_mut() {
             b.reserve(&mut data, block, &mut w);
@@ -186,7 +188,15 @@ impl Blocks {
         ph
     }
 
-    fn reserve_symbols(data: &mut Data, block: &ReadBlock, w: &mut Writer) {
+    fn reserve_export_symbols(data: &mut Data, block: &ReadBlock, w: &mut Writer) {
+        // reserve exports
+        for (_, symbol) in block.exports.iter() {
+            let section_index = symbol.section.section_index(data);
+            data.statics.symbol_add(symbol, section_index, w);
+        }
+    }
+
+    fn reserve_symbols(data: &mut Data, w: &mut Writer) {
         let syms = vec![
             (
                 "data_start",
@@ -233,11 +243,6 @@ impl Blocks {
             symbol.kind = kind;
             let section_index = data.section_index_get(section_name);
             data.statics.symbol_add(&symbol, Some(section_index), w);
-        }
-
-        for (_, symbol) in block.exports.iter() {
-            let section_index = symbol.section.section_index(data);
-            data.statics.symbol_add(symbol, section_index, w);
         }
     }
 }

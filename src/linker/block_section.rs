@@ -26,7 +26,7 @@ pub trait BlockSection {
     //fn write_section_header(&self, w: &mut Writer);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GeneralSection {
     state: BlockSectionState,
     pub(crate) name: &'static str,
@@ -111,7 +111,7 @@ impl ElfBlock for GeneralSection {
         self.state = BlockSectionState::Located;
     }
 
-    fn write(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write(&self, data: &Data, w: &mut Writer) {
         w.write_start_section(&self.offsets);
         self.apply_relocations(data);
 

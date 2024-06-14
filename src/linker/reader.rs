@@ -77,9 +77,18 @@ impl ReadSectionKind {
         }
     }
 
+    /*
     pub fn block(&self) -> Box<dyn ElfBlock> {
-        Box::new(BlockSectionX::new(*self))
+        let block = match self {
+            Self::RX => GeneralSection::new(AllocSegment::RX, ".text", 0x10),
+            Self::ROData => GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
+            Self::RW => GeneralSection::new(AllocSegment::RW, ".data", 0x10),
+            Self::Bss => GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
+            _ => unreachable!(),
+        };
+        Box::new(block)
     }
+    */
 
     pub fn alloc(&self) -> Option<AllocSegment> {
         match self {
@@ -419,7 +428,7 @@ impl ReadBlock {
         let endian = object::Endianness::Little;
         let mut writer = object::write::elf::Writer::new(endian, data.is_64(), &mut out_data);
         self.build_strings(data, &mut writer);
-        let mut blocks = Blocks::new(data, &mut writer);
+        let mut blocks = Blocks::new(data, &self, &mut writer);
         blocks.build(data, &mut writer, &mut self);
         let size = out_data.len();
         std::fs::write(path, out_data)?;
@@ -716,7 +725,7 @@ pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
     let endian = object::Endianness::Little;
     let mut writer = object::write::elf::Writer::new(endian, data.is_64(), &mut out_data);
     block.build_strings(data, &mut writer);
-    let mut blocks = Blocks::new(data, &mut writer);
+    let mut blocks = Blocks::new(data, &block, &mut writer);
     blocks.build(data, &mut writer, &mut block);
     let size = out_data.len();
     std::fs::write(path, out_data)?;

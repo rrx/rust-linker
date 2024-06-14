@@ -102,13 +102,11 @@ impl ElfBlock for GeneralSection {
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve(self.bytes.len(), 1);
         let after = w.reserved_len();
+        let size = after - file_offset;
+        self.offsets.size = size as u64;
 
-        data.segments.add_offsets(
-            self.offsets.alloc,
-            &mut self.offsets,
-            after - file_offset,
-            w,
-        );
+        data.segments
+            .add_offsets(self.offsets.alloc, &mut self.offsets, size, w);
         data.addr_set(&self.name, self.offsets.address);
         self.state = BlockSectionState::Located;
     }

@@ -659,8 +659,10 @@ impl ElfBlock for DynSymSection {
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve_dynsym();
         let after = w.reserved_len();
+        let size = after - file_offset;
+        self.offsets.size = size as u64;
         data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, after - file_offset, w);
+            .add_offsets(self.alloc(), &mut self.offsets, size, w);
         data.dynsym.addr = Some(self.offsets.address);
         data.dynsym.size = Some(self.offsets.size as usize);
     }
@@ -880,12 +882,14 @@ impl ElfBlock for GnuHashSection {
     }
 
     fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
-        let file_offset = w.reserve_start_section(&self.offsets);
+        self.offsets.file_offset = w.reserve_start_section(&self.offsets) as u64;
         w.reserve_gnu_hash(self.bloom_count, self.bucket_count, self.chain_count);
 
         let after = w.reserved_len();
+        let size = after - self.offsets.file_offset as usize;
+        self.offsets.size = size as u64;
         data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, after - file_offset, w);
+            .add_offsets(self.alloc(), &mut self.offsets, size, w);
     }
 
     fn write(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {

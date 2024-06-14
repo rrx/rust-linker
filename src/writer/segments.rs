@@ -293,13 +293,14 @@ impl SegmentTracker {
         &mut self,
         alloc: AllocSegment,
         offsets: &mut SectionOffset,
-        size: usize,
+        _size: usize,
         w: &Writer,
     ) {
         let current_size;
         let current_file_offset;
         let current_alloc;
         let mut base;
+        assert_eq!(_size, offsets.size as usize);
 
         // get current segment, or defaults
         if let Some(c) = self.segments.last() {
@@ -336,7 +337,7 @@ impl SegmentTracker {
                 file_offset,
                 current_file_offset,
                 current_size,
-                size,
+                offsets.size,
                 offsets.align,
                 base,
             );
@@ -352,7 +353,8 @@ impl SegmentTracker {
             assert!(file_offset >= (current_file_offset + current_size));
         }
 
-        self.current_mut().add_offsets(offsets, size, w);
+        self.current_mut()
+            .add_offsets(offsets, offsets.size as usize, w);
     }
 
     pub fn program_headers(&self) -> Vec<ProgramHeaderEntry> {

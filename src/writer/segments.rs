@@ -64,7 +64,7 @@ impl Blocks {
     }
 
     pub fn build(&mut self, data: &mut Data, w: &mut Writer, block: &mut ReadBlock) {
-        //let mut tracker = SegmentTracker::new(data.base as u64);
+        // generate the program header
         data.ph = self.generate_ph(block);
 
         // RESERVE SECTION HEADERS
@@ -74,9 +74,6 @@ impl Blocks {
         }
 
         // RESERVE SYMBOLS
-        //for b in self.blocks.iter_mut() {
-        //b.reserve_symbols(data, block, w);
-        //}
         Self::reserve_symbols(data, block, w);
 
         // RESERVE
@@ -90,7 +87,6 @@ impl Blocks {
 
         // UPDATE
         data.ph = self.program_headers(data, block);
-        //self.update(data);
 
         // WRITE
         self.write(data, block, w);
@@ -113,27 +109,21 @@ impl Blocks {
         let mut out_data = Vec::new();
         let endian = Endianness::Little;
         let mut w = object::write::elf::Writer::new(endian, data.is_64, &mut out_data);
-        //temp_w.add_string("asdf".as_bytes());
-        //temp_w.add_dynamic_string("asdf".as_bytes());
 
         block.build_strings(&mut data, &mut w);
         for b in self.blocks.iter_mut() {
             b.reserve_section_index(&mut data, block, &mut w);
         }
 
-        //for b in self.blocks.iter_mut() {
         Self::reserve_symbols(&mut data, block, &mut w);
-        //}
 
         for b in self.blocks.iter_mut() {
-            //eprintln!("reserve: {}", b.name());
             b.reserve(&mut data, block, &mut w);
         }
         // get a list of program headers
         // we really only need to know the number of headers, so we can correctly
         // set the values in the file header
         self.program_headers(&mut data, block)
-        //data.segments.ph
     }
 
     pub fn reserve(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
@@ -179,14 +169,6 @@ impl Blocks {
         }
     }
 
-    /*
-    pub fn update(&mut self, data: &mut Data) {
-        for b in self.blocks.iter_mut() {
-            b.update(data);
-        }
-    }
-    */
-
     pub fn write_section_headers(&self, data: &Data, block: &ReadBlock, w: &mut Writer) {
         for b in self.blocks.iter() {
             b.write_section_header(&data, block, w);
@@ -201,22 +183,8 @@ impl Blocks {
         ph.extend(data.segments.program_headers());
 
         ph
-        /*
-        // hack to get dynamic to be the last program header
-        // may not be necessary
-        ph.iter()
-            .filter(|p| p.p_type != elf::PT_DYNAMIC)
-            .cloned()
-            .chain(ph.iter().filter(|p| p.p_type == elf::PT_DYNAMIC).cloned())
-            .collect()
-            */
     }
 
-    //pub fn generate_program_headers(&self, data: &mut Data, block: &ReadBlock) {
-    //let ph = self.program_headers(data, block);
-    //data.ph = ph;
-    //}
-    //
     fn reserve_symbols(data: &mut Data, block: &ReadBlock, w: &mut Writer) {
         let syms = vec![
             (
@@ -301,7 +269,6 @@ pub struct SegmentTracker {
     // track the current segment base
     start_base: u64,
     page_size: usize,
-    //pub ph: Vec<ProgramHeaderEntry>,
 }
 
 impl SegmentTracker {
@@ -310,7 +277,6 @@ impl SegmentTracker {
             segments: vec![],
             start_base,
             page_size: 0x1000,
-            //ph: vec![],
         }
     }
 

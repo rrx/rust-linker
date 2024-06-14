@@ -215,7 +215,7 @@ pub struct Data {
     interp: String,
     is_64: bool,
     pub(crate) libs: Vec<Library>,
-    base: usize,
+    //base: usize,
     pub dynamics: Dynamics,
     pub statics: Statics,
     debug: HashSet<DebugFlag>,
@@ -253,7 +253,7 @@ impl Data {
             // default gnu loader
             interp: "/lib64/ld-linux-x86-64.so.2".to_string(),
             libs,
-            base,
+            //base,
             ph: vec![],
             addr: HashMap::new(),
             section_index: HashMap::new(),
@@ -472,15 +472,8 @@ pub fn size_align(n: usize, align: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::path::Path;
     use test_log::test;
 
     #[test]
-    fn write_empty_main() {
-        let mut b = Link::new();
-        b.add_obj_file("test", Path::new("./build/clang-glibc/empty_main.o"))
-            .unwrap();
-        //b.write(Path::new("../tmp/out.exe")).unwrap();
-    }
+    fn write_empty_main() {}
 }

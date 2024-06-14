@@ -99,7 +99,6 @@ impl ElfBlock for FileHeader {
     }
 
     fn write(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
-        //let mut e_entry = 0;
         let start = data.pointer_get("_start");
         let e_entry = start;
 
@@ -115,12 +114,13 @@ impl ElfBlock for FileHeader {
     }
 
     fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+        // null section header must be the first written
         w.write_null_section_header();
     }
 }
 
 pub struct ProgramHeader {
-    size: usize,
+    //size: usize,
     //base: usize,
     offsets: SectionOffset,
     ph_count: usize,
@@ -129,7 +129,7 @@ pub struct ProgramHeader {
 impl Default for ProgramHeader {
     fn default() -> Self {
         Self {
-            size: 0,
+            //size: 0,
             ph_count: 0,
             //base: 0,
             offsets: SectionOffset::new("ph".into(), AllocSegment::RO, 0x01),
@@ -155,8 +155,8 @@ impl ElfBlock for ProgramHeader {
                 p_offset: self.offsets.file_offset,
                 p_vaddr: self.offsets.address,
                 p_paddr: self.offsets.address,
-                p_filesz: self.size as u64,
-                p_memsz: self.size as u64,
+                p_filesz: self.offsets.size as u64,
+                p_memsz: self.offsets.size as u64,
                 p_align: 8,
             },
         ]
@@ -167,18 +167,17 @@ impl ElfBlock for ProgramHeader {
         let before = w.reserved_len();
         w.reserve_program_headers(self.ph_count as u32);
         let after = w.reserved_len();
-        self.size = after - before;
+        self.offsets.size = (after - before) as u64;
 
         let alloc = self.alloc();
-        data.segments
-            .add_offsets(alloc, &mut self.offsets, self.size, w);
+        let size = self.offsets.size as usize;
+        data.segments.add_offsets(alloc, &mut self.offsets, size, w);
     }
 
     fn write(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
         w.write_align_program_headers();
 
         for ph in data.ph.iter() {
-            //eprintln!("ph: {:?}", ph);
             w.write_program_header(&object::write::elf::ProgramHeader {
                 p_type: ph.p_type,
                 p_flags: ph.p_flags,
@@ -1173,6 +1172,7 @@ impl ElfBlock for PltSection {
     }
 
     fn reserve_section_index(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
+        // TODO: remove use of ReadBlock
         self.section.reserve_section_index(data, block, w);
     }
 
@@ -1275,23 +1275,8 @@ impl ElfBlock for PltSection {
     }
 
     fn write_section_header(&self, data: &Data, block: &ReadBlock, w: &mut Writer) {
+        // TODO: remove use of ReadBlock
         self.section.write_section_header(data, block, w);
-        /*
-        let sh_flags = self.alloc().section_header_flags() as u64;
-        let sh_addralign = self.section.offsets.align;
-        w.write_section_header(&object::write::elf::SectionHeader {
-            name: self.name_id,
-            sh_type: elf::SHT_PROGBITS,
-            sh_flags,
-            sh_addr: self.offsets.address,
-            sh_offset: self.offsets.file_offset,
-            sh_info: 0,
-            sh_link: 0,
-            sh_entsize: 0,
-            sh_addralign,
-            sh_size: self.offsets.size,
-        });
-        */
     }
 }
 
@@ -1319,6 +1304,7 @@ impl ElfBlock for PltGotSection {
     }
 
     fn reserve_section_index(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
+        // TODO: remove use of ReadBlock, not used
         self.section.reserve_section_index(data, block, w);
     }
 
@@ -1376,6 +1362,7 @@ impl ElfBlock for PltGotSection {
     }
 
     fn write_section_header(&self, data: &Data, block: &ReadBlock, w: &mut Writer) {
+        // TODO: remove use of ReadBlock, not used
         self.section.write_section_header(data, block, w);
     }
 }

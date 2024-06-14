@@ -36,9 +36,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let block = reader.build();
     block.dump();
 
-    //let mut libs: Vec<String> = block.libs.iter().cloned().collect();
-    //libs.push("/usr/lib/x86_64-linux-gnu/libc.so.6".to_string());
-
     let mut data = link::Data::new(block.libs.iter().cloned().collect());
     if let Some(interp) = args.interp {
         data = data.interp(interp);

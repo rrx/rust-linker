@@ -278,7 +278,7 @@ impl ReadBlock {
         }
     }
 
-    pub fn data(self) -> crate::Data {
+    pub fn data(&self) -> crate::Data {
         let mut data = crate::Data::new(self.libs.iter().cloned().collect());
         data.exports = self.exports.clone();
         data.ro = self.ro.clone();
@@ -425,32 +425,18 @@ impl ReadBlock {
         }
     }
 
-    pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
-        self,
-        data: &mut Data,
-        path: &Path,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut out_data = Vec::new();
-        let endian = object::Endianness::Little;
-        let mut writer = object::write::elf::Writer::new(endian, data.is_64(), &mut out_data);
-        self.build_strings(data, &mut writer);
-        let mut blocks = Blocks::new(data, &self, &mut writer);
-        blocks.build(data, &mut writer);
-        let size = out_data.len();
-        std::fs::write(path, out_data)?;
-        eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());
-        Ok(())
-    }
-
     pub fn insert_local(&mut self, s: ReadSymbol) {
         self.locals.insert(s.name.clone(), s);
     }
+
     pub fn insert_export(&mut self, s: ReadSymbol) {
         self.exports.insert(s.name.clone(), s);
     }
+
     pub fn insert_dynamic(&mut self, s: ReadSymbol) {
         self.dynamic.insert(s.name.clone(), s);
     }
+
     pub fn insert_unknown(&mut self, s: ReadSymbol) {
         self.unknown.insert(s.name.clone(), s);
     }
@@ -731,7 +717,7 @@ pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
     let endian = object::Endianness::Little;
     let mut writer = object::write::elf::Writer::new(endian, data.is_64(), &mut out_data);
     block.build_strings(data, &mut writer);
-    let mut blocks = Blocks::new(data, &block, &mut writer);
+    let mut blocks = Blocks::new(data, &mut writer);
     blocks.build(data, &mut writer);
     let size = out_data.len();
     std::fs::write(path, out_data)?;

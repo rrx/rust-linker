@@ -36,9 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let block = reader.build();
     block.dump();
 
-    //let mut data = block.data();
-    let mut data = link::Data::new(block.libs.iter().cloned().collect());
-    data.exports = block.exports.clone();
+    let mut data = block.data();
     if let Some(interp) = args.interp {
         data = data.interp(interp);
     }
@@ -49,6 +47,5 @@ fn main() -> Result<(), Box<dyn Error>> {
         &mut data,
         Path::new(&output),
     )?;
-    //block.write::<object::elf::FileHeader64<object::Endianness>>(&mut data, Path::new(&output))?;
     Ok(())
 }

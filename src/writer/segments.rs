@@ -6,7 +6,7 @@ pub struct Blocks {
 }
 
 impl Blocks {
-    pub fn new(data: &Data, block: &ReadBlock, w: &mut Writer) -> Self {
+    pub fn new(data: &Data, w: &mut Writer) -> Self {
         let mut blocks: Vec<Box<dyn ElfBlock>> = vec![];
 
         blocks.push(Box::new(FileHeader::default()));
@@ -33,13 +33,13 @@ impl Blocks {
 
         //blocks.push(Box::new(BlockSectionP::new(ReadSectionKind::ROData, block)));
         //blocks.push(ReadSectionKind::ROData.block());
-        blocks.push(Box::new(block.ro.clone()));
+        blocks.push(Box::new(data.ro.clone()));
         //blocks.push(ReadSectionKind::RX.block());
-        blocks.push(Box::new(block.rx.clone()));
+        blocks.push(Box::new(data.rx.clone()));
         blocks.push(Box::new(PltSection::new(".plt")));
         blocks.push(Box::new(PltGotSection::new(".plt.got")));
         //blocks.push(ReadSectionKind::RW.block());
-        blocks.push(Box::new(block.rw.clone()));
+        blocks.push(Box::new(data.rw.clone()));
 
         if data.is_dynamic() {
             blocks.push(Box::new(DynamicSection::default()));
@@ -49,7 +49,7 @@ impl Blocks {
 
         // bss is the last alloc block
         //blocks.push(ReadSectionKind::Bss.block());
-        blocks.push(Box::new(block.bss.clone()));
+        blocks.push(Box::new(data.bss.clone()));
 
         if data.add_symbols {
             blocks.push(Box::new(SymTabSection::default()));

@@ -26,8 +26,8 @@ pub struct Reader {
     // link block
     block: ReadBlock,
 
-    got: HashSet<String>,
-    plt: HashSet<String>,
+    //got: HashSet<String>,
+    //plt: HashSet<String>,
     debug: HashSet<DebugFlag>,
 }
 
@@ -36,8 +36,8 @@ impl Reader {
         Self {
             blocks: vec![],
             block: ReadBlock::new("exe"),
-            got: HashSet::new(),
-            plt: HashSet::new(),
+            //got: HashSet::new(),
+            //plt: HashSet::new(),
             debug: HashSet::new(),
         }
     }
@@ -121,27 +121,6 @@ impl ReadSectionKind {
     }
 }
 
-/*
-#[derive(Debug)]
-pub struct ReadSection {
-    kind: ReadSectionKind,
-    relocations: Vec<LinkRelocation>,
-    bytes: Vec<u8>,
-    bss: usize,
-}
-
-impl ReadSection {
-    pub fn new(kind: ReadSectionKind) -> Self {
-        Self {
-            kind,
-            relocations: vec![],
-            bytes: vec![],
-            bss: 0,
-        }
-    }
-}
-*/
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum SymbolSource {
     Dynamic,
@@ -177,8 +156,8 @@ pub enum SymbolLookupTable {
 #[derive(Debug, Clone)]
 pub struct ReadSymbol {
     pub(crate) name: String,
-    pub(crate) name_id: Option<StringId>,
-    pub(crate) dyn_name_id: Option<StringId>,
+    //pub(crate) name_id: Option<StringId>,
+    //pub(crate) dyn_name_id: Option<StringId>,
     pub(crate) section: ReadSectionKind,
     pub(crate) source: SymbolSource,
     pub(crate) kind: SymbolKind,
@@ -192,8 +171,8 @@ impl ReadSymbol {
     pub fn from_pointer(name: String, pointer: ResolvePointer) -> Self {
         ReadSymbol {
             name,
-            name_id: None,
-            dyn_name_id: None,
+            //name_id: None,
+            //dyn_name_id: None,
             section: ReadSectionKind::Undefined,
             source: SymbolSource::Static,
             kind: SymbolKind::Unknown,
@@ -943,8 +922,8 @@ pub fn read_symbol<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
 
     Ok(ReadSymbol {
         name,
-        name_id: None,
-        dyn_name_id: None,
+        //name_id: None,
+        //dyn_name_id: None,
         section: section_kind,
         kind: symbol.kind(),
         bind,

@@ -273,15 +273,37 @@ impl ReadBlock {
         crate::Data::new(self.libs.iter().cloned().collect())
     }
 
-    pub fn build_strings(&self, data: &mut Data, w: &mut Writer) {
-        // add libraries if they are configured
-        for lib in data.libs.iter_mut() {
-            unsafe {
-                let buf = extend_lifetime(lib.name.as_bytes());
-                lib.string_id = Some(w.add_dynamic_string(buf));
+    pub fn update_data(&self, data: &mut Data) {
+        for (name, _, pointer) in data.dynamics.symbols() {
+            data.pointers.insert(name, pointer);
+        }
+
+        //eprintln!("plt: {:?}", data.dynamics.plt_hash);
+        //eprintln!("pltgot: {:?}", data.dynamics.pltgot_hash);
+
+        for (name, symbol) in self.locals.iter() {
+            match symbol.section {
+                ReadSectionKind::RX
+                //| ReadSectionKind::ROStrings
+                | ReadSectionKind::ROData
+                | ReadSectionKind::RW
+                | ReadSectionKind::Bss => {
+                    data.pointers
+                        .insert(name.to_string(), symbol.pointer.clone());
+                }
+                _ => (),
             }
         }
 
+        // Add static symbols to data
+        let locals = vec!["_DYNAMIC"];
+        for symbol_name in locals {
+            let s = self.lookup_static(symbol_name).unwrap();
+            data.pointers.insert(s.name, s.pointer);
+        }
+    }
+
+    pub fn update_relocations(&self, data: &mut Data, w: &mut Writer) {
         let iter = self
             .ro
             .relocations()
@@ -366,34 +388,18 @@ impl ReadBlock {
                 unreachable!("Unable to find symbol for relocation: {}", &r.name)
             }
         }
-
-        for (name, _, pointer) in data.dynamics.symbols() {
-            data.pointers.insert(name, pointer);
-        }
-
-        //eprintln!("plt: {:?}", data.dynamics.plt_hash);
-        //eprintln!("pltgot: {:?}", data.dynamics.pltgot_hash);
-
-        for (name, symbol) in self.locals.iter() {
-            match symbol.section {
-                ReadSectionKind::RX
-                //| ReadSectionKind::ROStrings
-                | ReadSectionKind::ROData
-                | ReadSectionKind::RW
-                | ReadSectionKind::Bss => {
-                    data.pointers
-                        .insert(name.to_string(), symbol.pointer.clone());
-                }
-                _ => (),
+    }
+    pub fn build_strings(&self, data: &mut Data, w: &mut Writer) {
+        // add libraries if they are configured
+        for lib in data.libs.iter_mut() {
+            unsafe {
+                let buf = extend_lifetime(lib.name.as_bytes());
+                lib.string_id = Some(w.add_dynamic_string(buf));
             }
         }
 
-        // Add static symbols to data
-        let locals = vec!["_DYNAMIC"];
-        for symbol_name in locals {
-            let s = self.lookup_static(symbol_name).unwrap();
-            data.pointers.insert(s.name, s.pointer);
-        }
+        self.update_relocations(data, w);
+        self.update_data(data);
 
         for (name, symbol) in self.exports.iter() {
             // allocate string for the symbol table

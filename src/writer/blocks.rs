@@ -93,7 +93,11 @@ impl ElfBlock for FileHeader {
         let size = w.reserved_len();
         self.offsets.size = size as u64;
         let alloc = self.alloc();
-        data.segments.add_offsets(alloc, &mut self.offsets, w);
+        data.segments.add_offsets(alloc, &mut self.offsets); //, w);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
+            w.reserved_len()
+        );
     }
 
     fn write(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
@@ -168,7 +172,11 @@ impl ElfBlock for ProgramHeader {
         let alloc = self.alloc();
         let size = self.offsets.size as usize;
         self.offsets.size = size as u64;
-        data.segments.add_offsets(alloc, &mut self.offsets, w);
+        data.segments.add_offsets(alloc, &mut self.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
+            w.reserved_len()
+        );
     }
 
     fn write(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
@@ -246,8 +254,11 @@ impl ElfBlock for InterpSection {
         let size = self.as_slice().len();
         self.offsets.size = size as u64;
         w.reserve(size, 1); //self.offsets.align as usize);
-        data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, w);
+        data.segments.add_offsets(self.alloc(), &mut self.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
+            w.reserved_len()
+        );
     }
 
     fn write(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
@@ -323,8 +334,11 @@ impl ElfBlock for DynamicSection {
         let size = after - file_offset;
         self.offsets.size = size as u64;
 
-        data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, w);
+        data.segments.add_offsets(self.alloc(), &mut self.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
+            w.reserved_len()
+        );
         data.section_dynamic.addr = Some(self.offsets.address);
         data.pointers.insert(
             ".dynamic".to_string(),
@@ -400,8 +414,11 @@ impl ElfBlock for RelaDynSection {
         let size = after - file_offset;
         self.offsets.size = size as u64;
 
-        data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, w);
+        data.segments.add_offsets(self.alloc(), &mut self.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
+            w.reserved_len()
+        );
         match self.kind {
             GotSectionKind::GOT => {
                 data.addr_set(".rela.dyn", self.offsets.address);
@@ -660,8 +677,11 @@ impl ElfBlock for DynSymSection {
         let after = w.reserved_len();
         let size = after - file_offset;
         self.offsets.size = size as u64;
-        data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, w);
+        data.segments.add_offsets(self.alloc(), &mut self.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
+            w.reserved_len()
+        );
         data.dynsym.addr = Some(self.offsets.address);
         data.dynsym.size = Some(self.offsets.size as usize);
     }
@@ -717,8 +737,11 @@ impl ElfBlock for DynStrSection {
         let after = w.reserved_len();
         let size = after - file_offset;
         self.offsets.size = size as u64;
-        data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, w);
+        data.segments.add_offsets(self.alloc(), &mut self.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
+            w.reserved_len()
+        );
         data.dynstr.addr = Some(self.offsets.address);
         data.dynstr.size = Some(self.offsets.size as usize);
     }
@@ -819,8 +842,11 @@ impl ElfBlock for HashSection {
         let after = w.reserved_len();
         let size = after - file_offset;
         self.offsets.size = size as u64;
-        data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, w);
+        data.segments.add_offsets(self.alloc(), &mut self.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
+            w.reserved_len()
+        );
         data.hash.addr = Some(self.offsets.address);
     }
 
@@ -887,8 +913,11 @@ impl ElfBlock for GnuHashSection {
         let after = w.reserved_len();
         let size = after - self.offsets.file_offset as usize;
         self.offsets.size = size as u64;
-        data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, w);
+        data.segments.add_offsets(self.alloc(), &mut self.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
+            w.reserved_len()
+        );
     }
 
     fn write(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
@@ -1005,7 +1034,12 @@ impl ElfBlock for GotSection {
         let after = w.reserved_len();
         assert_eq!(after - file_offset, size);
         data.segments
-            .add_offsets(self.alloc(), &mut self.section.offsets, w);
+            .add_offsets(self.alloc(), &mut self.section.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize
+                + self.section.offsets.size as usize,
+            w.reserved_len()
+        );
         // update section pointers
         data.addr_set(name, self.section.offsets.address);
     }
@@ -1073,7 +1107,12 @@ impl ElfBlock for PltSection {
         let after = w.reserved_len();
         assert_eq!(size, after - file_offset);
         data.segments
-            .add_offsets(self.alloc(), &mut self.section.offsets, w);
+            .add_offsets(self.alloc(), &mut self.section.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize
+                + self.section.offsets.size as usize,
+            w.reserved_len()
+        );
 
         // update section pointers
         data.addr.insert(
@@ -1198,7 +1237,12 @@ impl ElfBlock for PltGotSection {
         assert_eq!(size, after - file_offset);
 
         data.segments
-            .add_offsets(self.alloc(), &mut self.section.offsets, w);
+            .add_offsets(self.alloc(), &mut self.section.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize
+                + self.section.offsets.size as usize,
+            w.reserved_len()
+        );
 
         // update section pointers
         let address = self.section.offsets.address;

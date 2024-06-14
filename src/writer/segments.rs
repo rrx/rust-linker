@@ -289,7 +289,8 @@ impl SegmentTracker {
     }
 
     // add non-section data
-    pub fn add_offsets(&mut self, alloc: AllocSegment, offsets: &mut SectionOffset, w: &Writer) {
+    pub fn add_offsets(&mut self, alloc: AllocSegment, offsets: &mut SectionOffset) {
+        //, w: &Writer) {
         let current_size;
         let current_file_offset;
         let current_alloc;
@@ -347,7 +348,11 @@ impl SegmentTracker {
             assert!(file_offset >= (current_file_offset + current_size));
         }
 
-        self.current_mut().add_offsets(offsets, w);
+        self.current_mut().add_offsets(offsets);
+        //assert_eq!(
+        //self.current().adjusted_file_offset as usize + offsets.size as usize,
+        //w.reserved_len()
+        //);
     }
 
     pub fn program_headers(&self) -> Vec<ProgramHeaderEntry> {
@@ -401,15 +406,16 @@ impl Segment {
         self.segment_size
     }
 
-    pub fn add_offsets(&mut self, offsets: &mut SectionOffset, w: &Writer) {
+    pub fn add_offsets(&mut self, offsets: &mut SectionOffset) {
+        //, w: &Writer) {
         let aligned = size_align(self.segment_size, offsets.align as usize);
         self.segment_size = aligned + offsets.size as usize;
         self.adjusted_file_offset = self.file_offset + aligned as u64;
 
-        assert_eq!(
-            self.adjusted_file_offset as usize + offsets.size as usize,
-            w.reserved_len()
-        );
+        //assert_eq!(
+        //self.adjusted_file_offset as usize + offsets.size as usize,
+        //w.reserved_len()
+        //);
 
         offsets.base = self.base;
         offsets.address = self.base + self.adjusted_file_offset;

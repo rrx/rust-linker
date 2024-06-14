@@ -55,7 +55,7 @@ pub trait ElfBlock {
     fn reserve_section_index(&mut self, _: &mut Data, _: &mut Writer) {}
     fn reserve(&mut self, _: &mut Data, _: &mut Writer) {}
     fn write(&self, _: &Data, _: &mut Writer) {}
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, _: &mut Writer) {}
+    fn write_section_header(&self, _: &Data, _: &mut Writer) {}
 }
 
 pub struct FileHeader {
@@ -115,7 +115,7 @@ impl ElfBlock for FileHeader {
         .unwrap();
     }
 
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, _: &Data, w: &mut Writer) {
         // null section header must be the first written
         w.write_null_section_header();
     }
@@ -266,7 +266,7 @@ impl ElfBlock for InterpSection {
         w.write(self.as_slice());
     }
 
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, _: &Data, w: &mut Writer) {
         if let Some(name_id) = self.name_id {
             w.write_section_header(&object::write::elf::SectionHeader {
                 name: Some(name_id),
@@ -361,7 +361,7 @@ impl ElfBlock for DynamicSection {
         }
     }
 
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, _: &Data, w: &mut Writer) {
         w.write_dynamic_section_header(self.offsets.address);
     }
 }
@@ -494,7 +494,7 @@ impl ElfBlock for RelaDynSection {
         }
     }
 
-    fn write_section_header(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, data: &Data, w: &mut Writer) {
         let relocations = data.dynamics.relocations(self.kind);
 
         let sh_addralign = self.offsets.align;
@@ -555,7 +555,7 @@ impl ElfBlock for StrTabSection {
         w.write_strtab();
     }
 
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, _: &Data, w: &mut Writer) {
         w.write_strtab_section_header();
     }
 }
@@ -620,7 +620,7 @@ impl ElfBlock for SymTabSection {
         }
     }
 
-    fn write_section_header(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, data: &Data, w: &mut Writer) {
         let symbols = data.statics.gen_symbols(data);
         assert_eq!(symbols.len(), self.count);
 
@@ -693,7 +693,7 @@ impl ElfBlock for DynSymSection {
         data.dynamics.symbols_write(data, w);
     }
 
-    fn write_section_header(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, data: &Data, w: &mut Writer) {
         // find the number of local symbols, probably 1 (the null symbol)?
         let num_locals = data.dynamics.symbols_local_count();
         /*
@@ -751,7 +751,7 @@ impl ElfBlock for DynStrSection {
         w.write_dynstr();
     }
 
-    fn write_section_header(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, data: &Data, w: &mut Writer) {
         w.write_dynstr_section_header(data.dynstr.addr.unwrap());
     }
 }
@@ -790,7 +790,7 @@ impl ElfBlock for ShStrTabSection {
         w.write_shstrtab();
     }
 
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, _: &Data, w: &mut Writer) {
         w.write_shstrtab_section_header();
     }
 }
@@ -870,7 +870,7 @@ impl ElfBlock for HashSection {
         });
     }
 
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, _: &Data, w: &mut Writer) {
         w.write_hash_section_header(self.offsets.address);
     }
 }
@@ -932,7 +932,7 @@ impl ElfBlock for GnuHashSection {
         );
     }
 
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, _: &Data, w: &mut Writer) {
         w.write_gnu_hash_section_header(self.offsets.address);
     }
 }
@@ -1049,7 +1049,7 @@ impl ElfBlock for GotSection {
         self.kind.write_entries(data, w);
     }
 
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, _: &Data, w: &mut Writer) {
         let sh_flags = self.alloc().section_header_flags() as u64;
         let sh_addralign = self.section.offsets.align;
         w.write_section_header(&object::write::elf::SectionHeader {
@@ -1191,9 +1191,9 @@ impl ElfBlock for PltSection {
         w.write(stub.as_slice());
     }
 
-    fn write_section_header(&self, data: &Data, block: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, data: &Data, w: &mut Writer) {
         // TODO: remove use of ReadBlock
-        self.section.write_section_header(data, block, w);
+        self.section.write_section_header(data, w);
     }
 }
 
@@ -1279,8 +1279,7 @@ impl ElfBlock for PltGotSection {
         }
     }
 
-    fn write_section_header(&self, data: &Data, block: &ReadBlock, w: &mut Writer) {
-        // TODO: remove use of ReadBlock, not used
-        self.section.write_section_header(data, block, w);
+    fn write_section_header(&self, data: &Data, w: &mut Writer) {
+        self.section.write_section_header(data, w);
     }
 }

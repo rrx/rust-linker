@@ -98,7 +98,7 @@ impl Blocks {
 
         // SECTION HEADERS
         if data.add_section_headers {
-            self.write_section_headers(&data, block, w);
+            self.write_section_headers(&data, w);
         }
     }
 
@@ -140,9 +140,9 @@ impl Blocks {
         }
     }
 
-    pub fn write_section_headers(&self, data: &Data, block: &ReadBlock, w: &mut Writer) {
+    pub fn write_section_headers(&self, data: &Data, w: &mut Writer) {
         for b in self.blocks.iter() {
-            b.write_section_header(&data, block, w);
+            b.write_section_header(&data, w);
         }
     }
 

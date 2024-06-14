@@ -118,7 +118,7 @@ impl ElfBlock for GeneralSection {
         w.write(self.bytes.as_slice());
     }
 
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, _: &Data, w: &mut Writer) {
         if let Some(name_id) = self.name_id {
             w.write_section_header(&object::write::elf::SectionHeader {
                 name: Some(name_id),

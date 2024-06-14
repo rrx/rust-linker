@@ -90,9 +90,8 @@ impl Blocks {
             w.reserve_section_headers();
         }
 
-        // UPDATE
+        // UPDATE PROGRAM HEADERS
         data.ph = Self::program_headers(&self.blocks, data);
-        //data.ph = self.ph.clone();
 
         // WRITE
         self.write(data, w);

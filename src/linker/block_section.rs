@@ -26,7 +26,7 @@ pub trait BlockSection {
     //fn write_section_header(&self, w: &mut Writer);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GeneralSection {
     state: BlockSectionState,
     pub(crate) name: &'static str,
@@ -91,37 +91,34 @@ impl ElfBlock for GeneralSection {
         self.offsets.alloc
     }
 
-    fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
         self.name_id = Some(w.add_section_name(self.name.as_bytes()));
         let index = w.reserve_section_index();
         self.section_index = Some(index);
-        //eprintln!("section index set: {}, {:?}", self.name, index);
         data.section_index_set(&self.name, index);
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve(self.bytes.len(), 1);
         let after = w.reserved_len();
+        let size = after - file_offset;
+        self.offsets.size = size as u64;
 
-        data.segments.add_offsets(
-            self.offsets.alloc,
-            &mut self.offsets,
-            after - file_offset,
-            w,
-        );
+        data.segments
+            .add_offsets(self.offsets.alloc, &mut self.offsets);
         data.addr_set(&self.name, self.offsets.address);
         self.state = BlockSectionState::Located;
     }
 
-    fn write(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write(&self, data: &Data, w: &mut Writer) {
         w.write_start_section(&self.offsets);
         self.apply_relocations(data);
 
         w.write(self.bytes.as_slice());
     }
 
-    fn write_section_header(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
+    fn write_section_header(&self, _: &Data, w: &mut Writer) {
         if let Some(name_id) = self.name_id {
             w.write_section_header(&object::write::elf::SectionHeader {
                 name: Some(name_id),

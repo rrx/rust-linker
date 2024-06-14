@@ -2,6 +2,7 @@ use super::*;
 
 pub struct Blocks {
     pub blocks: Vec<Box<dyn ElfBlock>>,
+    pub ph: Vec<ProgramHeaderEntry>,
 }
 
 impl Blocks {
@@ -31,11 +32,14 @@ impl Blocks {
         }
 
         //blocks.push(Box::new(BlockSectionP::new(ReadSectionKind::ROData, block)));
-        blocks.push(ReadSectionKind::ROData.block());
-        blocks.push(ReadSectionKind::RX.block());
+        //blocks.push(ReadSectionKind::ROData.block());
+        blocks.push(Box::new(data.ro.clone()));
+        //blocks.push(ReadSectionKind::RX.block());
+        blocks.push(Box::new(data.rx.clone()));
         blocks.push(Box::new(PltSection::new(".plt")));
         blocks.push(Box::new(PltGotSection::new(".plt.got")));
-        blocks.push(ReadSectionKind::RW.block());
+        //blocks.push(ReadSectionKind::RW.block());
+        blocks.push(Box::new(data.rw.clone()));
 
         if data.is_dynamic() {
             blocks.push(Box::new(DynamicSection::default()));
@@ -44,7 +48,8 @@ impl Blocks {
         }
 
         // bss is the last alloc block
-        blocks.push(ReadSectionKind::Bss.block());
+        //blocks.push(ReadSectionKind::Bss.block());
+        blocks.push(Box::new(data.bss.clone()));
 
         if data.add_symbols {
             blocks.push(Box::new(SymTabSection::default()));
@@ -60,86 +65,47 @@ impl Blocks {
             blocks.push(Box::new(ShStrTabSection::default()));
         }
 
-        Self { blocks }
+        let ph = Self::generate_ph(&mut blocks);
+        Self { blocks, ph }
     }
 
-    pub fn build(&mut self, data: &mut Data, w: &mut Writer, block: &mut ReadBlock) {
-        //let mut tracker = SegmentTracker::new(data.base as u64);
-        data.ph = self.generate_ph(block);
+    pub fn build(&mut self, data: &mut Data, w: &mut Writer) {
+        // copy the program header
+        data.ph = self.ph.clone();
 
         // RESERVE SECTION HEADERS
         // section headers are optional
         if data.add_section_headers {
-            self.reserve_section_index(data, block, w);
+            self.reserve_section_index(data, w);
         }
 
         // RESERVE SYMBOLS
-        //for b in self.blocks.iter_mut() {
-        //b.reserve_symbols(data, block, w);
-        //}
-        Self::reserve_symbols(data, block, w);
-
-        // RESERVE
+        Self::reserve_symbols(data, w);
+        self.reserve_export_symbols(data, w);
 
         // finalize the layout
-        self.reserve(data, block, w);
+        self.reserve(data, w);
 
         if data.add_section_headers {
             w.reserve_section_headers();
         }
 
-        // UPDATE
-        data.ph = self.program_headers(data, block);
-        //self.update(data);
+        // UPDATE PROGRAM HEADERS
+        data.ph = Self::program_headers(&self.blocks, data);
 
         // WRITE
-        self.write(data, block, w);
+        self.write(data, w);
 
         // SECTION HEADERS
         if data.add_section_headers {
-            self.write_section_headers(&data, block, w);
+            self.write_section_headers(&data, w);
         }
     }
 
-    /// generate a temporary list of program headers
-    pub fn generate_ph(&mut self, block: &mut ReadBlock) -> Vec<ProgramHeaderEntry> {
-        // build a list of sections that are loaded
-        // this is a hack to get tracker to build a correct list of program headers
-        // without having to go through the blocks and do reservations
-        let mut data = Data::new(vec![]);
-        //data.addr_set(".got.plt", 0);
-        //data.pointer_set("_start".to_string(), 0);
-        //data.pointer_set("__data_start".to_string(), 0);
-        let mut out_data = Vec::new();
-        let endian = Endianness::Little;
-        let mut w = object::write::elf::Writer::new(endian, data.is_64, &mut out_data);
-        //temp_w.add_string("asdf".as_bytes());
-        //temp_w.add_dynamic_string("asdf".as_bytes());
-
-        block.build_strings(&mut data, &mut w);
-        for b in self.blocks.iter_mut() {
-            b.reserve_section_index(&mut data, block, &mut w);
-        }
-
-        //for b in self.blocks.iter_mut() {
-        Self::reserve_symbols(&mut data, block, &mut w);
-        //}
-
-        for b in self.blocks.iter_mut() {
-            //eprintln!("reserve: {}", b.name());
-            b.reserve(&mut data, block, &mut w);
-        }
-        // get a list of program headers
-        // we really only need to know the number of headers, so we can correctly
-        // set the values in the file header
-        self.program_headers(&mut data, block)
-        //data.segments.ph
-    }
-
-    pub fn reserve(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
+    pub fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         for b in self.blocks.iter_mut() {
             let pos = w.reserved_len();
-            b.reserve(data, block, w);
+            b.reserve(data, w);
             let after = w.reserved_len();
             log::debug!(
                 "reserve: {}, {:#0x}, {:#0x},  {:?}",
@@ -151,11 +117,11 @@ impl Blocks {
         }
     }
 
-    pub fn write(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
+    pub fn write(&mut self, data: &mut Data, w: &mut Writer) {
         for b in self.blocks.iter() {
             let pos = w.len();
             //eprintln!("write: {}", b.name());
-            b.write(&data, block, w);
+            b.write(&data, w);
             let after = w.len();
             log::debug!(
                 "write: {}, {:?}, pos: {:#0x}, after: {:#0x}, base: {:#0x}",
@@ -168,56 +134,69 @@ impl Blocks {
         }
     }
 
-    pub fn reserve_section_index(
-        &mut self,
-        data: &mut Data,
-        block: &mut ReadBlock,
-        w: &mut Writer,
-    ) {
+    pub fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
         for b in self.blocks.iter_mut() {
-            b.reserve_section_index(data, block, w);
+            b.reserve_section_index(data, w);
         }
     }
 
-    /*
-    pub fn update(&mut self, data: &mut Data) {
-        for b in self.blocks.iter_mut() {
-            b.update(data);
-        }
-    }
-    */
-
-    pub fn write_section_headers(&self, data: &Data, block: &ReadBlock, w: &mut Writer) {
+    pub fn write_section_headers(&self, data: &Data, w: &mut Writer) {
         for b in self.blocks.iter() {
-            b.write_section_header(&data, block, w);
+            b.write_section_header(&data, w);
         }
     }
 
-    pub fn program_headers(&self, data: &Data, block: &ReadBlock) -> Vec<ProgramHeaderEntry> {
+    /// generate a temporary list of program headers
+    pub fn generate_ph(blocks: &mut Vec<Box<dyn ElfBlock>>) -> Vec<ProgramHeaderEntry> {
+        // build a list of sections that are loaded
+        // this is a hack to get tracker to build a correct list of program headers
+        // without having to go through the blocks and do reservations
+        let mut data = Data::new(vec![]);
+        //data.addr_set(".got.plt", 0);
+        //data.pointer_set("_start".to_string(), 0);
+        //data.pointer_set("__data_start".to_string(), 0);
+        let mut out_data = Vec::new();
+        let endian = Endianness::Little;
+        let mut w = object::write::elf::Writer::new(endian, data.is_64, &mut out_data);
+
+        //block.build_strings(&mut data, &mut w);
+        for b in blocks.iter_mut() {
+            b.reserve_section_index(&mut data, &mut w);
+        }
+
+        Self::reserve_symbols(&mut data, &mut w);
+
+        for b in blocks.iter_mut() {
+            b.reserve(&mut data, &mut w);
+        }
+        // get a list of program headers
+        // we really only need to know the number of headers, so we can correctly
+        // set the values in the file header
+        Self::program_headers(blocks, &mut data)
+    }
+
+    pub fn program_headers(
+        blocks: &Vec<Box<dyn ElfBlock>>,
+        data: &Data,
+    ) -> Vec<ProgramHeaderEntry> {
         let mut ph = vec![];
-        for b in self.blocks.iter() {
-            ph.extend(b.program_header(block));
+        for b in blocks.iter() {
+            ph.extend(b.program_header());
         }
         ph.extend(data.segments.program_headers());
 
         ph
-        /*
-        // hack to get dynamic to be the last program header
-        // may not be necessary
-        ph.iter()
-            .filter(|p| p.p_type != elf::PT_DYNAMIC)
-            .cloned()
-            .chain(ph.iter().filter(|p| p.p_type == elf::PT_DYNAMIC).cloned())
-            .collect()
-            */
     }
 
-    //pub fn generate_program_headers(&self, data: &mut Data, block: &ReadBlock) {
-    //let ph = self.program_headers(data, block);
-    //data.ph = ph;
-    //}
-    //
-    fn reserve_symbols(data: &mut Data, block: &ReadBlock, w: &mut Writer) {
+    fn reserve_export_symbols(&self, data: &mut Data, w: &mut Writer) {
+        // reserve exports
+        for (_, symbol) in data.exports.iter() {
+            let section_index = symbol.section.section_index(data);
+            data.statics.symbol_add(symbol, section_index, w);
+        }
+    }
+
+    fn reserve_symbols(data: &mut Data, w: &mut Writer) {
         let syms = vec![
             (
                 "data_start",
@@ -265,15 +244,10 @@ impl Blocks {
             let section_index = data.section_index_get(section_name);
             data.statics.symbol_add(&symbol, Some(section_index), w);
         }
-
-        for (_, symbol) in block.exports.iter() {
-            let section_index = symbol.section.section_index(data);
-            data.statics.symbol_add(symbol, section_index, w);
-        }
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct SectionOffset {
     pub name: String,
     pub alloc: AllocSegment,
@@ -301,7 +275,6 @@ pub struct SegmentTracker {
     // track the current segment base
     start_base: u64,
     page_size: usize,
-    //pub ph: Vec<ProgramHeaderEntry>,
 }
 
 impl SegmentTracker {
@@ -310,7 +283,6 @@ impl SegmentTracker {
             segments: vec![],
             start_base,
             page_size: 0x1000,
-            //ph: vec![],
         }
     }
 
@@ -323,21 +295,17 @@ impl SegmentTracker {
     }
 
     // add non-section data
-    pub fn add_offsets(
-        &mut self,
-        alloc: AllocSegment,
-        offsets: &mut SectionOffset,
-        size: usize,
-        w: &Writer,
-    ) {
+    pub fn add_offsets(&mut self, alloc: AllocSegment, offsets: &mut SectionOffset) {
+        //, w: &Writer) {
         let current_size;
         let current_file_offset;
         let current_alloc;
         let mut base;
+        //assert_eq!(_size, offsets.size as usize);
 
         // get current segment, or defaults
         if let Some(c) = self.segments.last() {
-            current_size = c.size() as u64;
+            current_size = c.segment_size() as u64;
             current_file_offset = c.file_offset;
             current_alloc = c.alloc;
             base = c.base;
@@ -370,7 +338,7 @@ impl SegmentTracker {
                 file_offset,
                 current_file_offset,
                 current_size,
-                size,
+                offsets.size,
                 offsets.align,
                 base,
             );
@@ -386,7 +354,11 @@ impl SegmentTracker {
             assert!(file_offset >= (current_file_offset + current_size));
         }
 
-        self.current_mut().add_offsets(offsets, size, w);
+        self.current_mut().add_offsets(offsets);
+        //assert_eq!(
+        //self.current().adjusted_file_offset as usize + offsets.size as usize,
+        //w.reserved_len()
+        //);
     }
 
     pub fn program_headers(&self) -> Vec<ProgramHeaderEntry> {
@@ -436,35 +408,29 @@ impl Segment {
         }
     }
 
-    pub fn size(&self) -> usize {
+    pub fn segment_size(&self) -> usize {
         self.segment_size
     }
 
-    pub fn add_offsets(&mut self, offsets: &mut SectionOffset, size: usize, w: &Writer) {
+    pub fn add_offsets(&mut self, offsets: &mut SectionOffset) {
+        //, w: &Writer) {
         let aligned = size_align(self.segment_size, offsets.align as usize);
-        self.segment_size = aligned + size;
+        self.segment_size = aligned + offsets.size as usize;
         self.adjusted_file_offset = self.file_offset + aligned as u64;
 
-        //eprintln!("add: {:#0x}, {:?}", size, self);
-        //eprintln!(
-        //"x: {:#0x}, {:#0x}",
-        //self.adjusted_file_offset as usize + size,
+        //assert_eq!(
+        //self.adjusted_file_offset as usize + offsets.size as usize,
         //w.reserved_len()
         //);
 
-        assert_eq!(self.adjusted_file_offset as usize + size, w.reserved_len());
-
         offsets.base = self.base;
-        offsets.size = size as u64;
         offsets.address = self.base + self.adjusted_file_offset;
         offsets.file_offset = self.adjusted_file_offset;
-
-        //eprintln!("add: {:#0x}, {:?}", size, self);
     }
 
     pub fn program_header(&self) -> Option<ProgramHeaderEntry> {
         // add a load section for the file and program header, so it's covered
-        let size = self.size() as u64;
+        let size = self.segment_size() as u64;
         Some(ProgramHeaderEntry {
             p_type: elf::PT_LOAD,
             p_flags: self.alloc.program_header_flags(),

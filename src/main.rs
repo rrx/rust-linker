@@ -36,15 +36,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let block = reader.build();
     block.dump();
 
-    //let mut libs: Vec<String> = block.libs.iter().cloned().collect();
-    //libs.push("/usr/lib/x86_64-linux-gnu/libc.so.6".to_string());
-
-    let mut data = link::Data::new(block.libs.iter().cloned().collect());
+    let mut data = block.data();
     if let Some(interp) = args.interp {
         data = data.interp(interp);
     }
 
     let output = args.output.unwrap_or("a.out".to_string());
-    block.write::<object::elf::FileHeader64<object::Endianness>>(&mut data, Path::new(&output))?;
+    reader::write::<object::elf::FileHeader64<object::Endianness>>(
+        block,
+        &mut data,
+        Path::new(&output),
+    )?;
     Ok(())
 }

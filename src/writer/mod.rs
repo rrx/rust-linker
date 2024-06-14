@@ -1,4 +1,4 @@
-use std::error::Error;
+//use std::error::Error;
 
 use object::elf;
 use object::write::elf::Sym;
@@ -82,14 +82,6 @@ pub struct TrackSection {
     pub size: Option<usize>,
     pub addr: Option<u64>,
     pub section_index: Option<SectionIndex>,
-}
-
-impl TrackSection {
-    /*
-        fn new() -> Self {
-            Self { size: 0, addr: 0, section_index: None }
-        }
-    */
 }
 
 pub enum SymbolPointer {
@@ -215,7 +207,7 @@ pub struct Data {
     interp: String,
     is_64: bool,
     pub(crate) libs: Vec<Library>,
-    base: usize,
+    //base: usize,
     pub dynamics: Dynamics,
     pub statics: Statics,
     debug: HashSet<DebugFlag>,
@@ -235,6 +227,12 @@ pub struct Data {
 
     add_section_headers: bool,
     add_symbols: bool,
+
+    pub exports: SymbolMap,
+    pub ro: GeneralSection,
+    pub rw: GeneralSection,
+    pub rx: GeneralSection,
+    pub bss: GeneralSection,
 }
 
 impl Data {
@@ -253,7 +251,7 @@ impl Data {
             // default gnu loader
             interp: "/lib64/ld-linux-x86-64.so.2".to_string(),
             libs,
-            base,
+            //base,
             ph: vec![],
             addr: HashMap::new(),
             section_index: HashMap::new(),
@@ -274,6 +272,12 @@ impl Data {
             // Tables
             dynamics: Dynamics::new(),
             statics: Statics::new(),
+
+            exports: SymbolMap::new(),
+            ro: GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
+            rw: GeneralSection::new(AllocSegment::RW, ".data", 0x10),
+            rx: GeneralSection::new(AllocSegment::RX, ".text", 0x10),
+            bss: GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
         }
     }
 
@@ -454,17 +458,6 @@ impl Data {
     }
 }
 
-pub fn write_file_main<Elf: object::read::elf::FileHeader<Endian = Endianness>>(
-    data: &mut Data,
-    block: &mut ReadBlock,
-    w: &mut Writer,
-) -> std::result::Result<(), Box<dyn Error>> {
-    block.build_strings(data, w);
-    let mut blocks = Blocks::new(data, w);
-    blocks.build(data, w, block);
-    Ok(())
-}
-
 /// align size
 pub fn size_align(n: usize, align: usize) -> usize {
     return (n + (align - 1)) & !(align - 1);
@@ -472,15 +465,8 @@ pub fn size_align(n: usize, align: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::path::Path;
     use test_log::test;
 
     #[test]
-    fn write_empty_main() {
-        let mut b = Link::new();
-        b.add_obj_file("test", Path::new("./build/clang-glibc/empty_main.o"))
-            .unwrap();
-        //b.write(Path::new("../tmp/out.exe")).unwrap();
-    }
+    fn write_empty_main() {}
 }

@@ -26,8 +26,8 @@ pub struct Reader {
     // link block
     block: ReadBlock,
 
-    got: HashSet<String>,
-    plt: HashSet<String>,
+    //got: HashSet<String>,
+    //plt: HashSet<String>,
     debug: HashSet<DebugFlag>,
 }
 
@@ -36,8 +36,8 @@ impl Reader {
         Self {
             blocks: vec![],
             block: ReadBlock::new("exe"),
-            got: HashSet::new(),
-            plt: HashSet::new(),
+            //got: HashSet::new(),
+            //plt: HashSet::new(),
             debug: HashSet::new(),
         }
     }
@@ -59,9 +59,36 @@ pub enum ReadSectionKind {
 }
 
 impl ReadSectionKind {
-    pub fn block(&self) -> Box<dyn ElfBlock> {
-        Box::new(BlockSectionX::new(self.clone()))
+    pub fn new_section_kind(kind: SectionKind) -> Self {
+        match kind {
+            SectionKind::Text => ReadSectionKind::RX,
+            SectionKind::Data => ReadSectionKind::RW,
+            SectionKind::ReadOnlyData => ReadSectionKind::ROData,
+            SectionKind::ReadOnlyString => ReadSectionKind::ROData,
+            SectionKind::UninitializedData => ReadSectionKind::Bss,
+            SectionKind::Metadata => ReadSectionKind::Other,
+            SectionKind::OtherString => ReadSectionKind::Other,
+            SectionKind::Other => ReadSectionKind::Other,
+            SectionKind::Note => ReadSectionKind::Other,
+            SectionKind::UninitializedTls => ReadSectionKind::Other,
+            SectionKind::Tls => ReadSectionKind::Other,
+            SectionKind::Elf(_) => ReadSectionKind::Other,
+            _ => unimplemented!("{:?}", kind),
+        }
     }
+
+    /*
+    pub fn block(&self) -> Box<dyn ElfBlock> {
+        let block = match self {
+            Self::RX => GeneralSection::new(AllocSegment::RX, ".text", 0x10),
+            Self::ROData => GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
+            Self::RW => GeneralSection::new(AllocSegment::RW, ".data", 0x10),
+            Self::Bss => GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
+            _ => unreachable!(),
+        };
+        Box::new(block)
+    }
+    */
 
     pub fn alloc(&self) -> Option<AllocSegment> {
         match self {
@@ -79,26 +106,6 @@ impl ReadSectionKind {
         match self {
             RX | RW | ROData | Bss => data.section_index.get(self.section_name()).cloned(),
             _ => None,
-        }
-    }
-}
-
-impl ReadSectionKind {
-    pub fn new_section_kind(kind: SectionKind) -> Self {
-        match kind {
-            SectionKind::Text => ReadSectionKind::RX,
-            SectionKind::Data => ReadSectionKind::RW,
-            SectionKind::ReadOnlyData => ReadSectionKind::ROData,
-            SectionKind::ReadOnlyString => ReadSectionKind::ROData,
-            SectionKind::UninitializedData => ReadSectionKind::Bss,
-            SectionKind::Metadata => ReadSectionKind::Other,
-            SectionKind::OtherString => ReadSectionKind::Other,
-            SectionKind::Other => ReadSectionKind::Other,
-            SectionKind::Note => ReadSectionKind::Other,
-            SectionKind::UninitializedTls => ReadSectionKind::Other,
-            SectionKind::Tls => ReadSectionKind::Other,
-            SectionKind::Elf(_) => ReadSectionKind::Other,
-            _ => unimplemented!("{:?}", kind),
         }
     }
 
@@ -119,25 +126,6 @@ impl ReadSectionKind {
                 ResolvePointer::Section(self.section_name().to_string(), address)
             }
             _ => ResolvePointer::Resolved(address),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ReadSection {
-    kind: ReadSectionKind,
-    relocations: Vec<LinkRelocation>,
-    bytes: Vec<u8>,
-    bss: usize,
-}
-
-impl ReadSection {
-    pub fn new(kind: ReadSectionKind) -> Self {
-        Self {
-            kind,
-            relocations: vec![],
-            bytes: vec![],
-            bss: 0,
         }
     }
 }
@@ -165,42 +153,31 @@ impl SymbolBind {
     }
 }
 
-/*
-#[derive(Debug, Clone)]
-pub enum SymbolLookupTable {
-    GOT,
-    PLT,
-    None,
-}
-*/
-
 #[derive(Debug, Clone)]
 pub struct ReadSymbol {
     pub(crate) name: String,
-    pub(crate) name_id: Option<StringId>,
-    pub(crate) dyn_name_id: Option<StringId>,
+    //pub(crate) name_id: Option<StringId>,
+    //pub(crate) dyn_name_id: Option<StringId>,
     pub(crate) section: ReadSectionKind,
     pub(crate) source: SymbolSource,
     pub(crate) kind: SymbolKind,
     pub(crate) bind: SymbolBind,
     pub(crate) pointer: ResolvePointer,
     pub(crate) size: u64,
-    //lookup: SymbolLookupTable,
 }
 
 impl ReadSymbol {
     pub fn from_pointer(name: String, pointer: ResolvePointer) -> Self {
         ReadSymbol {
             name,
-            name_id: None,
-            dyn_name_id: None,
+            //name_id: None,
+            //dyn_name_id: None,
             section: ReadSectionKind::Undefined,
             source: SymbolSource::Static,
             kind: SymbolKind::Unknown,
             bind: SymbolBind::Local,
             pointer,
             size: 0,
-            //lookup: SymbolLookupTable::None,
         }
     }
 
@@ -269,7 +246,7 @@ pub struct ReadBlock {
     pub libs: HashSet<String>,
     local_index: usize,
     pub(crate) locals: SymbolMap,
-    pub(crate) exports: SymbolMap,
+    pub exports: SymbolMap,
     pub(crate) dynamic: SymbolMap,
     pub(crate) unknown: SymbolMap,
     pub ro: GeneralSection,
@@ -301,27 +278,47 @@ impl ReadBlock {
         }
     }
 
-    pub fn build_strings(&mut self, data: &mut Data, w: &mut Writer) {
-        // add libraries if they are configured
-        for lib in data.libs.iter_mut() {
-            unsafe {
-                let buf = extend_lifetime(lib.name.as_bytes());
-                lib.string_id = Some(w.add_dynamic_string(buf));
+    pub fn data(&self) -> crate::Data {
+        let mut data = crate::Data::new(self.libs.iter().cloned().collect());
+        data.exports = self.exports.clone();
+        data.ro = self.ro.clone();
+        data.rw = self.rw.clone();
+        data.rx = self.rx.clone();
+        data.bss = self.bss.clone();
+        data
+    }
+
+    pub fn update_data(&self, data: &mut Data) {
+        for (name, _, pointer) in data.dynamics.symbols() {
+            data.pointers.insert(name, pointer);
+        }
+
+        //eprintln!("plt: {:?}", data.dynamics.plt_hash);
+        //eprintln!("pltgot: {:?}", data.dynamics.pltgot_hash);
+
+        for (name, symbol) in self.locals.iter() {
+            match symbol.section {
+                ReadSectionKind::RX
+                //| ReadSectionKind::ROStrings
+                | ReadSectionKind::ROData
+                | ReadSectionKind::RW
+                | ReadSectionKind::Bss => {
+                    data.pointers
+                        .insert(name.to_string(), symbol.pointer.clone());
+                }
+                _ => (),
             }
         }
 
-        // These need to be declared
-        let locals = vec![("_DYNAMIC", ".dynamic")];
-
-        for (symbol_name, section_name) in locals {
-            let symbol_name = symbol_name.to_string();
-            let section_name = section_name.to_string();
-            let pointer = ResolvePointer::Section(section_name, 0);
-            data.pointers.insert(symbol_name.clone(), pointer.clone());
-            let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
-            self.insert_local(symbol);
+        // Add static symbols to data
+        let locals = vec!["_DYNAMIC"];
+        for symbol_name in locals {
+            let s = self.lookup_static(symbol_name).unwrap();
+            data.pointers.insert(s.name, s.pointer);
         }
+    }
 
+    pub fn update_relocations(&self, data: &mut Data, w: &mut Writer) {
         let iter = self
             .ro
             .relocations()
@@ -352,8 +349,6 @@ impl ReadBlock {
                 }
                 _ => (),
             }
-            //}
-            //*/
         }
 
         for r in iter {
@@ -408,61 +403,40 @@ impl ReadBlock {
                 unreachable!("Unable to find symbol for relocation: {}", &r.name)
             }
         }
+    }
 
-        for (name, _, pointer) in data.dynamics.symbols() {
-            data.pointers.insert(name, pointer);
-        }
+    fn build_strings(&self, data: &mut Data, w: &mut Writer) {
+        self.update_relocations(data, w);
+        self.update_data(data);
 
-        //eprintln!("plt: {:?}", data.dynamics.plt_hash);
-        //eprintln!("pltgot: {:?}", data.dynamics.pltgot_hash);
-
-        for (name, symbol) in self.locals.iter() {
-            match symbol.section {
-                ReadSectionKind::RX
-                //| ReadSectionKind::ROStrings
-                | ReadSectionKind::ROData
-                | ReadSectionKind::RW
-                | ReadSectionKind::Bss => {
-                    data.pointers
-                        .insert(name.to_string(), symbol.pointer.clone());
-                }
-                _ => (),
+        // add libraries if they are configured
+        for lib in data.libs.iter_mut() {
+            unsafe {
+                let buf = extend_lifetime(lib.name.as_bytes());
+                lib.string_id = Some(w.add_dynamic_string(buf));
             }
         }
 
-        for (name, symbol) in self.exports.iter() {
+        for (name, symbol) in data.exports.iter() {
             // allocate string for the symbol table
-            //eprintln!("y: {:?}", symbol);
             let _string_id = data.statics.string_add(name, w);
             data.pointers
                 .insert(name.to_string(), symbol.pointer.clone());
         }
     }
 
-    pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
-        mut self,
-        data: &mut Data,
-        path: &Path,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut out_data = Vec::new();
-        let endian = object::Endianness::Little;
-        let mut writer = object::write::elf::Writer::new(endian, data.is_64(), &mut out_data);
-        write_file_main::<Elf>(data, &mut self, &mut writer)?;
-        let size = out_data.len();
-        std::fs::write(path, out_data)?;
-        eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());
-        Ok(())
-    }
-
     pub fn insert_local(&mut self, s: ReadSymbol) {
         self.locals.insert(s.name.clone(), s);
     }
+
     pub fn insert_export(&mut self, s: ReadSymbol) {
         self.exports.insert(s.name.clone(), s);
     }
+
     pub fn insert_dynamic(&mut self, s: ReadSymbol) {
         self.dynamic.insert(s.name.clone(), s);
     }
+
     pub fn insert_unknown(&mut self, s: ReadSymbol) {
         self.unknown.insert(s.name.clone(), s);
     }
@@ -734,6 +708,23 @@ impl ReadBlock {
     }
 }
 
+pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
+    block: ReadBlock,
+    data: &mut Data,
+    path: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let mut out_data = Vec::new();
+    let endian = object::Endianness::Little;
+    let mut writer = object::write::elf::Writer::new(endian, data.is_64(), &mut out_data);
+    block.build_strings(data, &mut writer);
+    let mut blocks = Blocks::new(data, &mut writer);
+    blocks.build(data, &mut writer);
+    let size = out_data.len();
+    std::fs::write(path, out_data)?;
+    eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());
+    Ok(())
+}
+
 impl Reader {
     pub fn add(&mut self, path: &std::path::Path) -> Result<(), Box<dyn Error>> {
         let buf = std::fs::read(path)?;
@@ -848,6 +839,17 @@ impl Reader {
             self.block.add_block(b);
         }
 
+        // These need to be declared
+        let locals = vec![("_DYNAMIC", ".dynamic")];
+
+        for (symbol_name, section_name) in locals {
+            let symbol_name = symbol_name.to_string();
+            let section_name = section_name.to_string();
+            let pointer = ResolvePointer::Section(section_name, 0);
+            let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
+            self.block.insert_local(symbol);
+        }
+
         self.block
     }
 }
@@ -943,8 +945,8 @@ pub fn read_symbol<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
 
     Ok(ReadSymbol {
         name,
-        name_id: None,
-        dyn_name_id: None,
+        //name_id: None,
+        //dyn_name_id: None,
         section: section_kind,
         kind: symbol.kind(),
         bind,

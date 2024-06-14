@@ -2,6 +2,7 @@ use super::*;
 
 pub struct Blocks {
     pub blocks: Vec<Box<dyn ElfBlock>>,
+    pub ph: Vec<ProgramHeaderEntry>,
 }
 
 impl Blocks {
@@ -60,7 +61,7 @@ impl Blocks {
             blocks.push(Box::new(ShStrTabSection::default()));
         }
 
-        Self { blocks }
+        Self { blocks, ph: vec![] }
     }
 
     pub fn build(&mut self, data: &mut Data, w: &mut Writer, block: &mut ReadBlock) {
@@ -175,10 +176,10 @@ impl Blocks {
         }
     }
 
-    pub fn program_headers(&self, data: &Data, block: &ReadBlock) -> Vec<ProgramHeaderEntry> {
+    pub fn program_headers(&self, data: &Data, _: &ReadBlock) -> Vec<ProgramHeaderEntry> {
         let mut ph = vec![];
         for b in self.blocks.iter() {
-            ph.extend(b.program_header(block));
+            ph.extend(b.program_header());
         }
         ph.extend(data.segments.program_headers());
 

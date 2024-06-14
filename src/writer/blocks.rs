@@ -49,7 +49,7 @@ pub trait ElfBlock {
     fn alloc(&self) -> AllocSegment {
         AllocSegment::None
     }
-    fn program_header(&self, _: &ReadBlock) -> Vec<ProgramHeaderEntry> {
+    fn program_header(&self) -> Vec<ProgramHeaderEntry> {
         vec![]
     }
     fn reserve_section_index(&mut self, _: &mut Data, _: &mut ReadBlock, _: &mut Writer) {}
@@ -146,7 +146,7 @@ impl ElfBlock for ProgramHeader {
         self.offsets.alloc
     }
 
-    fn program_header(&self, _: &ReadBlock) -> Vec<ProgramHeaderEntry> {
+    fn program_header(&self) -> Vec<ProgramHeaderEntry> {
         vec![
             // program header
             ProgramHeaderEntry {
@@ -230,7 +230,7 @@ impl ElfBlock for InterpSection {
     fn alloc(&self) -> AllocSegment {
         self.offsets.alloc
     }
-    fn program_header(&self, _: &ReadBlock) -> Vec<ProgramHeaderEntry> {
+    fn program_header(&self) -> Vec<ProgramHeaderEntry> {
         let size = self.as_slice().len() as u64;
         vec![ProgramHeaderEntry {
             p_type: elf::PT_INTERP,
@@ -305,7 +305,7 @@ impl ElfBlock for DynamicSection {
         self.offsets.alloc
     }
 
-    fn program_header(&self, _: &ReadBlock) -> Vec<ProgramHeaderEntry> {
+    fn program_header(&self) -> Vec<ProgramHeaderEntry> {
         //program DYNAMIC
         vec![ProgramHeaderEntry {
             p_type: elf::PT_DYNAMIC,

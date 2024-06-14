@@ -280,7 +280,7 @@ impl ReadBlock {
         }
     }
 
-    pub fn build_strings(&mut self, data: &mut Data, w: &mut Writer) {
+    pub fn build_strings(&self, data: &mut Data, w: &mut Writer) {
         // add libraries if they are configured
         for lib in data.libs.iter_mut() {
             unsafe {
@@ -289,16 +289,11 @@ impl ReadBlock {
             }
         }
 
-        // These need to be declared
-        let locals = vec![("_DYNAMIC", ".dynamic")];
-
-        for (symbol_name, section_name) in locals {
-            let symbol_name = symbol_name.to_string();
-            let section_name = section_name.to_string();
-            let pointer = ResolvePointer::Section(section_name, 0);
-            data.pointers.insert(symbol_name.clone(), pointer.clone());
-            let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
-            self.insert_local(symbol);
+        // Add static symbols to data
+        let locals = vec!["_DYNAMIC"];
+        for symbol_name in locals {
+            let s = self.lookup_static(symbol_name).unwrap();
+            data.pointers.insert(s.name, s.pointer);
         }
 
         let iter = self
@@ -429,7 +424,6 @@ impl ReadBlock {
         self.build_strings(data, &mut writer);
         let mut blocks = Blocks::new(data, &mut writer);
         blocks.build(data, &mut writer, &mut self);
-        //write_file_main::<Elf>(data, &mut self, &mut writer)?;
         let size = out_data.len();
         std::fs::write(path, out_data)?;
         eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());
@@ -828,6 +822,17 @@ impl Reader {
         self.block.name = "exe".to_string();
         for b in self.blocks.into_iter() {
             self.block.add_block(b);
+        }
+
+        // These need to be declared
+        let locals = vec![("_DYNAMIC", ".dynamic")];
+
+        for (symbol_name, section_name) in locals {
+            let symbol_name = symbol_name.to_string();
+            let section_name = section_name.to_string();
+            let pointer = ResolvePointer::Section(section_name, 0);
+            let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
+            self.block.insert_local(symbol);
         }
 
         self.block

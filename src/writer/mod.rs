@@ -446,19 +446,6 @@ impl Data {
     }
 }
 
-/*
-pub fn write_file_main<Elf: object::read::elf::FileHeader<Endian = Endianness>>(
-    data: &mut Data,
-    block: &mut ReadBlock,
-    w: &mut Writer,
-) -> std::result::Result<(), Box<dyn Error>> {
-    block.build_strings(data, w);
-    let mut blocks = Blocks::new(data, w);
-    blocks.build(data, w, block);
-    Ok(())
-}
-*/
-
 /// align size
 pub fn size_align(n: usize, align: usize) -> usize {
     return (n + (align - 1)) & !(align - 1);

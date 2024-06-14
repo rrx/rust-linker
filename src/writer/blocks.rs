@@ -398,9 +398,11 @@ impl ElfBlock for RelaDynSection {
         w.reserve_relocations(self.count, self.is_rela);
 
         let after = w.reserved_len();
+        let size = after - file_offset;
+        self.offsets.size = size as u64;
 
         data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, after - file_offset, w);
+            .add_offsets(self.alloc(), &mut self.offsets, size, w);
         match self.kind {
             GotSectionKind::GOT => {
                 data.addr_set(".rela.dyn", self.offsets.address);
@@ -420,8 +422,6 @@ impl ElfBlock for RelaDynSection {
 
         // we are writing a relocation for the GOT entries
         for (index, symbol) in relocations.iter().enumerate() {
-            //eprintln!("unapplied: {:?}", &symbol);
-
             let mut r_addend = 0;
             let r_sym;
 
@@ -507,134 +507,12 @@ impl ElfBlock for RelaDynSection {
     }
 }
 
-/*
-pub struct RelocationSection {
-    alloc: AllocSegment,
-    index: SectionIndex,
-    target_section_index: SectionIndex,
-    align: usize,
-    name_id: Option<StringId>,
-    file_offset: usize,
-    relocations: Vec<CodeRelocation>,
-}
-
-impl RelocationSection {
-    pub fn new(alloc: AllocSegment, section: &ProgSection) -> Self {
-        let relocations = section.relocations.clone();
-        Self {
-            alloc,
-            index: SectionIndex::default(),
-            target_section_index: SectionIndex::default(),
-            name_id: None,
-            align: 0x10,
-            file_offset: 0,
-            relocations,
-        }
-    }
-}
-
-impl ElfBlock for RelocationSection {
-    fn name(&self) -> String {
-        return "reloc".to_string();
-    }
-    fn alloc(&self) -> Option<AllocSegment> {
-        Some(AllocSegment::RO)
-    }
-    fn reserve_section_index(&mut self, _data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
-        match self.alloc {
-            AllocSegment::RX => {
-                self.name_id = Some(w.add_section_name(".rela.text".as_bytes()));
-                self.index = w.reserve_section_index();
-            }
-            AllocSegment::RO => {
-                self.name_id = Some(w.add_section_name(".rela.data".as_bytes()));
-                self.index = w.reserve_section_index();
-            }
-            _ => (),
-        }
-    }
-
-    fn reserve(
-        &mut self,
-        _data: &mut Data,
-        tracker: &mut SegmentTracker,
-        _: &mut ReadBlock,
-        w: &mut Writer,
-    ) {
-        let before = w.reserved_len();
-        self.file_offset = w.reserve_relocations(self.relocations.len(), true);
-        let after = w.reserved_len();
-        tracker.add_data(self.alloc().unwrap(), 1, after - before, before);
-    }
-
-    fn update(&mut self, data: &mut Data) {
-        match self.alloc {
-            AllocSegment::RX => {
-                self.target_section_index = data.section_index_get(".text");
-            }
-            AllocSegment::RO => {
-                self.target_section_index = data.section_index_get(".data");
-            }
-            _ => (),
-        }
-    }
-
-    fn write(
-        &self,
-        data: &Data,
-        _tracker: &mut SegmentTracker,
-        _: &mut ReadBlock,
-        w: &mut Writer,
-    ) {
-        w.write_align_relocation();
-
-        for rel in self.relocations.iter() {
-            let r_offset = rel.offset;
-            let r_addend = rel.r.addend;
-            rel.r.target;
-            let r_sym = self.target_section_index.0;
-            let r_type = crate::linker::relocations::r_type(data.arch, &rel.r).unwrap();
-            w.write_relocation(
-                true,
-                &object::write::elf::Rel {
-                    r_offset,
-                    r_sym,
-                    r_type,
-                    r_addend,
-                },
-            );
-        }
-    }
-
-    fn write_section_header(
-        &self,
-        data: &Data,
-        _tracker: &SegmentTracker,
-        _: &ReadBlock,
-        w: &mut Writer,
-    ) {
-        w.write_relocation_section_header(
-            self.name_id.unwrap(),
-            // section the relocations apply to (.text)
-            *data.section_index.get(".text").unwrap(),
-            // .symtab section
-            *data.section_index.get(".symtab").unwrap(),
-            self.file_offset,
-            self.relocations.len(),
-            true,
-        );
-    }
-}
-*/
-
 pub struct StrTabSection {
-    //index: Option<SectionIndex>,
     offsets: SectionOffset,
 }
 impl StrTabSection {
     pub fn new() -> Self {
         Self {
-            //index: None,
             offsets: SectionOffset::new("strtab".into(), AllocSegment::None, 1),
         }
     }
@@ -646,6 +524,7 @@ impl ElfBlock for StrTabSection {
     }
     fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
         let index = w.reserve_strtab_section_index();
+        self.offsets.section_index = Some(index);
         data.section_index.insert(".strtab".to_string(), index);
     }
 
@@ -666,16 +545,12 @@ impl ElfBlock for StrTabSection {
 }
 
 pub struct SymTabSection {
-    //index: Option<SectionIndex>,
-    //symbols: Vec<Sym>,
     count: usize,
     offsets: SectionOffset,
 }
 impl Default for SymTabSection {
     fn default() -> Self {
         Self {
-            //index: None,
-            //symbols: vec![],
             count: 0,
             offsets: SectionOffset::new("symtab".into(), AllocSegment::None, 0x10),
         }
@@ -689,6 +564,7 @@ impl ElfBlock for SymTabSection {
 
     fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
         let index = w.reserve_symtab_section_index();
+        self.offsets.section_index = Some(index);
         data.symtab.section_index = Some(index);
 
         if w.symtab_shndx_needed() {
@@ -703,12 +579,9 @@ impl ElfBlock for SymTabSection {
         for x in symbols.iter() {
             println!("static: {:?}", x);
         }
-        //for x in data.dynamics.symbols() {
-        //println!("dynamic: {:?}", x);
-        //}
 
         assert_eq!(symbols.len(), self.count);
-        //assert_eq!(symbols.len() + 1, w.symbol_count() as usize);
+        assert_eq!(symbols.len() + 1, w.symbol_count() as usize);
 
         // reserve the symbols in the various sections
         self.offsets.file_offset = w.reserve_start_section(&self.offsets) as u64;
@@ -754,14 +627,12 @@ impl ElfBlock for SymTabSection {
 }
 
 pub struct DynSymSection {
-    //index: Option<SectionIndex>,
     offsets: SectionOffset,
     symbol_count: u32,
 }
 impl Default for DynSymSection {
     fn default() -> Self {
         Self {
-            //index: None,
             offsets: SectionOffset::new("dynsym".into(), AllocSegment::RO, 0x08),
             symbol_count: 0,
         }
@@ -779,6 +650,7 @@ impl ElfBlock for DynSymSection {
 
     fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
         let index = w.reserve_dynsym_section_index();
+        self.offsets.section_index = Some(index);
         data.dynsym.section_index = Some(index);
     }
 
@@ -814,13 +686,11 @@ impl ElfBlock for DynSymSection {
 }
 
 pub struct DynStrSection {
-    //index: Option<SectionIndex>,
     offsets: SectionOffset,
 }
 impl Default for DynStrSection {
     fn default() -> Self {
         Self {
-            //index: None,
             offsets: SectionOffset::new("dynstr".into(), AllocSegment::RO, 0x01),
         }
     }
@@ -836,6 +706,7 @@ impl ElfBlock for DynStrSection {
 
     fn reserve_section_index(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
         let index = w.reserve_dynstr_section_index();
+        self.offsets.section_index = Some(index);
         data.dynstr.section_index = Some(index);
     }
 
@@ -843,8 +714,10 @@ impl ElfBlock for DynStrSection {
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve_dynstr();
         let after = w.reserved_len();
+        let size = after - file_offset;
+        self.offsets.size = size as u64;
         data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, after - file_offset, w);
+            .add_offsets(self.alloc(), &mut self.offsets, size, w);
         data.dynstr.addr = Some(self.offsets.address);
         data.dynstr.size = Some(self.offsets.size as usize);
     }
@@ -859,26 +732,37 @@ impl ElfBlock for DynStrSection {
     }
 }
 
-#[derive(Default)]
 pub struct ShStrTabSection {
-    //index: Option<SectionIndex>,
-    file_offset: usize,
+    offsets: SectionOffset,
+}
+impl Default for ShStrTabSection {
+    fn default() -> Self {
+        Self {
+            offsets: SectionOffset::new("shstrtab".into(), AllocSegment::RO, 0x01),
+        }
+    }
 }
 impl ElfBlock for ShStrTabSection {
     fn name(&self) -> String {
-        return "shstrtab".to_string();
+        self.offsets.name.to_string()
     }
+
+    fn alloc(&self) -> AllocSegment {
+        self.offsets.alloc
+    }
+
     fn reserve_section_index(&mut self, _data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
-        let _shstrtab_index = w.reserve_shstrtab_section_index();
+        let index = w.reserve_shstrtab_section_index();
+        self.offsets.section_index = Some(index);
     }
 
     fn reserve(&mut self, _: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
-        self.file_offset = w.reserved_len();
+        self.offsets.file_offset = w.reserved_len() as u64;
         w.reserve_shstrtab();
     }
 
     fn write(&self, _: &Data, _: &ReadBlock, w: &mut Writer) {
-        assert_eq!(w.len(), self.file_offset);
+        assert_eq!(w.len(), self.offsets.file_offset as usize);
         w.write_shstrtab();
     }
 

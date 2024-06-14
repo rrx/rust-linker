@@ -772,7 +772,6 @@ impl ElfBlock for ShStrTabSection {
 }
 
 pub struct HashSection {
-    index: Option<SectionIndex>,
     bucket_count: u32,
     offsets: SectionOffset,
 }
@@ -793,7 +792,6 @@ fn sysv_hash(s: &[u8]) -> u32 {
 impl HashSection {
     pub fn new() -> Self {
         Self {
-            index: None,
             bucket_count: 2,
             offsets: SectionOffset::new("hash".into(), AllocSegment::RO, 0x08),
         }
@@ -809,7 +807,7 @@ impl ElfBlock for HashSection {
     }
 
     fn reserve_section_index(&mut self, _data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
-        self.index = Some(w.reserve_hash_section_index());
+        self.offsets.section_index = Some(w.reserve_hash_section_index());
     }
 
     fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
@@ -818,8 +816,10 @@ impl ElfBlock for HashSection {
         w.reserve_hash(self.bucket_count, chain_count);
 
         let after = w.reserved_len();
+        let size = after - file_offset;
+        self.offsets.size = size as u64;
         data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, after - file_offset, w);
+            .add_offsets(self.alloc(), &mut self.offsets, size, w);
         data.hash.addr = Some(self.offsets.address);
     }
 
@@ -836,7 +836,6 @@ impl ElfBlock for HashSection {
         w.write_hash(self.bucket_count, chain_count, |i| {
             if let Some(name) = h.get(&SymbolIndex(i)) {
                 let hash = sysv_hash(name.as_bytes());
-                //eprintln!("w: {}, i:{:#8x}, hash:{:#08x}", name, i, hash);
                 Some(hash)
             } else {
                 None
@@ -851,7 +850,6 @@ impl ElfBlock for HashSection {
 
 /// See: https://flapenguin.me/elf-dt-gnu-hash
 pub struct GnuHashSection {
-    index: Option<SectionIndex>,
     bucket_count: u32,
     chain_count: u32,
     bloom_count: u32,
@@ -861,7 +859,6 @@ pub struct GnuHashSection {
 impl GnuHashSection {
     pub fn new() -> Self {
         Self {
-            index: None,
             bucket_count: 10,
             chain_count: 10,
             bloom_count: 10,
@@ -879,7 +876,7 @@ impl ElfBlock for GnuHashSection {
     }
 
     fn reserve_section_index(&mut self, _data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
-        self.index = Some(w.reserve_gnu_hash_section_index());
+        self.offsets.section_index = Some(w.reserve_gnu_hash_section_index());
     }
 
     fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
@@ -982,7 +979,7 @@ impl GotSection {
 
 impl ElfBlock for GotSection {
     fn name(&self) -> String {
-        self.section.name() //offsets.name.clone()
+        self.section.name()
     }
     fn alloc(&self) -> AllocSegment {
         self.section.alloc()
@@ -1000,14 +997,12 @@ impl ElfBlock for GotSection {
         let len = unapplied.len() + self.kind.start_index();
         let size = len * std::mem::size_of::<usize>();
         let file_offset = w.reserve_start_section(&self.section.offsets);
+        self.section.offsets.size = size as u64;
         w.reserve(size, 1);
         let after = w.reserved_len();
-        data.segments.add_offsets(
-            self.alloc(),
-            &mut self.section.offsets,
-            after - file_offset,
-            w,
-        );
+        assert_eq!(after - file_offset, size);
+        data.segments
+            .add_offsets(self.alloc(), &mut self.section.offsets, size, w);
         // update section pointers
         data.addr_set(name, self.section.offsets.address);
     }
@@ -1070,15 +1065,12 @@ impl ElfBlock for PltSection {
 
         println!("plt align: {}", align);
         let file_offset = w.reserve_start_section(&self.section.offsets);
+        self.section.offsets.size = size as u64;
         w.reserve(self.section.bytes.len(), align);
         let after = w.reserved_len();
         assert_eq!(size, after - file_offset);
-        data.segments.add_offsets(
-            self.alloc(),
-            &mut self.section.offsets,
-            after - file_offset,
-            w,
-        );
+        data.segments
+            .add_offsets(self.alloc(), &mut self.section.offsets, size, w);
 
         // update section pointers
         data.addr.insert(
@@ -1197,16 +1189,13 @@ impl ElfBlock for PltGotSection {
         let size = (pltgot.len()) * self.entry_size;
         self.section.size = size;
         let file_offset = w.reserve_start_section(&self.section.offsets);
+        self.section.offsets.size = size as u64;
         w.reserve(size, 1);
         let after = w.reserved_len();
         assert_eq!(size, after - file_offset);
 
-        data.segments.add_offsets(
-            self.alloc(),
-            &mut self.section.offsets,
-            after - file_offset,
-            w,
-        );
+        data.segments
+            .add_offsets(self.alloc(), &mut self.section.offsets, size, w);
 
         // update section pointers
         let address = self.section.offsets.address;

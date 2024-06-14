@@ -70,7 +70,7 @@ impl Blocks {
 
     pub fn build(&mut self, data: &mut Data, w: &mut Writer, block: &mut ReadBlock) {
         // generate the program header
-        data.ph = self.generate_ph();
+        data.ph = Self::generate_ph(&mut self.blocks);
 
         // RESERVE SECTION HEADERS
         // section headers are optional
@@ -92,7 +92,7 @@ impl Blocks {
         }
 
         // UPDATE
-        data.ph = self.program_headers(data);
+        data.ph = Self::program_headers(&self.blocks, data);
 
         // WRITE
         self.write(data, w);
@@ -101,36 +101,6 @@ impl Blocks {
         if data.add_section_headers {
             self.write_section_headers(&data, block, w);
         }
-    }
-
-    /// generate a temporary list of program headers
-    pub fn generate_ph(&mut self) -> Vec<ProgramHeaderEntry> {
-        // build a list of sections that are loaded
-        // this is a hack to get tracker to build a correct list of program headers
-        // without having to go through the blocks and do reservations
-        let mut data = Data::new(vec![]);
-        //data.addr_set(".got.plt", 0);
-        //data.pointer_set("_start".to_string(), 0);
-        //data.pointer_set("__data_start".to_string(), 0);
-        let mut out_data = Vec::new();
-        let endian = Endianness::Little;
-        let mut w = object::write::elf::Writer::new(endian, data.is_64, &mut out_data);
-
-        //block.build_strings(&mut data, &mut w);
-        for b in self.blocks.iter_mut() {
-            b.reserve_section_index(&mut data, &mut w);
-        }
-
-        Self::reserve_symbols(&mut data, &mut w);
-        //Self::reserve_export_symbols(&mut data, block, &mut w);
-
-        for b in self.blocks.iter_mut() {
-            b.reserve(&mut data, &mut w);
-        }
-        // get a list of program headers
-        // we really only need to know the number of headers, so we can correctly
-        // set the values in the file header
-        self.program_headers(&mut data)
     }
 
     pub fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
@@ -177,9 +147,42 @@ impl Blocks {
         }
     }
 
-    pub fn program_headers(&self, data: &Data) -> Vec<ProgramHeaderEntry> {
+    /// generate a temporary list of program headers
+    pub fn generate_ph(blocks: &mut Vec<Box<dyn ElfBlock>>) -> Vec<ProgramHeaderEntry> {
+        // build a list of sections that are loaded
+        // this is a hack to get tracker to build a correct list of program headers
+        // without having to go through the blocks and do reservations
+        let mut data = Data::new(vec![]);
+        //data.addr_set(".got.plt", 0);
+        //data.pointer_set("_start".to_string(), 0);
+        //data.pointer_set("__data_start".to_string(), 0);
+        let mut out_data = Vec::new();
+        let endian = Endianness::Little;
+        let mut w = object::write::elf::Writer::new(endian, data.is_64, &mut out_data);
+
+        //block.build_strings(&mut data, &mut w);
+        for b in blocks.iter_mut() {
+            b.reserve_section_index(&mut data, &mut w);
+        }
+
+        Self::reserve_symbols(&mut data, &mut w);
+        //Self::reserve_export_symbols(&mut data, block, &mut w);
+
+        for b in blocks.iter_mut() {
+            b.reserve(&mut data, &mut w);
+        }
+        // get a list of program headers
+        // we really only need to know the number of headers, so we can correctly
+        // set the values in the file header
+        Self::program_headers(blocks, &mut data)
+    }
+
+    pub fn program_headers(
+        blocks: &Vec<Box<dyn ElfBlock>>,
+        data: &Data,
+    ) -> Vec<ProgramHeaderEntry> {
         let mut ph = vec![];
-        for b in self.blocks.iter() {
+        for b in blocks.iter() {
             ph.extend(b.program_header());
         }
         ph.extend(data.segments.program_headers());

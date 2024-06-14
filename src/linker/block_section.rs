@@ -106,7 +106,7 @@ impl ElfBlock for GeneralSection {
         self.offsets.size = size as u64;
 
         data.segments
-            .add_offsets(self.offsets.alloc, &mut self.offsets, size, w);
+            .add_offsets(self.offsets.alloc, &mut self.offsets, w);
         data.addr_set(&self.name, self.offsets.address);
         self.state = BlockSectionState::Located;
     }

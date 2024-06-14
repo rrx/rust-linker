@@ -289,18 +289,12 @@ impl SegmentTracker {
     }
 
     // add non-section data
-    pub fn add_offsets(
-        &mut self,
-        alloc: AllocSegment,
-        offsets: &mut SectionOffset,
-        _size: usize,
-        w: &Writer,
-    ) {
+    pub fn add_offsets(&mut self, alloc: AllocSegment, offsets: &mut SectionOffset, w: &Writer) {
         let current_size;
         let current_file_offset;
         let current_alloc;
         let mut base;
-        assert_eq!(_size, offsets.size as usize);
+        //assert_eq!(_size, offsets.size as usize);
 
         // get current segment, or defaults
         if let Some(c) = self.segments.last() {

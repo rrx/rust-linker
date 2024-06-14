@@ -36,12 +36,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let block = reader.build();
     block.dump();
 
+    //let mut data = block.data();
     let mut data = link::Data::new(block.libs.iter().cloned().collect());
     if let Some(interp) = args.interp {
         data = data.interp(interp);
     }
 
     let output = args.output.unwrap_or("a.out".to_string());
-    block.write::<object::elf::FileHeader64<object::Endianness>>(&mut data, Path::new(&output))?;
+    reader::write::<object::elf::FileHeader64<object::Endianness>>(
+        block,
+        &mut data,
+        Path::new(&output),
+    )?;
+    //block.write::<object::elf::FileHeader64<object::Endianness>>(&mut data, Path::new(&output))?;
     Ok(())
 }

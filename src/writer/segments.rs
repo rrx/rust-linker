@@ -110,7 +110,7 @@ impl Blocks {
         let endian = Endianness::Little;
         let mut w = object::write::elf::Writer::new(endian, data.is_64, &mut out_data);
 
-        block.build_strings(&mut data, &mut w);
+        //block.build_strings(&mut data, &mut w);
         for b in self.blocks.iter_mut() {
             b.reserve_section_index(&mut data, block, &mut w);
         }

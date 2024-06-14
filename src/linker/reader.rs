@@ -389,7 +389,11 @@ impl ReadBlock {
             }
         }
     }
-    pub fn build_strings(&self, data: &mut Data, w: &mut Writer) {
+
+    fn build_strings(&self, data: &mut Data, w: &mut Writer) {
+        self.update_relocations(data, w);
+        self.update_data(data);
+
         // add libraries if they are configured
         for lib in data.libs.iter_mut() {
             unsafe {
@@ -397,9 +401,6 @@ impl ReadBlock {
                 lib.string_id = Some(w.add_dynamic_string(buf));
             }
         }
-
-        self.update_relocations(data, w);
-        self.update_data(data);
 
         for (name, symbol) in self.exports.iter() {
             // allocate string for the symbol table

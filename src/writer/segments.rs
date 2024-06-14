@@ -85,7 +85,7 @@ impl Blocks {
         // RESERVE
 
         // finalize the layout
-        self.reserve(data, block, w);
+        self.reserve(data, w);
 
         if data.add_section_headers {
             w.reserve_section_headers();
@@ -95,7 +95,7 @@ impl Blocks {
         data.ph = self.program_headers(data);
 
         // WRITE
-        self.write(data, block, w);
+        self.write(data, w);
 
         // SECTION HEADERS
         if data.add_section_headers {
@@ -125,7 +125,7 @@ impl Blocks {
         //Self::reserve_export_symbols(&mut data, block, &mut w);
 
         for b in self.blocks.iter_mut() {
-            b.reserve(&mut data, block, &mut w);
+            b.reserve(&mut data, &mut w);
         }
         // get a list of program headers
         // we really only need to know the number of headers, so we can correctly
@@ -133,10 +133,10 @@ impl Blocks {
         self.program_headers(&mut data)
     }
 
-    pub fn reserve(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
+    pub fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         for b in self.blocks.iter_mut() {
             let pos = w.reserved_len();
-            b.reserve(data, block, w);
+            b.reserve(data, w);
             let after = w.reserved_len();
             log::debug!(
                 "reserve: {}, {:#0x}, {:#0x},  {:?}",
@@ -148,7 +148,7 @@ impl Blocks {
         }
     }
 
-    pub fn write(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
+    pub fn write(&mut self, data: &mut Data, w: &mut Writer) {
         for b in self.blocks.iter() {
             let pos = w.len();
             //eprintln!("write: {}", b.name());

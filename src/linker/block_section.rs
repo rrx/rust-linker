@@ -98,7 +98,7 @@ impl ElfBlock for GeneralSection {
         data.section_index_set(&self.name, index);
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve(self.bytes.len(), 1);
         let after = w.reserved_len();

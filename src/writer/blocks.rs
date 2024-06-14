@@ -53,7 +53,7 @@ pub trait ElfBlock {
         vec![]
     }
     fn reserve_section_index(&mut self, _: &mut Data, _: &mut ReadBlock, _: &mut Writer) {}
-    fn reserve(&mut self, _: &mut Data, _: &mut ReadBlock, _: &mut Writer) {}
+    fn reserve(&mut self, _: &mut Data, _: &mut Writer) {}
     fn write(&self, _: &Data, _: &mut Writer) {}
     fn write_section_header(&self, _: &Data, _: &ReadBlock, _: &mut Writer) {}
 }
@@ -83,7 +83,7 @@ impl ElfBlock for FileHeader {
         let _null_section_index = w.reserve_null_section_index();
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         if w.reserved_len() > 0 {
             panic!("Must start with file header");
         }
@@ -162,7 +162,7 @@ impl ElfBlock for ProgramHeader {
         ]
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         self.ph_count = data.ph.len();
         let before = w.reserved_len();
         w.reserve_program_headers(self.ph_count as u32);
@@ -249,7 +249,7 @@ impl ElfBlock for InterpSection {
         let _index = w.reserve_section_index();
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         w.reserve_start_section(&self.offsets);
         let size = self.as_slice().len();
         self.offsets.size = size as u64;
@@ -326,7 +326,7 @@ impl ElfBlock for DynamicSection {
         self.index = Some(index);
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let dynamic = data.gen_dynamic();
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve_dynamic(dynamic.len());
@@ -403,7 +403,7 @@ impl ElfBlock for RelaDynSection {
         self.offsets.section_index = Some(w.reserve_section_index());
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let relocations = data.dynamics.relocations(self.kind);
 
         self.count = relocations.len();
@@ -544,7 +544,7 @@ impl ElfBlock for StrTabSection {
         data.section_index.insert(".strtab".to_string(), index);
     }
 
-    fn reserve(&mut self, _: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, _: &mut Data, w: &mut Writer) {
         self.offsets.file_offset = w.reserve_start_section(&self.offsets) as u64;
         assert!(w.strtab_needed());
         w.reserve_strtab();
@@ -588,7 +588,7 @@ impl ElfBlock for SymTabSection {
         }
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         self.count = data.statics.symbol_count();
         let symbols = data.statics.gen_symbols(data);
 
@@ -670,7 +670,7 @@ impl ElfBlock for DynSymSection {
         data.dynsym.section_index = Some(index);
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         self.symbol_count = w.dynamic_symbol_count();
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve_dynsym();
@@ -731,7 +731,7 @@ impl ElfBlock for DynStrSection {
         data.dynstr.section_index = Some(index);
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve_dynstr();
         let after = w.reserved_len();
@@ -780,7 +780,7 @@ impl ElfBlock for ShStrTabSection {
         self.offsets.section_index = Some(index);
     }
 
-    fn reserve(&mut self, _: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, _: &mut Data, w: &mut Writer) {
         self.offsets.file_offset = w.reserved_len() as u64;
         w.reserve_shstrtab();
     }
@@ -834,7 +834,7 @@ impl ElfBlock for HashSection {
         self.offsets.section_index = Some(w.reserve_hash_section_index());
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let chain_count = data.dynamics.symbol_count() as u32;
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve_hash(self.bucket_count, chain_count);
@@ -906,7 +906,7 @@ impl ElfBlock for GnuHashSection {
         self.offsets.section_index = Some(w.reserve_gnu_hash_section_index());
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         self.offsets.file_offset = w.reserve_start_section(&self.offsets) as u64;
         w.reserve_gnu_hash(self.bloom_count, self.bucket_count, self.chain_count);
 
@@ -1021,7 +1021,7 @@ impl ElfBlock for GotSection {
         self.section.reserve_section_index(data, block, w);
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         // each entry in unapplied will be a GOT entry
         let unapplied = data.dynamics.relocations(self.kind);
         let name = self.kind.section_name();
@@ -1092,7 +1092,7 @@ impl ElfBlock for PltSection {
         self.section.reserve_section_index(data, block, w);
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let plt_entries_count = data.dynamics.plt_objects().len();
 
         // length + 1, to account for the stub.  Each entry is 0x10 in size
@@ -1226,7 +1226,7 @@ impl ElfBlock for PltGotSection {
         self.section.reserve_section_index(data, block, w);
     }
 
-    fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let pltgot = data.dynamics.pltgot_objects();
         let size = (pltgot.len()) * self.entry_size;
         self.section.size = size;

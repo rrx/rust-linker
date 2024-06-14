@@ -84,14 +84,6 @@ pub struct TrackSection {
     pub section_index: Option<SectionIndex>,
 }
 
-impl TrackSection {
-    /*
-        fn new() -> Self {
-            Self { size: 0, addr: 0, section_index: None }
-        }
-    */
-}
-
 pub enum SymbolPointer {
     RX(usize),
     RO(usize),

@@ -303,7 +303,7 @@ impl SegmentTracker {
 
         // get current segment, or defaults
         if let Some(c) = self.segments.last() {
-            current_size = c.size() as u64;
+            current_size = c.segment_size() as u64;
             current_file_offset = c.file_offset;
             current_alloc = c.alloc;
             base = c.base;
@@ -402,7 +402,7 @@ impl Segment {
         }
     }
 
-    pub fn size(&self) -> usize {
+    pub fn segment_size(&self) -> usize {
         self.segment_size
     }
 
@@ -411,26 +411,17 @@ impl Segment {
         self.segment_size = aligned + size;
         self.adjusted_file_offset = self.file_offset + aligned as u64;
 
-        //eprintln!("add: {:#0x}, {:?}", size, self);
-        //eprintln!(
-        //"x: {:#0x}, {:#0x}",
-        //self.adjusted_file_offset as usize + size,
-        //w.reserved_len()
-        //);
-
         assert_eq!(self.adjusted_file_offset as usize + size, w.reserved_len());
 
         offsets.base = self.base;
         offsets.size = size as u64;
         offsets.address = self.base + self.adjusted_file_offset;
         offsets.file_offset = self.adjusted_file_offset;
-
-        //eprintln!("add: {:#0x}, {:?}", size, self);
     }
 
     pub fn program_header(&self) -> Option<ProgramHeaderEntry> {
         // add a load section for the file and program header, so it's covered
-        let size = self.size() as u64;
+        let size = self.segment_size() as u64;
         Some(ProgramHeaderEntry {
             p_type: elf::PT_LOAD,
             p_flags: self.alloc.program_header_flags(),

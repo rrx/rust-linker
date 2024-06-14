@@ -59,14 +59,12 @@ pub trait ElfBlock {
 }
 
 pub struct FileHeader {
-    size: usize,
     offsets: SectionOffset,
 }
 
 impl Default for FileHeader {
     fn default() -> Self {
         Self {
-            size: 0,
             offsets: SectionOffset::new("fh".into(), AllocSegment::RO, 0x01),
         }
     }
@@ -92,10 +90,10 @@ impl ElfBlock for FileHeader {
 
         // Start reserving file ranges.
         w.reserve_file_header();
-        self.size = w.reserved_len();
+        let size = w.reserved_len();
+        self.offsets.size = size as u64;
         let alloc = self.alloc();
-        data.segments
-            .add_offsets(alloc, &mut self.offsets, self.size, w);
+        data.segments.add_offsets(alloc, &mut self.offsets, size, w);
     }
 
     fn write(&self, data: &Data, _: &ReadBlock, w: &mut Writer) {
@@ -120,7 +118,6 @@ impl ElfBlock for FileHeader {
 }
 
 pub struct ProgramHeader {
-    //size: usize,
     //base: usize,
     offsets: SectionOffset,
     ph_count: usize,
@@ -129,7 +126,6 @@ pub struct ProgramHeader {
 impl Default for ProgramHeader {
     fn default() -> Self {
         Self {
-            //size: 0,
             ph_count: 0,
             //base: 0,
             offsets: SectionOffset::new("ph".into(), AllocSegment::RO, 0x01),
@@ -171,6 +167,7 @@ impl ElfBlock for ProgramHeader {
 
         let alloc = self.alloc();
         let size = self.offsets.size as usize;
+        self.offsets.size = size as u64;
         data.segments.add_offsets(alloc, &mut self.offsets, size, w);
     }
 
@@ -247,6 +244,7 @@ impl ElfBlock for InterpSection {
     fn reserve(&mut self, data: &mut Data, _: &mut ReadBlock, w: &mut Writer) {
         w.reserve_start_section(&self.offsets);
         let size = self.as_slice().len();
+        self.offsets.size = size as u64;
         w.reserve(size, 1); //self.offsets.align as usize);
         data.segments
             .add_offsets(self.alloc(), &mut self.offsets, size, w);
@@ -322,9 +320,11 @@ impl ElfBlock for DynamicSection {
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve_dynamic(dynamic.len());
         let after = w.reserved_len();
+        let size = after - file_offset;
+        self.offsets.size = size as u64;
 
         data.segments
-            .add_offsets(self.alloc(), &mut self.offsets, after - file_offset, w);
+            .add_offsets(self.alloc(), &mut self.offsets, size, w);
         data.section_dynamic.addr = Some(self.offsets.address);
         data.pointers.insert(
             ".dynamic".to_string(),

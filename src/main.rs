@@ -38,6 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     //let mut data = block.data();
     let mut data = link::Data::new(block.libs.iter().cloned().collect());
+    data.exports = block.exports.clone();
     if let Some(interp) = args.interp {
         data = data.interp(interp);
     }

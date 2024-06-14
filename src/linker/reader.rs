@@ -246,7 +246,7 @@ pub struct ReadBlock {
     pub libs: HashSet<String>,
     local_index: usize,
     pub(crate) locals: SymbolMap,
-    pub(crate) exports: SymbolMap,
+    pub exports: SymbolMap,
     pub(crate) dynamic: SymbolMap,
     pub(crate) unknown: SymbolMap,
     pub ro: GeneralSection,
@@ -281,6 +281,10 @@ impl ReadBlock {
     pub fn data(self) -> crate::Data {
         let mut data = crate::Data::new(self.libs.iter().cloned().collect());
         data.exports = self.exports.clone();
+        data.ro = self.ro.clone();
+        data.rw = self.rw.clone();
+        data.rx = self.rx.clone();
+        data.bss = self.bss.clone();
         data
     }
 
@@ -413,7 +417,7 @@ impl ReadBlock {
             }
         }
 
-        for (name, symbol) in self.exports.iter() {
+        for (name, symbol) in data.exports.iter() {
             // allocate string for the symbol table
             let _string_id = data.statics.string_add(name, w);
             data.pointers

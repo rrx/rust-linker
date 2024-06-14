@@ -228,7 +228,11 @@ pub struct Data {
     add_section_headers: bool,
     add_symbols: bool,
 
-    pub(crate) exports: SymbolMap,
+    pub exports: SymbolMap,
+    pub ro: GeneralSection,
+    pub rw: GeneralSection,
+    pub rx: GeneralSection,
+    pub bss: GeneralSection,
 }
 
 impl Data {
@@ -270,6 +274,10 @@ impl Data {
             statics: Statics::new(),
 
             exports: SymbolMap::new(),
+            ro: GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
+            rw: GeneralSection::new(AllocSegment::RW, ".data", 0x10),
+            rx: GeneralSection::new(AllocSegment::RX, ".text", 0x10),
+            bss: GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
         }
     }
 

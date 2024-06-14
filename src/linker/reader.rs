@@ -144,15 +144,6 @@ impl SymbolBind {
     }
 }
 
-/*
-#[derive(Debug, Clone)]
-pub enum SymbolLookupTable {
-    GOT,
-    PLT,
-    None,
-}
-*/
-
 #[derive(Debug, Clone)]
 pub struct ReadSymbol {
     pub(crate) name: String,
@@ -164,7 +155,6 @@ pub struct ReadSymbol {
     pub(crate) bind: SymbolBind,
     pub(crate) pointer: ResolvePointer,
     pub(crate) size: u64,
-    //lookup: SymbolLookupTable,
 }
 
 impl ReadSymbol {
@@ -179,7 +169,6 @@ impl ReadSymbol {
             bind: SymbolBind::Local,
             pointer,
             size: 0,
-            //lookup: SymbolLookupTable::None,
         }
     }
 
@@ -289,13 +278,6 @@ impl ReadBlock {
             }
         }
 
-        // Add static symbols to data
-        let locals = vec!["_DYNAMIC"];
-        for symbol_name in locals {
-            let s = self.lookup_static(symbol_name).unwrap();
-            data.pointers.insert(s.name, s.pointer);
-        }
-
         let iter = self
             .ro
             .relocations()
@@ -402,6 +384,13 @@ impl ReadBlock {
                 }
                 _ => (),
             }
+        }
+
+        // Add static symbols to data
+        let locals = vec!["_DYNAMIC"];
+        for symbol_name in locals {
+            let s = self.lookup_static(symbol_name).unwrap();
+            data.pointers.insert(s.name, s.pointer);
         }
 
         for (name, symbol) in self.exports.iter() {

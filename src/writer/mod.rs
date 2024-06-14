@@ -446,6 +446,7 @@ impl Data {
     }
 }
 
+/*
 pub fn write_file_main<Elf: object::read::elf::FileHeader<Endian = Endianness>>(
     data: &mut Data,
     block: &mut ReadBlock,
@@ -456,6 +457,7 @@ pub fn write_file_main<Elf: object::read::elf::FileHeader<Endian = Endianness>>(
     blocks.build(data, w, block);
     Ok(())
 }
+*/
 
 /// align size
 pub fn size_align(n: usize, align: usize) -> usize {

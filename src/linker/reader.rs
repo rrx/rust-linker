@@ -78,7 +78,7 @@ impl ReadSectionKind {
     }
 
     pub fn block(&self) -> Box<dyn ElfBlock> {
-        Box::new(BlockSectionX::new(self.clone()))
+        Box::new(BlockSectionX::new(*self))
     }
 
     pub fn alloc(&self) -> Option<AllocSegment> {
@@ -426,7 +426,10 @@ impl ReadBlock {
         let mut out_data = Vec::new();
         let endian = object::Endianness::Little;
         let mut writer = object::write::elf::Writer::new(endian, data.is_64(), &mut out_data);
-        write_file_main::<Elf>(data, &mut self, &mut writer)?;
+        self.build_strings(data, &mut writer);
+        let mut blocks = Blocks::new(data, &mut writer);
+        blocks.build(data, &mut writer, &mut self);
+        //write_file_main::<Elf>(data, &mut self, &mut writer)?;
         let size = out_data.len();
         std::fs::write(path, out_data)?;
         eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());

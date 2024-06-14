@@ -87,7 +87,7 @@ impl Blocks {
         }
 
         // UPDATE
-        data.ph = self.program_headers(data, block);
+        data.ph = self.program_headers(data);
 
         // WRITE
         self.write(data, block, w);
@@ -124,7 +124,7 @@ impl Blocks {
         // get a list of program headers
         // we really only need to know the number of headers, so we can correctly
         // set the values in the file header
-        self.program_headers(&mut data, block)
+        self.program_headers(&mut data)
     }
 
     pub fn reserve(&mut self, data: &mut Data, block: &mut ReadBlock, w: &mut Writer) {
@@ -176,7 +176,7 @@ impl Blocks {
         }
     }
 
-    pub fn program_headers(&self, data: &Data, _: &ReadBlock) -> Vec<ProgramHeaderEntry> {
+    pub fn program_headers(&self, data: &Data) -> Vec<ProgramHeaderEntry> {
         let mut ph = vec![];
         for b in self.blocks.iter() {
             ph.extend(b.program_header());

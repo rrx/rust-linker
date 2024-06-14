@@ -1192,7 +1192,6 @@ impl ElfBlock for PltSection {
     }
 
     fn write_section_header(&self, data: &Data, w: &mut Writer) {
-        // TODO: remove use of ReadBlock
         self.section.write_section_header(data, w);
     }
 }

@@ -3,6 +3,7 @@ use super::*;
 pub struct Blocks {
     pub blocks: Vec<Box<dyn ElfBlock>>,
     pub ph: Vec<ProgramHeaderEntry>,
+    pub(crate) exports: SymbolMap,
 }
 
 impl Blocks {
@@ -66,7 +67,11 @@ impl Blocks {
         }
 
         let ph = Self::generate_ph(&mut blocks);
-        Self { blocks, ph }
+        Self {
+            blocks,
+            ph,
+            exports: block.exports.clone(), //SymbolMap::new(),
+        }
     }
 
     pub fn build(&mut self, data: &mut Data, w: &mut Writer, block: &mut ReadBlock) {
@@ -81,7 +86,7 @@ impl Blocks {
 
         // RESERVE SYMBOLS
         Self::reserve_symbols(data, w);
-        Self::reserve_export_symbols(data, block, w);
+        self.reserve_export_symbols(data, w);
 
         // finalize the layout
         self.reserve(data, w);
@@ -189,9 +194,9 @@ impl Blocks {
         ph
     }
 
-    fn reserve_export_symbols(data: &mut Data, block: &ReadBlock, w: &mut Writer) {
+    fn reserve_export_symbols(&self, data: &mut Data, w: &mut Writer) {
         // reserve exports
-        for (_, symbol) in block.exports.iter() {
+        for (_, symbol) in self.exports.iter() {
             let section_index = symbol.section.section_index(data);
             data.statics.symbol_add(symbol, section_index, w);
         }

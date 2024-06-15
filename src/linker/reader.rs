@@ -555,6 +555,23 @@ impl Reader {
     }
 
     pub fn add(&mut self, path: &std::path::Path, config: &Config) -> Result<(), Box<dyn Error>> {
+        let p = Path::new(&path);
+        println!("p: {}", p.to_str().unwrap());
+        let ext = p.extension().unwrap().to_str().unwrap();
+        println!("ext: {}", ext);
+        if ext == "a" {
+            self.add_archive(&Path::new(&path), &config)?;
+        } else {
+            self.add_object(&Path::new(&path), &config)?;
+        }
+        Ok(())
+    }
+
+    pub fn add_object(
+        &mut self,
+        path: &std::path::Path,
+        config: &Config,
+    ) -> Result<(), Box<dyn Error>> {
         let buf = std::fs::read(path)?;
         let block = self.read(path.to_str().unwrap(), &buf, config)?;
         self.block.add_block(block);

@@ -7,8 +7,10 @@ use object::write::StringId;
 use object::SymbolKind;
 use object::{Architecture, Endianness};
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use std::fmt;
 use std::mem;
+use std::path::Path;
 
 use super::*;
 
@@ -500,6 +502,21 @@ impl Data {
             let s = self.target.lookup_static(symbol_name).unwrap();
             self.pointers.insert(s.name, s.pointer);
         }
+    }
+
+    pub fn write(&mut self, path: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
+        let mut out_data = Vec::new();
+        let endian = object::Endianness::Little;
+        let mut writer = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);
+        self.write_strings(&mut writer);
+        self.write_relocations(&mut writer);
+        self.update_data();
+        let mut blocks = Blocks::new(self, &mut writer, config);
+        blocks.build(self, &mut writer, config);
+        let size = out_data.len();
+        std::fs::write(path, out_data)?;
+        eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());
+        Ok(())
     }
 }
 

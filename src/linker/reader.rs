@@ -13,7 +13,6 @@ use std::path::Path;
 
 use super::*;
 use crate::writer::*;
-//use crate::*;
 
 pub type SymbolMap = HashMap<String, ReadSymbol>;
 
@@ -521,21 +520,6 @@ impl ReadBlock {
         eprintln!("Block: {}", &self.name);
         self.target.dump();
     }
-}
-
-pub fn write(data: &mut Data, path: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
-    let mut out_data = Vec::new();
-    let endian = object::Endianness::Little;
-    let mut writer = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);
-    data.write_strings(&mut writer);
-    data.write_relocations(&mut writer);
-    data.update_data();
-    let mut blocks = Blocks::new(data, &mut writer, config);
-    blocks.build(data, &mut writer, config);
-    let size = out_data.len();
-    std::fs::write(path, out_data)?;
-    eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());
-    Ok(())
 }
 
 pub fn dump_hash(data: &[u8]) {

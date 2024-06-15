@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let output = args.output.unwrap_or("a.out".to_string());
 
-    reader::write(&mut data, Path::new(&output), &config)?;
+    data.write(Path::new(&output), &config)?;
 
     Ok(())
 }

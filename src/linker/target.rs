@@ -13,6 +13,7 @@ pub struct Target {
     pub rx: GeneralSection,
     pub bss: GeneralSection,
     pub unresolved: HashSet<String>,
+    pub unknown: SymbolMap,
 }
 
 impl Target {
@@ -26,6 +27,7 @@ impl Target {
             rx: GeneralSection::new(AllocSegment::RX, ".text", 0x10),
             bss: GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
             unresolved: HashSet::new(),
+            unknown: SymbolMap::new(),
         }
     }
 
@@ -55,6 +57,22 @@ impl Target {
         } else {
             None
         }
+    }
+
+    pub fn insert_local(&mut self, s: ReadSymbol) {
+        self.locals.insert(s.name.clone(), s);
+    }
+
+    pub fn insert_export(&mut self, s: ReadSymbol) {
+        self.exports.insert(s.name.clone(), s);
+    }
+
+    pub fn insert_dynamic(&mut self, s: ReadSymbol) {
+        self.dynamic.insert(s.name.clone(), s);
+    }
+
+    pub fn insert_unknown(&mut self, s: ReadSymbol) {
+        self.unknown.insert(s.name.clone(), s);
     }
 
     pub fn dump(&self) {

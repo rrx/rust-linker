@@ -232,7 +232,6 @@ pub struct ReadBlock {
     target: Target,
     pub libs: HashSet<String>,
     local_index: usize,
-    pub(crate) unknown: SymbolMap,
     pub got: GeneralSection,
     pub gotplt: GeneralSection,
 }
@@ -246,7 +245,6 @@ impl ReadBlock {
             gotplt: GeneralSection::new(AllocSegment::RW, ".got.plt", 0x10),
             libs: HashSet::new(),
             local_index: 0,
-            unknown: SymbolMap::new(),
         }
     }
 
@@ -394,22 +392,6 @@ impl ReadBlock {
         }
     }
 
-    pub fn insert_local(&mut self, s: ReadSymbol) {
-        self.target.locals.insert(s.name.clone(), s);
-    }
-
-    pub fn insert_export(&mut self, s: ReadSymbol) {
-        self.target.exports.insert(s.name.clone(), s);
-    }
-
-    pub fn insert_dynamic(&mut self, s: ReadSymbol) {
-        self.target.dynamic.insert(s.name.clone(), s);
-    }
-
-    pub fn insert_unknown(&mut self, s: ReadSymbol) {
-        self.unknown.insert(s.name.clone(), s);
-    }
-
     fn relocate_symbol(&self, mut s: ReadSymbol) -> ReadSymbol {
         let base = match s.section {
             ReadSectionKind::RX => self.target.rx.size() as u64,
@@ -449,7 +431,7 @@ impl ReadBlock {
             let unique = format!(".u.{}{}", self.local_index, name);
             s.name = unique.clone();
             self.local_index += 1;
-            self.insert_local(s);
+            self.target.insert_local(s);
             renames.insert(name, unique);
         }
 
@@ -457,11 +439,11 @@ impl ReadBlock {
         for (_name, s) in block.target.exports.into_iter() {
             let s = self.relocate_symbol(s);
             //eprintln!("E: {:?}", (&block.name, name, &s));
-            self.insert_export(s);
+            self.target.insert_export(s);
         }
 
         for (_name, s) in block.target.dynamic.into_iter() {
-            self.insert_dynamic(s);
+            self.target.insert_dynamic(s);
         }
 
         self.libs.extend(block.libs.into_iter());
@@ -533,11 +515,11 @@ impl ReadBlock {
                     //if symbol.kind() == SymbolKind::Unknown {
                     //unreachable!("{:?}", s);
                     //}
-                    self.insert_local(s.clone());
+                    self.target.insert_local(s.clone());
                 } else if s.section == ReadSectionKind::Undefined {
                     //block.insert_unknown(s);
                 } else {
-                    self.insert_export(s.clone());
+                    self.target.insert_export(s.clone());
                 }
             }
         }
@@ -656,7 +638,7 @@ impl Reader {
             //eprintln!("s: {:#08x}, {:?}", 0, &s);
             count += 1;
             if s.kind != SymbolKind::Unknown {
-                block.insert_dynamic(s);
+                block.target.insert_dynamic(s);
             }
         }
         eprintln!("{} symbols read from {}", count, name);
@@ -706,7 +688,7 @@ impl Reader {
             let section_name = section_name.to_string();
             let pointer = ResolvePointer::Section(section_name, 0);
             let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
-            self.block.insert_local(symbol);
+            self.block.target.insert_local(symbol);
         }
 
         self.block

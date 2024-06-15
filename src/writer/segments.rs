@@ -261,6 +261,10 @@ impl SegmentTracker {
         }
     }
 
+    pub fn base(&self) -> u64 {
+        self.start_base
+    }
+
     pub fn current(&self) -> &Segment {
         self.segments.last().unwrap()
     }

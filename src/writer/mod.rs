@@ -266,7 +266,6 @@ impl Config {
 pub struct Data {
     interp: String,
     pub(crate) libs: Vec<Library>,
-    //base: usize,
     pub dynamics: Dynamics,
     pub statics: Statics,
     debug: HashSet<DebugFlag>,
@@ -283,7 +282,6 @@ pub struct Data {
     hash: TrackSection,
     symtab: TrackSection,
     section_dynamic: TrackSection,
-    //pub config: Config,
     pub target: Target,
 }
 
@@ -298,18 +296,15 @@ impl Data {
             })
             .collect();
 
-        let base = 0x80000;
-
         Self {
             //config: Config::new(),
             // default gnu loader
             interp: "/lib64/ld-linux-x86-64.so.2".to_string(),
             libs,
-            //base,
             ph: vec![],
             addr: HashMap::new(),
             section_index: HashMap::new(),
-            segments: SegmentTracker::new(base as u64),
+            segments: SegmentTracker::new(0x800000),
             dynstr: TrackSection::default(),
             dynsym: TrackSection::default(),
             reladyn: TrackSection::default(),

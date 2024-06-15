@@ -225,6 +225,79 @@ impl ReadBlock {
         data
     }
 
+    pub fn read<'a>(
+        &mut self,
+        name: &str,
+        buf: &'a [u8],
+        config: &Config,
+    ) -> Result<(), Box<dyn Error>> {
+        let b: elf::ElfFile<'a, FileHeader64<object::Endianness>> =
+            object::read::elf::ElfFile::parse(buf)?;
+        match b.kind() {
+            ObjectKind::Relocatable | ObjectKind::Executable => {
+                dump_header(&b)?;
+                self.relocatable(name.to_string(), &b, config)?
+            }
+            ObjectKind::Dynamic => self.dynamic(&b, name)?,
+            _ => unimplemented!("{:?}", b.kind()),
+        };
+        //Ok(block)
+        Ok(())
+    }
+
+    fn dynamic<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
+        &mut self,
+        b: &elf::ElfFile<'a, A, B>,
+        name: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        //let mut block = ReadBlock::new(name);
+        let mut count = 0;
+        for symbol in b.dynamic_symbols() {
+            let mut s = read_symbol(&b, 0, &symbol)?;
+            s.pointer = ResolvePointer::Resolved(0);
+            s.source = SymbolSource::Dynamic;
+            s.size = 0;
+            //eprintln!("s: {:#08x}, {:?}", 0, &s);
+            count += 1;
+            if s.kind != SymbolKind::Unknown {
+                self.target.insert_dynamic(s);
+            }
+        }
+        eprintln!("{} symbols read from {}", count, name);
+        self.libs.insert(name.to_string());
+        //Ok(block)
+        Ok(())
+    }
+
+    fn relocatable<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
+        &mut self,
+        name: String,
+        b: &elf::ElfFile<'a, A, B>,
+        config: &Config,
+    ) -> Result<(), Box<dyn Error>> {
+        //let mut block = ReadBlock::new(&name);
+
+        log::debug!("relocatable: {}", &name);
+
+        for section in b.sections() {
+            let kind = ReadSectionKind::new_section_kind(section.kind());
+
+            if config.debug.contains(&DebugFlag::HashTables) && section.name()? == ".hash" {
+                let data = section.uncompressed_data()?;
+                dump_hash(&data);
+            }
+
+            // skip other kinds
+            if kind == ReadSectionKind::Other {
+                continue;
+            }
+
+            self.from_section(&b, &section)?;
+        }
+
+        Ok(())
+    }
+
     pub fn update_data(&self, data: &mut Data) {
         for (name, _, pointer) in data.dynamics.symbols() {
             data.pointers.insert(name, pointer);
@@ -569,7 +642,7 @@ impl Reader {
         config: &Config,
     ) -> Result<(), Box<dyn Error>> {
         let buf = std::fs::read(path)?;
-        self.read(path.to_str().unwrap(), &buf, config)?;
+        self.block.read(path.to_str().unwrap(), &buf, config)?;
         //self.block.add_block(block);
         Ok(())
     }
@@ -604,84 +677,86 @@ impl Reader {
             let (offset, size) = m.file_range();
             let obj_buf = &buf[offset as usize..(offset + size) as usize];
             log::debug!("Member: {}, {:?}", &name, &m);
-            self.read(name, &obj_buf, config)?;
+            self.block.read(name, &obj_buf, config)?;
             //self.block.add_block(block);
         }
         Ok(())
     }
 
-    pub fn read<'a>(
-        &mut self,
-        name: &str,
-        buf: &'a [u8],
-        config: &Config,
-    ) -> Result<(), Box<dyn Error>> {
-        let b: elf::ElfFile<'a, FileHeader64<object::Endianness>> =
-            object::read::elf::ElfFile::parse(buf)?;
-        match b.kind() {
-            ObjectKind::Relocatable | ObjectKind::Executable => {
-                dump_header(&b)?;
-                self.relocatable(name.to_string(), &b, config)?
-            }
-            ObjectKind::Dynamic => self.dynamic(&b, name)?,
-            _ => unimplemented!("{:?}", b.kind()),
-        };
-        //Ok(block)
-        Ok(())
-    }
-
-    fn dynamic<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
-        &mut self,
-        b: &elf::ElfFile<'a, A, B>,
-        name: &str,
-    ) -> Result<(), Box<dyn Error>> {
-        //let mut block = ReadBlock::new(name);
-        let mut count = 0;
-        for symbol in b.dynamic_symbols() {
-            let mut s = read_symbol(&b, 0, &symbol)?;
-            s.pointer = ResolvePointer::Resolved(0);
-            s.source = SymbolSource::Dynamic;
-            s.size = 0;
-            //eprintln!("s: {:#08x}, {:?}", 0, &s);
-            count += 1;
-            if s.kind != SymbolKind::Unknown {
-                self.block.target.insert_dynamic(s);
-            }
-        }
-        eprintln!("{} symbols read from {}", count, name);
-        self.block.libs.insert(name.to_string());
-        //Ok(block)
-        Ok(())
-    }
-
-    fn relocatable<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
-        &mut self,
-        name: String,
-        b: &elf::ElfFile<'a, A, B>,
-        config: &Config,
-    ) -> Result<(), Box<dyn Error>> {
-        //let mut block = ReadBlock::new(&name);
-
-        log::debug!("relocatable: {}", &name);
-
-        for section in b.sections() {
-            let kind = ReadSectionKind::new_section_kind(section.kind());
-
-            if config.debug.contains(&DebugFlag::HashTables) && section.name()? == ".hash" {
-                let data = section.uncompressed_data()?;
-                dump_hash(&data);
-            }
-
-            // skip other kinds
-            if kind == ReadSectionKind::Other {
-                continue;
-            }
-
-            self.block.from_section(&b, &section)?;
+    /*
+        pub fn read<'a>(
+            &mut self,
+            name: &str,
+            buf: &'a [u8],
+            config: &Config,
+        ) -> Result<(), Box<dyn Error>> {
+            let b: elf::ElfFile<'a, FileHeader64<object::Endianness>> =
+                object::read::elf::ElfFile::parse(buf)?;
+            match b.kind() {
+                ObjectKind::Relocatable | ObjectKind::Executable => {
+                    dump_header(&b)?;
+                    self.relocatable(name.to_string(), &b, config)?
+                }
+                ObjectKind::Dynamic => self.dynamic(&b, name)?,
+                _ => unimplemented!("{:?}", b.kind()),
+            };
+            //Ok(block)
+            Ok(())
         }
 
-        Ok(())
-    }
+        fn dynamic<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
+            &mut self,
+            b: &elf::ElfFile<'a, A, B>,
+            name: &str,
+        ) -> Result<(), Box<dyn Error>> {
+            //let mut block = ReadBlock::new(name);
+            let mut count = 0;
+            for symbol in b.dynamic_symbols() {
+                let mut s = read_symbol(&b, 0, &symbol)?;
+                s.pointer = ResolvePointer::Resolved(0);
+                s.source = SymbolSource::Dynamic;
+                s.size = 0;
+                //eprintln!("s: {:#08x}, {:?}", 0, &s);
+                count += 1;
+                if s.kind != SymbolKind::Unknown {
+                    self.block.target.insert_dynamic(s);
+                }
+            }
+            eprintln!("{} symbols read from {}", count, name);
+            self.block.libs.insert(name.to_string());
+            //Ok(block)
+            Ok(())
+        }
+
+        fn relocatable<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
+            &mut self,
+            name: String,
+            b: &elf::ElfFile<'a, A, B>,
+            config: &Config,
+        ) -> Result<(), Box<dyn Error>> {
+            //let mut block = ReadBlock::new(&name);
+
+            log::debug!("relocatable: {}", &name);
+
+            for section in b.sections() {
+                let kind = ReadSectionKind::new_section_kind(section.kind());
+
+                if config.debug.contains(&DebugFlag::HashTables) && section.name()? == ".hash" {
+                    let data = section.uncompressed_data()?;
+                    dump_hash(&data);
+                }
+
+                // skip other kinds
+                if kind == ReadSectionKind::Other {
+                    continue;
+                }
+
+                self.block.from_section(&b, &section)?;
+            }
+
+            Ok(())
+        }
+    */
 
     pub fn build(mut self) -> ReadBlock {
         self.block.name = "exe".to_string();

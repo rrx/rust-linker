@@ -12,7 +12,6 @@ use std::error::Error;
 use std::path::Path;
 
 use super::*;
-use crate::disassemble::*;
 use crate::writer::*;
 use crate::*;
 
@@ -233,12 +232,9 @@ pub struct ReadBlock {
     target: Target,
     pub libs: HashSet<String>,
     local_index: usize,
-    pub(crate) locals: SymbolMap,
-    pub(crate) dynamic: SymbolMap,
     pub(crate) unknown: SymbolMap,
     pub got: GeneralSection,
     pub gotplt: GeneralSection,
-    pub unresolved: HashSet<String>,
 }
 
 impl ReadBlock {
@@ -250,10 +246,7 @@ impl ReadBlock {
             gotplt: GeneralSection::new(AllocSegment::RW, ".got.plt", 0x10),
             libs: HashSet::new(),
             local_index: 0,
-            locals: SymbolMap::new(),
-            dynamic: SymbolMap::new(),
             unknown: SymbolMap::new(),
-            unresolved: HashSet::new(),
         }
     }
 
@@ -271,7 +264,7 @@ impl ReadBlock {
         //eprintln!("plt: {:?}", data.dynamics.plt_hash);
         //eprintln!("pltgot: {:?}", data.dynamics.pltgot_hash);
 
-        for (name, symbol) in self.locals.iter() {
+        for (name, symbol) in self.target.locals.iter() {
             match symbol.section {
                 ReadSectionKind::RX
                 //| ReadSectionKind::ROStrings
@@ -288,7 +281,7 @@ impl ReadBlock {
         // Add static symbols to data
         let locals = vec!["_DYNAMIC"];
         for symbol_name in locals {
-            let s = self.lookup_static(symbol_name).unwrap();
+            let s = self.target.lookup_static(symbol_name).unwrap();
             data.pointers.insert(s.name, s.pointer);
         }
     }
@@ -328,7 +321,7 @@ impl ReadBlock {
         }
 
         for r in iter {
-            if let Some(s) = self.lookup(&r.name) {
+            if let Some(s) = self.target.lookup(&r.name) {
                 // we don't know the section yet, we just know which kind
                 let def = match s.bind {
                     SymbolBind::Local => CodeSymbolDefinition::Local,
@@ -402,7 +395,7 @@ impl ReadBlock {
     }
 
     pub fn insert_local(&mut self, s: ReadSymbol) {
-        self.locals.insert(s.name.clone(), s);
+        self.target.locals.insert(s.name.clone(), s);
     }
 
     pub fn insert_export(&mut self, s: ReadSymbol) {
@@ -410,7 +403,7 @@ impl ReadBlock {
     }
 
     pub fn insert_dynamic(&mut self, s: ReadSymbol) {
-        self.dynamic.insert(s.name.clone(), s);
+        self.target.dynamic.insert(s.name.clone(), s);
     }
 
     pub fn insert_unknown(&mut self, s: ReadSymbol) {
@@ -451,7 +444,7 @@ impl ReadBlock {
         let mut renames = HashMap::new();
 
         // rename local symbols so they are globally unique
-        for (name, s) in block.locals.into_iter() {
+        for (name, s) in block.target.locals.into_iter() {
             let mut s = self.relocate_symbol(s);
             let unique = format!(".u.{}{}", self.local_index, name);
             s.name = unique.clone();
@@ -467,7 +460,7 @@ impl ReadBlock {
             self.insert_export(s);
         }
 
-        for (_name, s) in block.dynamic.into_iter() {
+        for (_name, s) in block.target.dynamic.into_iter() {
             self.insert_dynamic(s);
         }
 
@@ -568,123 +561,9 @@ impl ReadBlock {
         Ok(())
     }
 
-    pub fn lookup_static(&self, name: &str) -> Option<ReadSymbol> {
-        if let Some(symbol) = self.locals.get(name) {
-            Some(symbol.clone())
-        } else if let Some(symbol) = self.target.exports.get(name) {
-            Some(symbol.clone())
-        } else {
-            None
-        }
-    }
-
-    pub fn lookup_dynamic(&self, name: &str) -> Option<ReadSymbol> {
-        if let Some(symbol) = self.dynamic.get(name) {
-            Some(symbol.clone())
-        } else {
-            None
-        }
-    }
-
-    pub fn lookup(&self, name: &str) -> Option<ReadSymbol> {
-        if let Some(symbol) = self.lookup_static(name) {
-            Some(symbol.clone())
-        } else if let Some(symbol) = self.lookup_dynamic(name) {
-            Some(symbol.clone())
-        } else {
-            None
-        }
-    }
-
     pub fn dump(&self) {
         eprintln!("Block: {}", &self.name);
-
-        let mut rx_symbols = vec![];
-        let mut rw_symbols = vec![];
-        let mut ro_symbols = vec![];
-        //let mut strings_symbols = vec![];
-        let mut bss_symbols = vec![];
-        let mut other_symbols = vec![];
-
-        for (_name, sym) in self.locals.iter().chain(self.target.exports.iter()) {
-            match sym.section {
-                ReadSectionKind::RX => rx_symbols.push(sym),
-                ReadSectionKind::RW => rw_symbols.push(sym),
-                ReadSectionKind::ROData => ro_symbols.push(sym),
-                //ReadSectionKind::ROStrings => strings_symbols.push(sym),
-                ReadSectionKind::Bss => bss_symbols.push(sym),
-                _ => other_symbols.push(sym),
-            }
-        }
-
-        eprintln!("RX, size: {:#0x}", self.target.rx.size());
-        for local in rx_symbols.iter() {
-            eprintln!(" S: {:?}", local);
-        }
-        for r in self.target.rx.relocations().iter() {
-            eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
-        }
-
-        let symbols = rx_symbols
-            .into_iter()
-            .map(|s| {
-                if let ResolvePointer::Section(_name, address) = &s.pointer {
-                    Symbol::new(0, *address, &s.name)
-                } else {
-                    unreachable!()
-                }
-            })
-            .collect();
-        disassemble_code_with_symbols(
-            self.target.rx.bytes(),
-            &symbols,
-            &self.target.rx.relocations(),
-        );
-
-        eprintln!("RO, size: {:#0x}", self.target.ro.size());
-        for local in ro_symbols.iter() {
-            eprintln!(" S: {:?}", local);
-        }
-        for r in self.target.ro.relocations().iter() {
-            eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
-        }
-        print_bytes(self.target.ro.bytes(), 0);
-
-        eprintln!("RW, size: {:#0x}", self.target.rw.size());
-        for local in rw_symbols.iter() {
-            eprintln!(" S: {:?}", local);
-        }
-        for r in self.target.rw.relocations().iter() {
-            eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
-        }
-        print_bytes(self.target.rw.bytes(), 0);
-
-        eprintln!("Bss, size: {:#0x}", self.target.bss.size());
-        for local in bss_symbols.iter() {
-            eprintln!(" S: {:?}", local);
-        }
-        for r in self.target.bss.relocations().iter() {
-            eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
-        }
-
-        //eprintln!("Strings");
-        //for local in strings_symbols.iter() {
-        //eprintln!(" S: {:?}", local);
-        //}
-
-        if other_symbols.len() > 0 {
-            eprintln!("Other");
-            for local in other_symbols.iter() {
-                eprintln!(" S: {:?}", local);
-            }
-        }
-
-        if self.unresolved.len() > 0 {
-            eprintln!("Unresolved: {}", self.unresolved.len());
-            for s in self.unresolved.iter() {
-                eprintln!(" {}", s);
-            }
-        }
+        self.target.dump();
     }
 }
 

@@ -402,6 +402,12 @@ impl Data {
             self.pointers
                 .insert(name.to_string(), symbol.pointer.clone());
         }
+
+        // reserve export symbols
+        for (_, symbol) in self.target.exports.iter() {
+            let section_index = symbol.section.section_index(self);
+            self.statics.symbol_add(symbol, section_index, w);
+        }
     }
 
     fn write_relocations(&mut self, w: &mut Writer) {
@@ -517,15 +523,11 @@ impl Data {
         }
     }
 
-    pub fn write(&mut self, path: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
+    pub fn write(mut self, path: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
         let mut out_data = Vec::new();
         let endian = object::Endianness::Little;
         let mut writer = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);
-        self.write_strings(&mut writer);
-        self.write_relocations(&mut writer);
-        self.update_data();
-        let mut blocks = Blocks::new(self, &mut writer, config);
-        blocks.build(self, &mut writer, config);
+        Blocks::build(&mut self, &mut writer, config);
         let size = out_data.len();
         std::fs::write(path, out_data)?;
         eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());

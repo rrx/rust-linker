@@ -1,12 +1,17 @@
 use super::*;
 
 pub struct Blocks {
-    pub blocks: Vec<Box<dyn ElfBlock>>,
-    pub ph: Vec<ProgramHeaderEntry>,
+    //pub blocks: Vec<Box<dyn ElfBlock>>,
+    //pub ph: Vec<ProgramHeaderEntry>,
 }
 
 impl Blocks {
-    pub fn new(data: &Data, w: &mut Writer, config: &Config) -> Self {
+    pub fn build(data: &mut Data, w: &mut Writer, config: &Config) {
+        // preparation
+        data.write_strings(w);
+        data.write_relocations(w);
+        data.update_data();
+
         let mut blocks: Vec<Box<dyn ElfBlock>> = vec![];
 
         blocks.push(Box::new(FileHeader::default()));
@@ -61,44 +66,23 @@ impl Blocks {
         }
 
         let ph = Self::generate_ph(&mut blocks, config);
-        Self { blocks, ph }
-    }
 
-    pub fn build(&mut self, data: &mut Data, w: &mut Writer, config: &Config) {
-        // copy the program header
-        data.ph = self.ph.clone();
+        // save program header
+        data.ph = ph.clone();
 
         // RESERVE SECTION HEADERS
         // section headers are optional
         if config.add_section_headers {
-            self.reserve_section_index(data, w);
+            for b in blocks.iter_mut() {
+                b.reserve_section_index(data, w);
+            }
         }
 
-        // RESERVE SYMBOLS
+        // RESERVE SYMBOLS - requires section headers
         Self::reserve_symbols(data, w);
-        self.reserve_export_symbols(data, w);
 
-        // finalize the layout
-        self.reserve(data, w);
-
-        if config.add_section_headers {
-            w.reserve_section_headers();
-        }
-
-        // UPDATE PROGRAM HEADERS
-        data.ph = Self::program_headers(&self.blocks, data);
-
-        // WRITE
-        self.write(data, w);
-
-        // SECTION HEADERS
-        if config.add_section_headers {
-            self.write_section_headers(&data, w);
-        }
-    }
-
-    pub fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
-        for b in self.blocks.iter_mut() {
+        // RESERVE blocks - finalize the layout
+        for b in blocks.iter_mut() {
             let pos = w.reserved_len();
             b.reserve(data, w);
             let after = w.reserved_len();
@@ -110,10 +94,16 @@ impl Blocks {
                 b.alloc()
             );
         }
-    }
 
-    pub fn write(&mut self, data: &mut Data, w: &mut Writer) {
-        for b in self.blocks.iter() {
+        if config.add_section_headers {
+            w.reserve_section_headers();
+        }
+
+        // UPDATE PROGRAM HEADERS
+        data.ph = Self::program_headers(&blocks, data);
+
+        // WRITE blocks
+        for b in blocks.iter() {
             let pos = w.len();
             //eprintln!("write: {}", b.name());
             b.write(&data, w);
@@ -127,17 +117,12 @@ impl Blocks {
                 data.segments.current().base
             );
         }
-    }
 
-    pub fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer) {
-        for b in self.blocks.iter_mut() {
-            b.reserve_section_index(data, w);
-        }
-    }
-
-    pub fn write_section_headers(&self, data: &Data, w: &mut Writer) {
-        for b in self.blocks.iter() {
-            b.write_section_header(&data, w);
+        // SECTION HEADERS
+        if config.add_section_headers {
+            for b in blocks.iter() {
+                b.write_section_header(&data, w);
+            }
         }
     }
 
@@ -184,14 +169,6 @@ impl Blocks {
         ph.extend(data.segments.program_headers());
 
         ph
-    }
-
-    fn reserve_export_symbols(&self, data: &mut Data, w: &mut Writer) {
-        // reserve exports
-        for (_, symbol) in data.target.exports.iter() {
-            let section_index = symbol.section.section_index(data);
-            data.statics.symbol_add(symbol, section_index, w);
-        }
     }
 
     fn reserve_symbols(data: &mut Data, w: &mut Writer) {
@@ -299,7 +276,6 @@ impl SegmentTracker {
         let current_file_offset;
         let current_alloc;
         let mut base;
-        //assert_eq!(_size, offsets.size as usize);
 
         // get current segment, or defaults
         if let Some(c) = self.segments.last() {
@@ -340,7 +316,6 @@ impl SegmentTracker {
                 offsets.align,
                 base,
             );
-            //eprintln!("seg: {:?}", segment);
             self.segments.push(segment);
 
             if file_offset < (current_file_offset + current_size) {
@@ -353,10 +328,6 @@ impl SegmentTracker {
         }
 
         self.current_mut().add_offsets(offsets);
-        //assert_eq!(
-        //self.current().adjusted_file_offset as usize + offsets.size as usize,
-        //w.reserved_len()
-        //);
     }
 
     pub fn program_headers(&self) -> Vec<ProgramHeaderEntry> {
@@ -415,11 +386,6 @@ impl Segment {
         let aligned = size_align(self.segment_size, offsets.align as usize);
         self.segment_size = aligned + offsets.size as usize;
         self.adjusted_file_offset = self.file_offset + aligned as u64;
-
-        //assert_eq!(
-        //self.adjusted_file_offset as usize + offsets.size as usize,
-        //w.reserved_len()
-        //);
 
         offsets.base = self.base;
         offsets.address = self.base + self.adjusted_file_offset;

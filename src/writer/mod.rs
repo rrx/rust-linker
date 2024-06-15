@@ -4,6 +4,7 @@ use object::elf;
 use object::write::elf::Sym;
 use object::write::elf::{SectionIndex, SymbolIndex, Writer};
 use object::write::StringId;
+use object::SymbolKind;
 use object::{Architecture, Endianness};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -385,6 +386,92 @@ impl Data {
         for (name, _) in self.target.exports.iter() {
             // allocate string for the symbol table
             let _string_id = self.statics.string_add(name, w);
+        }
+    }
+
+    pub fn write_relocations(&mut self, w: &mut Writer) {
+        let iter = self
+            .target
+            .ro
+            .relocations()
+            .iter()
+            .chain(self.target.rw.relocations().iter())
+            .chain(self.target.rx.relocations().iter())
+            .chain(self.target.bss.relocations().iter());
+
+        // add the relocations to the sets
+        // we only want to add a relocation to either got or gotplt
+        // if it's being added to got, then only add it to got
+        // with entries in the got and gotplt, we then apply relocations
+        // to point to the appropriate got and gotplt entries
+        let mut got = HashSet::new();
+        let mut gotplt = HashSet::new();
+        for r in iter.clone() {
+            //if r.is_got() {
+            //got.insert(r.name.clone());
+            //} else if r.is_plt() {
+            //gotplt.insert(r.name.clone());
+            //} else {
+            match r.effect() {
+                PatchEffect::AddToGot => {
+                    got.insert(r.name.clone());
+                }
+                PatchEffect::AddToPlt => {
+                    gotplt.insert(r.name.clone());
+                }
+                _ => (),
+            }
+        }
+
+        for r in iter {
+            if let Some(s) = self.target.lookup(&r.name) {
+                // we don't know the section yet, we just know which kind
+                let def = match s.bind {
+                    SymbolBind::Local => CodeSymbolDefinition::Local,
+                    SymbolBind::Global => CodeSymbolDefinition::Defined,
+                    SymbolBind::Weak => CodeSymbolDefinition::Defined,
+                };
+
+                let assign = match s.kind {
+                    SymbolKind::Text => {
+                        if s.is_static() {
+                            if r.is_plt() {
+                                GotPltAssign::GotPltWithPlt
+                            } else {
+                                GotPltAssign::Got
+                            }
+                        } else if got.contains(&r.name) {
+                            if r.is_plt() {
+                                GotPltAssign::GotWithPltGot
+                            } else {
+                                GotPltAssign::Got
+                            }
+                        } else if gotplt.contains(&r.name) {
+                            GotPltAssign::GotPltWithPlt
+                        } else {
+                            GotPltAssign::None
+                        }
+                    }
+                    SymbolKind::Data => GotPltAssign::Got,
+                    //_ => unimplemented!("{:?}, {}", s, r)
+                    _ => GotPltAssign::None,
+                };
+
+                if s.source == SymbolSource::Dynamic {
+                    log::debug!("reloc {}", &r);
+                    self.dynamics.relocation_add(&s, assign, r, w);
+                } else if def != CodeSymbolDefinition::Local {
+                    log::debug!("reloc2 {}", &r);
+                    if assign == GotPltAssign::None {
+                    } else {
+                        self.dynamics.relocation_add(&s, assign, r, w);
+                    }
+                } else {
+                    log::debug!("reloc3 {}", &r);
+                }
+            } else {
+                unreachable!("Unable to find symbol for relocation: {}", &r.name)
+            }
         }
     }
 }

@@ -77,19 +77,6 @@ impl ReadSectionKind {
         }
     }
 
-    /*
-    pub fn block(&self) -> Box<dyn ElfBlock> {
-        let block = match self {
-            Self::RX => GeneralSection::new(AllocSegment::RX, ".text", 0x10),
-            Self::ROData => GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
-            Self::RW => GeneralSection::new(AllocSegment::RW, ".data", 0x10),
-            Self::Bss => GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
-            _ => unreachable!(),
-        };
-        Box::new(block)
-    }
-    */
-
     pub fn alloc(&self) -> Option<AllocSegment> {
         match self {
             ReadSectionKind::RX => Some(AllocSegment::RX),
@@ -243,18 +230,14 @@ impl ReadSymbol {
 pub struct ReadBlock {
     name: String,
     // dynamic libraries referenced
+    target: Target,
     pub libs: HashSet<String>,
     local_index: usize,
     pub(crate) locals: SymbolMap,
-    pub exports: SymbolMap,
     pub(crate) dynamic: SymbolMap,
     pub(crate) unknown: SymbolMap,
-    pub ro: GeneralSection,
-    pub rw: GeneralSection,
-    pub rx: GeneralSection,
     pub got: GeneralSection,
     pub gotplt: GeneralSection,
-    pub bss: GeneralSection,
     pub unresolved: HashSet<String>,
 }
 
@@ -262,15 +245,11 @@ impl ReadBlock {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            ro: GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
-            rw: GeneralSection::new(AllocSegment::RW, ".data", 0x10),
-            rx: GeneralSection::new(AllocSegment::RX, ".text", 0x10),
+            target: Target::new(),
             got: GeneralSection::new(AllocSegment::RW, ".got", 0x10),
             gotplt: GeneralSection::new(AllocSegment::RW, ".got.plt", 0x10),
-            bss: GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
             libs: HashSet::new(),
             local_index: 0,
-            exports: SymbolMap::new(),
             locals: SymbolMap::new(),
             dynamic: SymbolMap::new(),
             unknown: SymbolMap::new(),
@@ -280,11 +259,7 @@ impl ReadBlock {
 
     pub fn data(&self) -> crate::Data {
         let mut data = crate::Data::new(self.libs.iter().cloned().collect());
-        data.exports = self.exports.clone();
-        data.ro = self.ro.clone();
-        data.rw = self.rw.clone();
-        data.rx = self.rx.clone();
-        data.bss = self.bss.clone();
+        data.target = self.target.clone();
         data
     }
 
@@ -320,12 +295,13 @@ impl ReadBlock {
 
     pub fn update_relocations(&self, data: &mut Data, w: &mut Writer) {
         let iter = self
+            .target
             .ro
             .relocations()
             .iter()
-            .chain(self.rw.relocations().iter())
-            .chain(self.rx.relocations().iter())
-            .chain(self.bss.relocations().iter());
+            .chain(self.target.rw.relocations().iter())
+            .chain(self.target.rx.relocations().iter())
+            .chain(self.target.bss.relocations().iter());
 
         // add the relocations to the sets
         // we only want to add a relocation to either got or gotplt
@@ -417,7 +393,7 @@ impl ReadBlock {
             }
         }
 
-        for (name, symbol) in data.exports.iter() {
+        for (name, symbol) in data.target.exports.iter() {
             // allocate string for the symbol table
             let _string_id = data.statics.string_add(name, w);
             data.pointers
@@ -430,7 +406,7 @@ impl ReadBlock {
     }
 
     pub fn insert_export(&mut self, s: ReadSymbol) {
-        self.exports.insert(s.name.clone(), s);
+        self.target.exports.insert(s.name.clone(), s);
     }
 
     pub fn insert_dynamic(&mut self, s: ReadSymbol) {
@@ -443,10 +419,10 @@ impl ReadBlock {
 
     fn relocate_symbol(&self, mut s: ReadSymbol) -> ReadSymbol {
         let base = match s.section {
-            ReadSectionKind::RX => self.rx.size() as u64,
-            ReadSectionKind::ROData => self.ro.size() as u64,
-            ReadSectionKind::RW => self.rw.size() as u64,
-            ReadSectionKind::Bss => self.bss.size() as u64,
+            ReadSectionKind::RX => self.target.rx.size() as u64,
+            ReadSectionKind::ROData => self.target.ro.size() as u64,
+            ReadSectionKind::RW => self.target.rw.size() as u64,
+            ReadSectionKind::Bss => self.target.bss.size() as u64,
             _ => 0,
         };
         s.relocate(base);
@@ -485,7 +461,7 @@ impl ReadBlock {
         }
 
         // exports
-        for (_name, s) in block.exports.into_iter() {
+        for (_name, s) in block.target.exports.into_iter() {
             let s = self.relocate_symbol(s);
             //eprintln!("E: {:?}", (&block.name, name, &s));
             self.insert_export(s);
@@ -512,20 +488,20 @@ impl ReadBlock {
         */
 
         // update Bss
-        Self::merge(&renames, &block.bss, &mut self.bss);
-        assert_eq!(block.bss.bytes().len(), 0);
+        Self::merge(&renames, &block.target.bss, &mut self.target.bss);
+        assert_eq!(block.target.bss.bytes().len(), 0);
 
         // update RX
-        Self::merge(&renames, &block.rx, &mut self.rx);
-        assert_eq!(block.rx.size(), block.rx.bytes().len());
+        Self::merge(&renames, &block.target.rx, &mut self.target.rx);
+        assert_eq!(block.target.rx.size(), block.target.rx.bytes().len());
 
         // update RO
-        Self::merge(&renames, &block.ro, &mut self.ro);
-        assert_eq!(block.ro.size(), block.ro.bytes().len());
+        Self::merge(&renames, &block.target.ro, &mut self.target.ro);
+        assert_eq!(block.target.ro.size(), block.target.ro.bytes().len());
 
         // update RW
-        Self::merge(&renames, &block.rw, &mut self.rw);
-        assert_eq!(block.rw.size(), block.rw.bytes().len());
+        Self::merge(&renames, &block.target.rw, &mut self.target.rw);
+        assert_eq!(block.target.rw.size(), block.target.rw.bytes().len());
 
         //eprintln!("B: {:?}", (&self.rx));
     }
@@ -537,10 +513,10 @@ impl ReadBlock {
     ) -> Result<(), Box<dyn Error>> {
         let kind = ReadSectionKind::new_section_kind(section.kind());
         let base = match kind {
-            ReadSectionKind::Bss => self.bss.size(),
-            ReadSectionKind::RX => self.rx.size(),
-            ReadSectionKind::ROData => self.ro.size(),
-            ReadSectionKind::RW => self.rw.size(),
+            ReadSectionKind::Bss => self.target.bss.size(),
+            ReadSectionKind::RX => self.target.rx.size(),
+            ReadSectionKind::ROData => self.target.ro.size(),
+            ReadSectionKind::RW => self.target.rw.size(),
             _ => unimplemented!(),
         } as u64;
 
@@ -576,16 +552,16 @@ impl ReadBlock {
 
         match kind {
             ReadSectionKind::Bss => {
-                self.bss.from_section(b, section)?;
+                self.target.bss.from_section(b, section)?;
             }
             ReadSectionKind::RX => {
-                self.rx.from_section(b, section)?;
+                self.target.rx.from_section(b, section)?;
             }
             ReadSectionKind::ROData => {
-                self.ro.from_section(b, section)?;
+                self.target.ro.from_section(b, section)?;
             }
             ReadSectionKind::RW => {
-                self.rw.from_section(b, section)?;
+                self.target.rw.from_section(b, section)?;
             }
             _ => unimplemented!(),
         }
@@ -595,7 +571,7 @@ impl ReadBlock {
     pub fn lookup_static(&self, name: &str) -> Option<ReadSymbol> {
         if let Some(symbol) = self.locals.get(name) {
             Some(symbol.clone())
-        } else if let Some(symbol) = self.exports.get(name) {
+        } else if let Some(symbol) = self.target.exports.get(name) {
             Some(symbol.clone())
         } else {
             None
@@ -630,7 +606,7 @@ impl ReadBlock {
         let mut bss_symbols = vec![];
         let mut other_symbols = vec![];
 
-        for (_name, sym) in self.locals.iter().chain(self.exports.iter()) {
+        for (_name, sym) in self.locals.iter().chain(self.target.exports.iter()) {
             match sym.section {
                 ReadSectionKind::RX => rx_symbols.push(sym),
                 ReadSectionKind::RW => rw_symbols.push(sym),
@@ -641,11 +617,11 @@ impl ReadBlock {
             }
         }
 
-        eprintln!("RX, size: {:#0x}", self.rx.size());
+        eprintln!("RX, size: {:#0x}", self.target.rx.size());
         for local in rx_symbols.iter() {
             eprintln!(" S: {:?}", local);
         }
-        for r in self.rx.relocations().iter() {
+        for r in self.target.rx.relocations().iter() {
             eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
         }
 
@@ -659,31 +635,35 @@ impl ReadBlock {
                 }
             })
             .collect();
-        disassemble_code_with_symbols(self.rx.bytes(), &symbols, &self.rx.relocations());
+        disassemble_code_with_symbols(
+            self.target.rx.bytes(),
+            &symbols,
+            &self.target.rx.relocations(),
+        );
 
-        eprintln!("RO, size: {:#0x}", self.ro.size());
+        eprintln!("RO, size: {:#0x}", self.target.ro.size());
         for local in ro_symbols.iter() {
             eprintln!(" S: {:?}", local);
         }
-        for r in self.ro.relocations().iter() {
+        for r in self.target.ro.relocations().iter() {
             eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
         }
-        print_bytes(self.ro.bytes(), 0);
+        print_bytes(self.target.ro.bytes(), 0);
 
-        eprintln!("RW, size: {:#0x}", self.rw.size());
+        eprintln!("RW, size: {:#0x}", self.target.rw.size());
         for local in rw_symbols.iter() {
             eprintln!(" S: {:?}", local);
         }
-        for r in self.rw.relocations().iter() {
+        for r in self.target.rw.relocations().iter() {
             eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
         }
-        print_bytes(self.rw.bytes(), 0);
+        print_bytes(self.target.rw.bytes(), 0);
 
-        eprintln!("Bss, size: {:#0x}", self.bss.size());
+        eprintln!("Bss, size: {:#0x}", self.target.bss.size());
         for local in bss_symbols.iter() {
             eprintln!(" S: {:?}", local);
         }
-        for r in self.bss.relocations().iter() {
+        for r in self.target.bss.relocations().iter() {
             eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
         }
 

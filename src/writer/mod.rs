@@ -202,6 +202,27 @@ pub enum DebugFlag {
     HashTables,
 }
 
+#[derive(Debug, Clone)]
+pub struct Target {
+    pub exports: SymbolMap,
+    pub ro: GeneralSection,
+    pub rw: GeneralSection,
+    pub rx: GeneralSection,
+    pub bss: GeneralSection,
+}
+
+impl Target {
+    pub fn new() -> Self {
+        Self {
+            exports: SymbolMap::new(),
+            ro: GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
+            rw: GeneralSection::new(AllocSegment::RW, ".data", 0x10),
+            rx: GeneralSection::new(AllocSegment::RX, ".text", 0x10),
+            bss: GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
+        }
+    }
+}
+
 pub struct Data {
     arch: Architecture,
     interp: String,
@@ -227,12 +248,7 @@ pub struct Data {
 
     add_section_headers: bool,
     add_symbols: bool,
-
-    pub exports: SymbolMap,
-    pub ro: GeneralSection,
-    pub rw: GeneralSection,
-    pub rx: GeneralSection,
-    pub bss: GeneralSection,
+    pub target: Target,
 }
 
 impl Data {
@@ -273,11 +289,7 @@ impl Data {
             dynamics: Dynamics::new(),
             statics: Statics::new(),
 
-            exports: SymbolMap::new(),
-            ro: GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
-            rw: GeneralSection::new(AllocSegment::RW, ".data", 0x10),
-            rx: GeneralSection::new(AllocSegment::RX, ".text", 0x10),
-            bss: GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
+            target: Target::new(),
         }
     }
 

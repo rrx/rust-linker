@@ -33,13 +33,13 @@ impl Blocks {
 
         //blocks.push(Box::new(BlockSectionP::new(ReadSectionKind::ROData, block)));
         //blocks.push(ReadSectionKind::ROData.block());
-        blocks.push(Box::new(data.ro.clone()));
+        blocks.push(Box::new(data.target.ro.clone()));
         //blocks.push(ReadSectionKind::RX.block());
-        blocks.push(Box::new(data.rx.clone()));
+        blocks.push(Box::new(data.target.rx.clone()));
         blocks.push(Box::new(PltSection::new(".plt")));
         blocks.push(Box::new(PltGotSection::new(".plt.got")));
         //blocks.push(ReadSectionKind::RW.block());
-        blocks.push(Box::new(data.rw.clone()));
+        blocks.push(Box::new(data.target.rw.clone()));
 
         if data.is_dynamic() {
             blocks.push(Box::new(DynamicSection::default()));
@@ -49,7 +49,7 @@ impl Blocks {
 
         // bss is the last alloc block
         //blocks.push(ReadSectionKind::Bss.block());
-        blocks.push(Box::new(data.bss.clone()));
+        blocks.push(Box::new(data.target.bss.clone()));
 
         if data.add_symbols {
             blocks.push(Box::new(SymTabSection::default()));
@@ -190,7 +190,7 @@ impl Blocks {
 
     fn reserve_export_symbols(&self, data: &mut Data, w: &mut Writer) {
         // reserve exports
-        for (_, symbol) in data.exports.iter() {
+        for (_, symbol) in data.target.exports.iter() {
             let section_index = symbol.section.section_index(data);
             data.statics.symbol_add(symbol, section_index, w);
         }

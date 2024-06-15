@@ -65,12 +65,6 @@ impl Blocks {
     }
 
     pub fn build(&mut self, data: &mut Data, w: &mut Writer, config: &Config) {
-        for (name, symbol) in data.target.exports.iter() {
-            // allocate string for the symbol table
-            let _string_id = data.statics.string_add(name, w);
-            data.pointers
-                .insert(name.to_string(), symbol.pointer.clone());
-        }
 
         // copy the program header
         data.ph = self.ph.clone();

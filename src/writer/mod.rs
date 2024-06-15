@@ -400,6 +400,13 @@ impl Data {
             // allocate string for the symbol table
             let _string_id = self.statics.string_add(name, w);
         }
+
+        for (name, symbol) in self.target.exports.iter() {
+            // allocate string for the symbol table
+            let _string_id = self.statics.string_add(name, w);
+            self.pointers
+                .insert(name.to_string(), symbol.pointer.clone());
+        }
     }
 
     pub fn write_relocations(&mut self, w: &mut Writer) {

@@ -258,7 +258,6 @@ impl ReadBlock {
     ) -> Result<(), Box<dyn Error>> {
         let buf = std::fs::read(path)?;
         self.read(path.to_str().unwrap(), &buf, config)?;
-        //self.block.add_block(block);
         Ok(())
     }
 
@@ -293,7 +292,6 @@ impl ReadBlock {
             let obj_buf = &buf[offset as usize..(offset + size) as usize];
             log::debug!("Member: {}, {:?}", &name, &m);
             self.read(name, &obj_buf, config)?;
-            //self.block.add_block(block);
         }
         Ok(())
     }
@@ -492,14 +490,6 @@ impl ReadBlock {
     fn build_strings(&self, data: &mut Data, w: &mut Writer) {
         self.update_relocations(data, w);
         self.update_data(data);
-
-        // add libraries if they are configured
-        for lib in data.libs.iter_mut() {
-            unsafe {
-                let buf = extend_lifetime(lib.name.as_bytes());
-                lib.string_id = Some(w.add_dynamic_string(buf));
-            }
-        }
 
         for (name, symbol) in data.target.exports.iter() {
             // allocate string for the symbol table
@@ -785,7 +775,6 @@ pub fn read_symbol<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
         //lookup: SymbolLookupTable::None,
     })
 }
-//pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
 
 pub fn dump_header<'a>(
     b: &elf::ElfFile<'a, FileHeader64<object::Endianness>>,

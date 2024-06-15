@@ -65,6 +65,14 @@ impl Blocks {
     }
 
     pub fn build(&mut self, data: &mut Data, w: &mut Writer) {
+        // add libraries if they are configured
+        for lib in data.libs.iter_mut() {
+            unsafe {
+                let buf = extend_lifetime(lib.name.as_bytes());
+                lib.string_id = Some(w.add_dynamic_string(buf));
+            }
+        }
+
         // copy the program header
         data.ph = self.ph.clone();
 

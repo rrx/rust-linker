@@ -375,12 +375,12 @@ impl ReadBlock {
         Ok(())
     }
 
-    pub fn update_data(&self, data: &mut Data) {
+    pub fn update_data(data: &mut Data) {
         for (name, _, pointer) in data.dynamics.symbols() {
             data.pointers.insert(name, pointer);
         }
 
-        for (name, symbol) in self.target.locals.iter() {
+        for (name, symbol) in data.target.locals.iter() {
             match symbol.section {
                 ReadSectionKind::RX
                 //| ReadSectionKind::ROStrings
@@ -397,7 +397,7 @@ impl ReadBlock {
         // Add static symbols to data
         let locals = vec!["_DYNAMIC"];
         for symbol_name in locals {
-            let s = self.target.lookup_static(symbol_name).unwrap();
+            let s = data.target.lookup_static(symbol_name).unwrap();
             data.pointers.insert(s.name, s.pointer);
         }
     }
@@ -571,7 +571,7 @@ pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
     data.write_strings(&mut writer);
     data.write_relocations(&mut writer);
     //ReadBlock::update_relocations(data, &mut writer);
-    block.update_data(data);
+    ReadBlock::update_data(data);
     let mut blocks = Blocks::new(data, &mut writer, config);
     blocks.build(data, &mut writer, config);
     let size = out_data.len();

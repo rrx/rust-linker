@@ -5,11 +5,11 @@ use std::path::Path;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
-    let mut reader = Reader::new();
     let config = Config::new();
+    let mut block = ReadBlock::new("exe");
     for path in env::args().skip(1) {
-        reader.add(Path::new(&path), &config)?;
-        reader.block.dump();
+        block.add(Path::new(&path), &config)?;
+        block.dump();
     }
     Ok(())
 }

@@ -21,12 +21,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let config = Config::new();
-    let mut reader = Reader::new();
+    let mut block = ReadBlock::new("exe");
     for path in args.inputs.iter() {
-        reader.add(&Path::new(&path), &config)?;
+        block.add(&Path::new(&path), &config)?;
     }
 
-    let block = reader.build();
     block.dump();
 
     let mut data = block.data();
@@ -35,10 +34,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let output = args.output.unwrap_or("a.out".to_string());
+
     reader::write::<object::elf::FileHeader64<object::Endianness>>(
         block,
         &mut data,
         Path::new(&output),
     )?;
+
     Ok(())
 }

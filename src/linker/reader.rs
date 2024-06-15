@@ -209,9 +209,22 @@ pub struct ReadBlock {
 
 impl ReadBlock {
     pub fn new(name: &str) -> Self {
+        let mut target = Target::new();
+
+        // These need to be declared
+        let locals = vec![("_DYNAMIC", ".dynamic")];
+
+        for (symbol_name, section_name) in locals {
+            let symbol_name = symbol_name.to_string();
+            let section_name = section_name.to_string();
+            let pointer = ResolvePointer::Section(section_name, 0);
+            let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
+            target.insert_local(symbol);
+        }
+
         Self {
             name: name.to_string(),
-            target: Target::new(),
+            target,
             got: GeneralSection::new(AllocSegment::RW, ".got", 0x10),
             gotplt: GeneralSection::new(AllocSegment::RW, ".got.plt", 0x10),
             libs: HashSet::new(),
@@ -223,6 +236,66 @@ impl ReadBlock {
         let mut data = crate::Data::new(self.libs.iter().cloned().collect());
         data.target = self.target.clone();
         data
+    }
+
+    pub fn add(&mut self, path: &std::path::Path, config: &Config) -> Result<(), Box<dyn Error>> {
+        let p = Path::new(&path);
+        println!("p: {}", p.to_str().unwrap());
+        let ext = p.extension().unwrap().to_str().unwrap();
+        println!("ext: {}", ext);
+        if ext == "a" {
+            self.add_archive(&Path::new(&path), &config)?;
+        } else {
+            self.add_object(&Path::new(&path), &config)?;
+        }
+        Ok(())
+    }
+
+    pub fn add_object(
+        &mut self,
+        path: &std::path::Path,
+        config: &Config,
+    ) -> Result<(), Box<dyn Error>> {
+        let buf = std::fs::read(path)?;
+        self.read(path.to_str().unwrap(), &buf, config)?;
+        //self.block.add_block(block);
+        Ok(())
+    }
+
+    pub fn add_archive(
+        &mut self,
+        path: &std::path::Path,
+        config: &Config,
+    ) -> Result<(), Box<dyn Error>> {
+        let buf = std::fs::read(path)?;
+        self.add_archive_buf(path.to_str().unwrap(), &buf, config)?;
+        Ok(())
+    }
+
+    pub fn add_archive_buf(
+        &mut self,
+        archive_name: &str,
+        buf: &[u8],
+        config: &Config,
+    ) -> Result<(), Box<dyn Error>> {
+        log::debug!("Archive: {}", archive_name);
+        let archive = object::read::archive::ArchiveFile::parse(buf)?;
+        log::debug!(
+            "Archive: {}, size: {}, kind: {:?}",
+            archive_name,
+            buf.len(),
+            archive.kind()
+        );
+        for result in archive.members() {
+            let m = result?;
+            let name = std::str::from_utf8(&m.name())?;
+            let (offset, size) = m.file_range();
+            let obj_buf = &buf[offset as usize..(offset + size) as usize];
+            log::debug!("Member: {}, {:?}", &name, &m);
+            self.read(name, &obj_buf, config)?;
+            //self.block.add_block(block);
+        }
+        Ok(())
     }
 
     pub fn read<'a>(
@@ -608,172 +681,6 @@ pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
     std::fs::write(path, out_data)?;
     eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());
     Ok(())
-}
-
-#[derive(Debug)]
-pub struct Reader {
-    // link block
-    pub block: ReadBlock,
-}
-
-impl Reader {
-    pub fn new() -> Self {
-        Self {
-            block: ReadBlock::new("exe"),
-        }
-    }
-
-    pub fn add(&mut self, path: &std::path::Path, config: &Config) -> Result<(), Box<dyn Error>> {
-        let p = Path::new(&path);
-        println!("p: {}", p.to_str().unwrap());
-        let ext = p.extension().unwrap().to_str().unwrap();
-        println!("ext: {}", ext);
-        if ext == "a" {
-            self.add_archive(&Path::new(&path), &config)?;
-        } else {
-            self.add_object(&Path::new(&path), &config)?;
-        }
-        Ok(())
-    }
-
-    pub fn add_object(
-        &mut self,
-        path: &std::path::Path,
-        config: &Config,
-    ) -> Result<(), Box<dyn Error>> {
-        let buf = std::fs::read(path)?;
-        self.block.read(path.to_str().unwrap(), &buf, config)?;
-        //self.block.add_block(block);
-        Ok(())
-    }
-
-    pub fn add_archive(
-        &mut self,
-        path: &std::path::Path,
-        config: &Config,
-    ) -> Result<(), Box<dyn Error>> {
-        let buf = std::fs::read(path)?;
-        self.add_archive_buf(path.to_str().unwrap(), &buf, config)?;
-        Ok(())
-    }
-
-    pub fn add_archive_buf(
-        &mut self,
-        archive_name: &str,
-        buf: &[u8],
-        config: &Config,
-    ) -> Result<(), Box<dyn Error>> {
-        log::debug!("Archive: {}", archive_name);
-        let archive = object::read::archive::ArchiveFile::parse(buf)?;
-        log::debug!(
-            "Archive: {}, size: {}, kind: {:?}",
-            archive_name,
-            buf.len(),
-            archive.kind()
-        );
-        for result in archive.members() {
-            let m = result?;
-            let name = std::str::from_utf8(&m.name())?;
-            let (offset, size) = m.file_range();
-            let obj_buf = &buf[offset as usize..(offset + size) as usize];
-            log::debug!("Member: {}, {:?}", &name, &m);
-            self.block.read(name, &obj_buf, config)?;
-            //self.block.add_block(block);
-        }
-        Ok(())
-    }
-
-    /*
-        pub fn read<'a>(
-            &mut self,
-            name: &str,
-            buf: &'a [u8],
-            config: &Config,
-        ) -> Result<(), Box<dyn Error>> {
-            let b: elf::ElfFile<'a, FileHeader64<object::Endianness>> =
-                object::read::elf::ElfFile::parse(buf)?;
-            match b.kind() {
-                ObjectKind::Relocatable | ObjectKind::Executable => {
-                    dump_header(&b)?;
-                    self.relocatable(name.to_string(), &b, config)?
-                }
-                ObjectKind::Dynamic => self.dynamic(&b, name)?,
-                _ => unimplemented!("{:?}", b.kind()),
-            };
-            //Ok(block)
-            Ok(())
-        }
-
-        fn dynamic<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
-            &mut self,
-            b: &elf::ElfFile<'a, A, B>,
-            name: &str,
-        ) -> Result<(), Box<dyn Error>> {
-            //let mut block = ReadBlock::new(name);
-            let mut count = 0;
-            for symbol in b.dynamic_symbols() {
-                let mut s = read_symbol(&b, 0, &symbol)?;
-                s.pointer = ResolvePointer::Resolved(0);
-                s.source = SymbolSource::Dynamic;
-                s.size = 0;
-                //eprintln!("s: {:#08x}, {:?}", 0, &s);
-                count += 1;
-                if s.kind != SymbolKind::Unknown {
-                    self.block.target.insert_dynamic(s);
-                }
-            }
-            eprintln!("{} symbols read from {}", count, name);
-            self.block.libs.insert(name.to_string());
-            //Ok(block)
-            Ok(())
-        }
-
-        fn relocatable<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
-            &mut self,
-            name: String,
-            b: &elf::ElfFile<'a, A, B>,
-            config: &Config,
-        ) -> Result<(), Box<dyn Error>> {
-            //let mut block = ReadBlock::new(&name);
-
-            log::debug!("relocatable: {}", &name);
-
-            for section in b.sections() {
-                let kind = ReadSectionKind::new_section_kind(section.kind());
-
-                if config.debug.contains(&DebugFlag::HashTables) && section.name()? == ".hash" {
-                    let data = section.uncompressed_data()?;
-                    dump_hash(&data);
-                }
-
-                // skip other kinds
-                if kind == ReadSectionKind::Other {
-                    continue;
-                }
-
-                self.block.from_section(&b, &section)?;
-            }
-
-            Ok(())
-        }
-    */
-
-    pub fn build(mut self) -> ReadBlock {
-        self.block.name = "exe".to_string();
-
-        // These need to be declared
-        let locals = vec![("_DYNAMIC", ".dynamic")];
-
-        for (symbol_name, section_name) in locals {
-            let symbol_name = symbol_name.to_string();
-            let section_name = section_name.to_string();
-            let pointer = ResolvePointer::Section(section_name, 0);
-            let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
-            self.block.target.insert_local(symbol);
-        }
-
-        self.block
-    }
 }
 
 pub fn dump_hash(data: &[u8]) {

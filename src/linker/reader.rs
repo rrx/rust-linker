@@ -556,7 +556,8 @@ impl Reader {
 
     pub fn add(&mut self, path: &std::path::Path, config: &Config) -> Result<(), Box<dyn Error>> {
         let buf = std::fs::read(path)?;
-        self.elf_read(path.to_str().unwrap(), &buf, config)?;
+        let block = self.read(path.to_str().unwrap(), &buf, config)?;
+        self.block.add_block(block);
         Ok(())
     }
 
@@ -590,14 +591,9 @@ impl Reader {
             let (offset, size) = m.file_range();
             let obj_buf = &buf[offset as usize..(offset + size) as usize];
             log::debug!("Member: {}, {:?}", &name, &m);
-            self.elf_read(name, &obj_buf, config)?;
+            let block = self.read(name, &obj_buf, config)?;
+            self.block.add_block(block);
         }
-        Ok(())
-    }
-
-    fn elf_read(&mut self, name: &str, buf: &[u8], config: &Config) -> Result<(), Box<dyn Error>> {
-        let block = self.read(name, buf, config)?;
-        self.block.add_block(block);
         Ok(())
     }
 

@@ -265,6 +265,7 @@ impl Config {
 
 pub struct Data {
     interp: String,
+    pub(crate) lib_names: Vec<String>,
     pub(crate) libs: Vec<Library>,
     pub dynamics: Dynamics,
     pub statics: Statics,
@@ -287,20 +288,11 @@ pub struct Data {
 
 impl Data {
     pub fn new(lib_names: Vec<String>) -> Self {
-        let libs = lib_names
-            .iter()
-            .map(|name| Library {
-                name: name.clone(),
-                // string_ids are added later
-                string_id: None,
-            })
-            .collect();
-
         Self {
-            //config: Config::new(),
             // default gnu loader
             interp: "/lib64/ld-linux-x86-64.so.2".to_string(),
-            libs,
+            lib_names,
+            libs: vec![],
             ph: vec![],
             addr: HashMap::new(),
             section_index: HashMap::new(),
@@ -334,7 +326,7 @@ impl Data {
     }
 
     fn is_dynamic(&self) -> bool {
-        self.libs.len() > 0
+        self.lib_names.len() > 0
     }
 
     pub fn pointer_set(&mut self, name: String, p: u64) {
@@ -384,12 +376,20 @@ impl Data {
 
     fn write_strings(&mut self, w: &mut Writer) {
         // add libraries if they are configured
-        for lib in self.libs.iter_mut() {
-            unsafe {
-                let buf = extend_lifetime(lib.name.as_bytes());
-                lib.string_id = Some(w.add_dynamic_string(buf));
-            }
-        }
+        self.libs = self
+            .lib_names
+            .iter()
+            .map(|name| {
+                unsafe {
+                    let buf = extend_lifetime(name.as_bytes());
+                    //let buf = name.as_bytes();
+                    Library {
+                        name: name.clone(),
+                        string_id: Some(w.add_dynamic_string(buf)),
+                    }
+                }
+            })
+            .collect();
 
         for (name, symbol) in self.target.exports.iter() {
             // allocate string for the symbol table
@@ -514,11 +514,11 @@ impl Data {
         }
     }
 
-    pub fn write(mut self, path: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
+    pub fn write(self, path: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
         let mut out_data = Vec::new();
         let endian = object::Endianness::Little;
         let mut writer = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);
-        Blocks::build(&mut self, &mut writer, config);
+        Blocks::build(self, &mut writer, config);
         let size = out_data.len();
         std::fs::write(path, out_data)?;
         eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());

@@ -6,7 +6,7 @@ pub struct Blocks {
 }
 
 impl Blocks {
-    pub fn build(data: &mut Data, w: &mut Writer, config: &Config) {
+    pub fn build(mut data: Data, w: &mut Writer, config: &Config) {
         // preparation
         data.write_strings(w);
         data.write_relocations(w);
@@ -43,7 +43,7 @@ impl Blocks {
         blocks.push(Box::new(data.target.rw.clone()));
 
         if data.is_dynamic() {
-            blocks.push(Box::new(DynamicSection::new(data, config)));
+            blocks.push(Box::new(DynamicSection::new(&data, config)));
             blocks.push(Box::new(GotSection::new(GotSectionKind::GOT)));
             blocks.push(Box::new(GotSection::new(GotSectionKind::GOTPLT)));
         }
@@ -74,17 +74,17 @@ impl Blocks {
         // section headers are optional
         if config.add_section_headers {
             for b in blocks.iter_mut() {
-                b.reserve_section_index(data, w);
+                b.reserve_section_index(&mut data, w);
             }
         }
 
         // RESERVE SYMBOLS - requires section headers
-        Self::reserve_symbols(data, w);
+        Self::reserve_symbols(&mut data, w);
 
         // RESERVE blocks - finalize the layout
         for b in blocks.iter_mut() {
             let pos = w.reserved_len();
-            b.reserve(data, w);
+            b.reserve(&mut data, w);
             let after = w.reserved_len();
             log::debug!(
                 "reserve: {}, {:#0x}, {:#0x},  {:?}",
@@ -100,7 +100,7 @@ impl Blocks {
         }
 
         // UPDATE PROGRAM HEADERS
-        data.ph = Self::program_headers(&blocks, data);
+        data.ph = Self::program_headers(&blocks, &mut data);
 
         // WRITE blocks
         for b in blocks.iter() {
@@ -275,7 +275,6 @@ impl SegmentTracker {
 
     // add non-section data
     pub fn add_offsets(&mut self, alloc: AllocSegment, offsets: &mut SectionOffset) {
-        //, w: &Writer) {
         let current_size;
         let current_file_offset;
         let current_alloc;

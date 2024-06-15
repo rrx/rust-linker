@@ -293,10 +293,13 @@ impl Data {
             .iter()
             .map(|name| Library {
                 name: name.clone(),
+                // string_ids are added later
                 string_id: None,
             })
             .collect();
+
         let base = 0x80000;
+
         Self {
             //config: Config::new(),
             // default gnu loader
@@ -385,6 +388,14 @@ impl Data {
     }
 
     pub fn write_strings(&mut self, w: &mut Writer) {
+        // add libraries if they are configured
+        for lib in self.libs.iter_mut() {
+            unsafe {
+                let buf = extend_lifetime(lib.name.as_bytes());
+                lib.string_id = Some(w.add_dynamic_string(buf));
+            }
+        }
+
         for (name, _) in self.target.exports.iter() {
             // allocate string for the symbol table
             let _string_id = self.statics.string_add(name, w);

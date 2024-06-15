@@ -65,14 +65,6 @@ impl Blocks {
     }
 
     pub fn build(&mut self, data: &mut Data, w: &mut Writer, config: &Config) {
-        // add libraries if they are configured
-        for lib in data.libs.iter_mut() {
-            unsafe {
-                let buf = extend_lifetime(lib.name.as_bytes());
-                lib.string_id = Some(w.add_dynamic_string(buf));
-            }
-        }
-
         for (name, symbol) in data.target.exports.iter() {
             // allocate string for the symbol table
             let _string_id = data.statics.string_add(name, w);

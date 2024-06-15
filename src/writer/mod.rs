@@ -401,10 +401,6 @@ impl Data {
             let _string_id = self.statics.string_add(name, w);
             self.pointers
                 .insert(name.to_string(), symbol.pointer.clone());
-        }
-
-        // reserve export symbols
-        for (_, symbol) in self.target.exports.iter() {
             let section_index = symbol.section.section_index(self);
             self.statics.symbol_add(symbol, section_index, w);
         }

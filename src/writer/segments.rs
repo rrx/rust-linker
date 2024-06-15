@@ -65,7 +65,6 @@ impl Blocks {
     }
 
     pub fn build(&mut self, data: &mut Data, w: &mut Writer, config: &Config) {
-
         // copy the program header
         data.ph = self.ph.clone();
 

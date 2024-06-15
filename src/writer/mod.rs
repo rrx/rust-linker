@@ -387,18 +387,13 @@ impl Data {
         self.section_index.insert(name.to_string(), section_index);
     }
 
-    pub fn write_strings(&mut self, w: &mut Writer) {
+    fn write_strings(&mut self, w: &mut Writer) {
         // add libraries if they are configured
         for lib in self.libs.iter_mut() {
             unsafe {
                 let buf = extend_lifetime(lib.name.as_bytes());
                 lib.string_id = Some(w.add_dynamic_string(buf));
             }
-        }
-
-        for (name, _) in self.target.exports.iter() {
-            // allocate string for the symbol table
-            let _string_id = self.statics.string_add(name, w);
         }
 
         for (name, symbol) in self.target.exports.iter() {
@@ -409,7 +404,7 @@ impl Data {
         }
     }
 
-    pub fn write_relocations(&mut self, w: &mut Writer) {
+    fn write_relocations(&mut self, w: &mut Writer) {
         let iter = self
             .target
             .ro
@@ -495,7 +490,7 @@ impl Data {
         }
     }
 
-    pub fn update_data(&mut self) {
+    fn update_data(&mut self) {
         for (name, _, pointer) in self.dynamics.symbols() {
             self.pointers.insert(name, pointer);
         }

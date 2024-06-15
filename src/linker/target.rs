@@ -12,6 +12,8 @@ pub struct Target {
     pub rw: GeneralSection,
     pub rx: GeneralSection,
     pub bss: GeneralSection,
+    //pub got: GeneralSection,
+    //pub gotplt: GeneralSection,
     pub unresolved: HashSet<String>,
     pub unknown: SymbolMap,
 }
@@ -26,6 +28,8 @@ impl Target {
             rw: GeneralSection::new(AllocSegment::RW, ".data", 0x10),
             rx: GeneralSection::new(AllocSegment::RX, ".text", 0x10),
             bss: GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
+            //got: GeneralSection::new(AllocSegment::RW, ".got", 0x10),
+            //gotplt: GeneralSection::new(AllocSegment::RW, ".got.plt", 0x10),
             unresolved: HashSet::new(),
             unknown: SymbolMap::new(),
         }

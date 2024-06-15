@@ -203,8 +203,6 @@ pub struct ReadBlock {
     target: Target,
     pub libs: HashSet<String>,
     local_index: usize,
-    pub got: GeneralSection,
-    pub gotplt: GeneralSection,
 }
 
 impl ReadBlock {
@@ -225,8 +223,6 @@ impl ReadBlock {
         Self {
             name: name.to_string(),
             target,
-            got: GeneralSection::new(AllocSegment::RW, ".got", 0x10),
-            gotplt: GeneralSection::new(AllocSegment::RW, ".got.plt", 0x10),
             libs: HashSet::new(),
             local_index: 0,
         }
@@ -318,7 +314,6 @@ impl ReadBlock {
             ObjectKind::Dynamic => self.dynamic(&b, name)?,
             _ => unimplemented!("{:?}", b.kind()),
         };
-        //Ok(block)
         Ok(())
     }
 
@@ -327,7 +322,6 @@ impl ReadBlock {
         b: &elf::ElfFile<'a, A, B>,
         name: &str,
     ) -> Result<(), Box<dyn Error>> {
-        //let mut block = ReadBlock::new(name);
         let mut count = 0;
         for symbol in b.dynamic_symbols() {
             let mut s = read_symbol(&b, 0, &symbol)?;
@@ -342,7 +336,6 @@ impl ReadBlock {
         }
         eprintln!("{} symbols read from {}", count, name);
         self.libs.insert(name.to_string());
-        //Ok(block)
         Ok(())
     }
 
@@ -352,8 +345,6 @@ impl ReadBlock {
         b: &elf::ElfFile<'a, A, B>,
         config: &Config,
     ) -> Result<(), Box<dyn Error>> {
-        //let mut block = ReadBlock::new(&name);
-
         log::debug!("relocatable: {}", &name);
 
         for section in b.sections() {

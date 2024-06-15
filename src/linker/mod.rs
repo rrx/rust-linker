@@ -5,6 +5,7 @@ pub mod libraries;
 pub mod reader;
 pub mod relocations;
 pub mod table;
+pub mod target;
 pub mod version;
 
 pub use block_section::*;
@@ -14,4 +15,5 @@ pub use libraries::*;
 pub use reader::*;
 pub use relocations::*;
 pub use table::*;
+pub use target::*;
 pub use version::*;

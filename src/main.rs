@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     block.dump();
 
-    let mut data = block.data();
+    let mut data = block.data(&config);
     if let Some(interp) = args.interp {
         data = data.interp(interp);
     }
@@ -39,6 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         block,
         &mut data,
         Path::new(&output),
+        &config,
     )?;
 
     Ok(())

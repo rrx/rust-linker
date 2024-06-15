@@ -232,7 +232,7 @@ impl ReadBlock {
         }
     }
 
-    pub fn data(&self) -> crate::Data {
+    pub fn data(&self, config: &Config) -> crate::Data {
         let mut data = crate::Data::new(self.libs.iter().cloned().collect());
         data.target = self.target.clone();
         data
@@ -488,9 +488,6 @@ impl ReadBlock {
     }
 
     fn build_strings(&self, data: &mut Data, w: &mut Writer) {
-        self.update_relocations(data, w);
-        self.update_data(data);
-
         for (name, symbol) in data.target.exports.iter() {
             // allocate string for the symbol table
             let _string_id = data.statics.string_add(name, w);
@@ -660,13 +657,16 @@ pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
     block: ReadBlock,
     data: &mut Data,
     path: &Path,
+    config: &Config,
 ) -> Result<(), Box<dyn Error>> {
     let mut out_data = Vec::new();
     let endian = object::Endianness::Little;
-    let mut writer = object::write::elf::Writer::new(endian, data.is_64(), &mut out_data);
+    let mut writer = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);
     block.build_strings(data, &mut writer);
-    let mut blocks = Blocks::new(data, &mut writer);
-    blocks.build(data, &mut writer);
+    block.update_relocations(data, &mut writer);
+    block.update_data(data);
+    let mut blocks = Blocks::new(data, &mut writer, config);
+    blocks.build(data, &mut writer, config);
     let size = out_data.len();
     std::fs::write(path, out_data)?;
     eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());

@@ -287,12 +287,14 @@ impl ElfBlock for InterpSection {
 pub struct DynamicSection {
     index: Option<SectionIndex>,
     offsets: SectionOffset,
+    config: Config,
 }
-impl Default for DynamicSection {
-    fn default() -> Self {
+impl DynamicSection {
+    pub fn new(data: &Data, config: &Config) -> Self {
         Self {
             index: None,
             offsets: SectionOffset::new("dynamic".into(), AllocSegment::RW, 0x08),
+            config: config.clone(),
         }
     }
 }
@@ -327,7 +329,7 @@ impl ElfBlock for DynamicSection {
     }
 
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
-        let dynamic = data.gen_dynamic();
+        let dynamic = gen_dynamic(data, &self.config);
         let file_offset = w.reserve_start_section(&self.offsets);
         w.reserve_dynamic(dynamic.len());
         let after = w.reserved_len();
@@ -348,7 +350,7 @@ impl ElfBlock for DynamicSection {
     }
 
     fn write(&self, data: &Data, w: &mut Writer) {
-        let dynamic = data.gen_dynamic();
+        let dynamic = gen_dynamic(data, &self.config);
         w.write_start_section(&self.offsets);
 
         // write out dynamic symbols

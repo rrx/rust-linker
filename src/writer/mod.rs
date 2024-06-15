@@ -204,6 +204,8 @@ pub enum DebugFlag {
 
 #[derive(Debug, Clone)]
 pub struct Config {
+    arch: Architecture,
+    is_64: bool,
     add_section_headers: bool,
     add_symbols: bool,
     pub debug: HashSet<DebugFlag>,
@@ -212,6 +214,8 @@ pub struct Config {
 impl Config {
     pub fn new() -> Self {
         Self {
+            arch: Architecture::X86_64,
+            is_64: true,
             add_section_headers: true,
             add_symbols: true,
             debug: HashSet::new(),
@@ -221,12 +225,43 @@ impl Config {
     pub fn debug_add(&mut self, f: &DebugFlag) {
         self.debug.insert(f.clone());
     }
+
+    pub fn is_64(&self) -> bool {
+        use object::AddressSize;
+        match self.arch.address_size().unwrap() {
+            AddressSize::U8 | AddressSize::U16 | AddressSize::U32 => false,
+            AddressSize::U64 => true,
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn symbol_size(&self) -> usize {
+        if self.is_64 {
+            mem::size_of::<elf::Sym64<Endianness>>()
+        } else {
+            mem::size_of::<elf::Sym32<Endianness>>()
+        }
+    }
+
+    pub fn rel_size(&self, is_rela: bool) -> usize {
+        if self.is_64 {
+            if is_rela {
+                mem::size_of::<elf::Rela64<Endianness>>()
+            } else {
+                mem::size_of::<elf::Rel64<Endianness>>()
+            }
+        } else {
+            if is_rela {
+                mem::size_of::<elf::Rela32<Endianness>>()
+            } else {
+                mem::size_of::<elf::Rel32<Endianness>>()
+            }
+        }
+    }
 }
 
 pub struct Data {
-    arch: Architecture,
     interp: String,
-    is_64: bool,
     pub(crate) libs: Vec<Library>,
     //base: usize,
     pub dynamics: Dynamics,
@@ -245,7 +280,7 @@ pub struct Data {
     hash: TrackSection,
     symtab: TrackSection,
     section_dynamic: TrackSection,
-    pub config: Config,
+    //pub config: Config,
     pub target: Target,
 }
 
@@ -260,9 +295,7 @@ impl Data {
             .collect();
         let base = 0x80000;
         Self {
-            config: Config::new(),
-            arch: Architecture::X86_64,
-            is_64: true,
+            //config: Config::new(),
             // default gnu loader
             interp: "/lib64/ld-linux-x86-64.so.2".to_string(),
             libs,
@@ -297,15 +330,6 @@ impl Data {
     pub fn interp(mut self, interp: String) -> Self {
         self.interp = interp;
         self
-    }
-
-    pub fn is_64(&self) -> bool {
-        use object::AddressSize;
-        match self.arch.address_size().unwrap() {
-            AddressSize::U8 | AddressSize::U16 | AddressSize::U32 => false,
-            AddressSize::U64 => true,
-            _ => unimplemented!(),
-        }
     }
 
     fn is_dynamic(&self) -> bool {
@@ -356,115 +380,91 @@ impl Data {
     pub fn section_index_set(&mut self, name: &str, section_index: SectionIndex) {
         self.section_index.insert(name.to_string(), section_index);
     }
+}
 
-    fn gen_dynamic(&self) -> Vec<Dynamic> {
-        let mut out = vec![];
-        for lib in self.libs.iter() {
-            out.push(Dynamic {
-                tag: elf::DT_NEEDED,
-                val: 0,
-                string: lib.string_id,
-            });
-        }
+fn gen_dynamic(data: &Data, config: &Config) -> Vec<Dynamic> {
+    let mut out = vec![];
+    for lib in data.libs.iter() {
         out.push(Dynamic {
-            tag: elf::DT_HASH,
-            val: self.hash.addr.unwrap(),
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_STRTAB,
-            val: self.dynstr.addr.unwrap(),
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_SYMTAB,
-            val: self.dynsym.addr.unwrap(),
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_STRSZ,
-            val: self.dynstr.size.unwrap() as u64,
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_SYMENT,
-            val: self.symbol_size() as u64,
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_DEBUG,
+            tag: elf::DT_NEEDED,
             val: 0,
-            string: None,
+            string: lib.string_id,
         });
-        out.push(Dynamic {
-            tag: elf::DT_PLTGOT,
-            val: *self
-                .addr
-                .get(&AddressKey::Section(".got.plt".to_string()))
-                .unwrap_or(&0),
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_PLTRELSZ,
-            val: self.relaplt.size.unwrap() as u64,
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_PLTREL,
-            val: 7,
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_JMPREL,
-            val: self.addr_get(".rela.plt"),
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_RELA,
-            val: self.addr_get(".rela.dyn"),
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_RELASZ,
-            val: self.reladyn.size.unwrap() as u64,
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_RELAENT,
-            val: self.rel_size(true) as u64,
-            string: None,
-        });
-        out.push(Dynamic {
-            tag: elf::DT_NULL,
-            val: 0,
-            string: None,
-        });
-        out
     }
-
-    pub fn symbol_size(&self) -> usize {
-        if self.is_64 {
-            mem::size_of::<elf::Sym64<Endianness>>()
-        } else {
-            mem::size_of::<elf::Sym32<Endianness>>()
-        }
-    }
-
-    pub fn rel_size(&self, is_rela: bool) -> usize {
-        if self.is_64 {
-            if is_rela {
-                mem::size_of::<elf::Rela64<Endianness>>()
-            } else {
-                mem::size_of::<elf::Rel64<Endianness>>()
-            }
-        } else {
-            if is_rela {
-                mem::size_of::<elf::Rela32<Endianness>>()
-            } else {
-                mem::size_of::<elf::Rel32<Endianness>>()
-            }
-        }
-    }
+    out.push(Dynamic {
+        tag: elf::DT_HASH,
+        val: data.hash.addr.unwrap(),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_STRTAB,
+        val: data.dynstr.addr.unwrap(),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_SYMTAB,
+        val: data.dynsym.addr.unwrap(),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_STRSZ,
+        val: data.dynstr.size.unwrap() as u64,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_SYMENT,
+        val: config.symbol_size() as u64,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_DEBUG,
+        val: 0,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_PLTGOT,
+        val: *data
+            .addr
+            .get(&AddressKey::Section(".got.plt".to_string()))
+            .unwrap_or(&0),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_PLTRELSZ,
+        val: data.relaplt.size.unwrap() as u64,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_PLTREL,
+        val: 7,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_JMPREL,
+        val: data.addr_get(".rela.plt"),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_RELA,
+        val: data.addr_get(".rela.dyn"),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_RELASZ,
+        val: data.reladyn.size.unwrap() as u64,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_RELAENT,
+        val: config.rel_size(true) as u64,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_NULL,
+        val: 0,
+        string: None,
+    });
+    out
 }
 
 /// align size

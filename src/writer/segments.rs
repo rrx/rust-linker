@@ -6,7 +6,7 @@ pub struct Blocks {
 }
 
 impl Blocks {
-    pub fn new(data: &Data, w: &mut Writer) -> Self {
+    pub fn new(data: &Data, w: &mut Writer, config: &Config) -> Self {
         let mut blocks: Vec<Box<dyn ElfBlock>> = vec![];
 
         blocks.push(Box::new(FileHeader::default()));
@@ -38,7 +38,7 @@ impl Blocks {
         blocks.push(Box::new(data.target.rw.clone()));
 
         if data.is_dynamic() {
-            blocks.push(Box::new(DynamicSection::default()));
+            blocks.push(Box::new(DynamicSection::new(data, config)));
             blocks.push(Box::new(GotSection::new(GotSectionKind::GOT)));
             blocks.push(Box::new(GotSection::new(GotSectionKind::GOTPLT)));
         }
@@ -46,25 +46,25 @@ impl Blocks {
         // bss is the last alloc block
         blocks.push(Box::new(data.target.bss.clone()));
 
-        if data.config.add_symbols {
+        if config.add_symbols {
             blocks.push(Box::new(SymTabSection::default()));
         }
 
         assert!(w.strtab_needed());
-        if data.config.add_symbols && w.strtab_needed() {
+        if config.add_symbols && w.strtab_needed() {
             blocks.push(Box::new(StrTabSection::new()));
         }
 
         // shstrtab needs to be allocated last, once all headers are reserved
-        if data.config.add_symbols {
+        if config.add_symbols {
             blocks.push(Box::new(ShStrTabSection::default()));
         }
 
-        let ph = Self::generate_ph(&mut blocks);
+        let ph = Self::generate_ph(&mut blocks, config);
         Self { blocks, ph }
     }
 
-    pub fn build(&mut self, data: &mut Data, w: &mut Writer) {
+    pub fn build(&mut self, data: &mut Data, w: &mut Writer, config: &Config) {
         // add libraries if they are configured
         for lib in data.libs.iter_mut() {
             unsafe {
@@ -73,12 +73,19 @@ impl Blocks {
             }
         }
 
+        for (name, symbol) in data.target.exports.iter() {
+            // allocate string for the symbol table
+            let _string_id = data.statics.string_add(name, w);
+            data.pointers
+                .insert(name.to_string(), symbol.pointer.clone());
+        }
+
         // copy the program header
         data.ph = self.ph.clone();
 
         // RESERVE SECTION HEADERS
         // section headers are optional
-        if data.config.add_section_headers {
+        if config.add_section_headers {
             self.reserve_section_index(data, w);
         }
 
@@ -89,7 +96,7 @@ impl Blocks {
         // finalize the layout
         self.reserve(data, w);
 
-        if data.config.add_section_headers {
+        if config.add_section_headers {
             w.reserve_section_headers();
         }
 
@@ -100,7 +107,7 @@ impl Blocks {
         self.write(data, w);
 
         // SECTION HEADERS
-        if data.config.add_section_headers {
+        if config.add_section_headers {
             self.write_section_headers(&data, w);
         }
     }
@@ -150,7 +157,10 @@ impl Blocks {
     }
 
     /// generate a temporary list of program headers
-    pub fn generate_ph(blocks: &mut Vec<Box<dyn ElfBlock>>) -> Vec<ProgramHeaderEntry> {
+    pub fn generate_ph(
+        blocks: &mut Vec<Box<dyn ElfBlock>>,
+        config: &Config,
+    ) -> Vec<ProgramHeaderEntry> {
         // build a list of sections that are loaded
         // this is a hack to get tracker to build a correct list of program headers
         // without having to go through the blocks and do reservations
@@ -160,7 +170,7 @@ impl Blocks {
         //data.pointer_set("__data_start".to_string(), 0);
         let mut out_data = Vec::new();
         let endian = Endianness::Little;
-        let mut w = object::write::elf::Writer::new(endian, data.is_64, &mut out_data);
+        let mut w = object::write::elf::Writer::new(endian, config.is_64, &mut out_data);
 
         //block.build_strings(&mut data, &mut w);
         for b in blocks.iter_mut() {

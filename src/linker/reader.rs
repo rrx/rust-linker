@@ -539,17 +539,13 @@ pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
 
 #[derive(Debug)]
 pub struct Reader {
-    // blocks
-    blocks: Vec<ReadBlock>,
-
     // link block
-    block: ReadBlock,
+    pub block: ReadBlock,
 }
 
 impl Reader {
     pub fn new() -> Self {
         Self {
-            blocks: vec![],
             block: ReadBlock::new("exe"),
         }
     }
@@ -573,8 +569,8 @@ impl Reader {
         config: &Config,
     ) -> Result<(), Box<dyn Error>> {
         let buf = std::fs::read(path)?;
-        let block = self.read(path.to_str().unwrap(), &buf, config)?;
-        self.block.add_block(block);
+        self.read(path.to_str().unwrap(), &buf, config)?;
+        //self.block.add_block(block);
         Ok(())
     }
 
@@ -608,8 +604,8 @@ impl Reader {
             let (offset, size) = m.file_range();
             let obj_buf = &buf[offset as usize..(offset + size) as usize];
             log::debug!("Member: {}, {:?}", &name, &m);
-            let block = self.read(name, &obj_buf, config)?;
-            self.block.add_block(block);
+            self.read(name, &obj_buf, config)?;
+            //self.block.add_block(block);
         }
         Ok(())
     }
@@ -619,10 +615,10 @@ impl Reader {
         name: &str,
         buf: &'a [u8],
         config: &Config,
-    ) -> Result<ReadBlock, Box<dyn Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let b: elf::ElfFile<'a, FileHeader64<object::Endianness>> =
             object::read::elf::ElfFile::parse(buf)?;
-        let block = match b.kind() {
+        match b.kind() {
             ObjectKind::Relocatable | ObjectKind::Executable => {
                 dump_header(&b)?;
                 self.relocatable(name.to_string(), &b, config)?
@@ -630,15 +626,16 @@ impl Reader {
             ObjectKind::Dynamic => self.dynamic(&b, name)?,
             _ => unimplemented!("{:?}", b.kind()),
         };
-        Ok(block)
+        //Ok(block)
+        Ok(())
     }
 
     fn dynamic<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
         &mut self,
         b: &elf::ElfFile<'a, A, B>,
         name: &str,
-    ) -> Result<ReadBlock, Box<dyn Error>> {
-        let mut block = ReadBlock::new(name);
+    ) -> Result<(), Box<dyn Error>> {
+        //let mut block = ReadBlock::new(name);
         let mut count = 0;
         for symbol in b.dynamic_symbols() {
             let mut s = read_symbol(&b, 0, &symbol)?;
@@ -648,12 +645,13 @@ impl Reader {
             //eprintln!("s: {:#08x}, {:?}", 0, &s);
             count += 1;
             if s.kind != SymbolKind::Unknown {
-                block.target.insert_dynamic(s);
+                self.block.target.insert_dynamic(s);
             }
         }
         eprintln!("{} symbols read from {}", count, name);
-        block.libs.insert(name.to_string());
-        Ok(block)
+        self.block.libs.insert(name.to_string());
+        //Ok(block)
+        Ok(())
     }
 
     fn relocatable<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
@@ -661,8 +659,8 @@ impl Reader {
         name: String,
         b: &elf::ElfFile<'a, A, B>,
         config: &Config,
-    ) -> Result<ReadBlock, Box<dyn Error>> {
-        let mut block = ReadBlock::new(&name);
+    ) -> Result<(), Box<dyn Error>> {
+        //let mut block = ReadBlock::new(&name);
 
         log::debug!("relocatable: {}", &name);
 
@@ -679,17 +677,14 @@ impl Reader {
                 continue;
             }
 
-            block.from_section(&b, &section)?;
+            self.block.from_section(&b, &section)?;
         }
 
-        Ok(block)
+        Ok(())
     }
 
     pub fn build(mut self) -> ReadBlock {
         self.block.name = "exe".to_string();
-        for b in self.blocks.into_iter() {
-            self.block.add_block(b);
-        }
 
         // These need to be declared
         let locals = vec![("_DYNAMIC", ".dynamic")];

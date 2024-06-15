@@ -8,8 +8,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::new();
     for path in env::args().skip(1) {
         let buf = std::fs::read(path.clone())?;
-        let block = reader.read(&path, &buf, &config)?;
-        block.dump();
+        reader.read(&path, &buf, &config)?;
+        reader.block.dump();
     }
     Ok(())
 }

@@ -474,6 +474,33 @@ impl Data {
             }
         }
     }
+
+    pub fn update_data(&mut self) {
+        for (name, _, pointer) in self.dynamics.symbols() {
+            self.pointers.insert(name, pointer);
+        }
+
+        for (name, symbol) in self.target.locals.iter() {
+            match symbol.section {
+                ReadSectionKind::RX
+                //| ReadSectionKind::ROStrings
+                | ReadSectionKind::ROData
+                | ReadSectionKind::RW
+                | ReadSectionKind::Bss => {
+                    self.pointers
+                        .insert(name.to_string(), symbol.pointer.clone());
+                }
+                _ => (),
+            }
+        }
+
+        // Add static symbols to data
+        let locals = vec!["_DYNAMIC"];
+        for symbol_name in locals {
+            let s = self.target.lookup_static(symbol_name).unwrap();
+            self.pointers.insert(s.name, s.pointer);
+        }
+    }
 }
 
 fn gen_dynamic(data: &Data, config: &Config) -> Vec<Dynamic> {

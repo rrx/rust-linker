@@ -36,7 +36,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let output = args.output.unwrap_or("a.out".to_string());
 
     reader::write::<object::elf::FileHeader64<object::Endianness>>(
-        block,
         &mut data,
         Path::new(&output),
         &config,

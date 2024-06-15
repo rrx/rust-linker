@@ -232,9 +232,9 @@ impl ReadBlock {
         }
     }
 
-    pub fn data(&self, config: &Config) -> crate::Data {
+    pub fn data(self, _config: &Config) -> crate::Data {
         let mut data = crate::Data::new(self.libs.iter().cloned().collect());
-        data.target = self.target.clone();
+        data.target = self.target;
 
         for (name, symbol) in data.target.exports.iter() {
             data.pointers
@@ -373,33 +373,6 @@ impl ReadBlock {
         }
 
         Ok(())
-    }
-
-    pub fn update_data(data: &mut Data) {
-        for (name, _, pointer) in data.dynamics.symbols() {
-            data.pointers.insert(name, pointer);
-        }
-
-        for (name, symbol) in data.target.locals.iter() {
-            match symbol.section {
-                ReadSectionKind::RX
-                //| ReadSectionKind::ROStrings
-                | ReadSectionKind::ROData
-                | ReadSectionKind::RW
-                | ReadSectionKind::Bss => {
-                    data.pointers
-                        .insert(name.to_string(), symbol.pointer.clone());
-                }
-                _ => (),
-            }
-        }
-
-        // Add static symbols to data
-        let locals = vec!["_DYNAMIC"];
-        for symbol_name in locals {
-            let s = data.target.lookup_static(symbol_name).unwrap();
-            data.pointers.insert(s.name, s.pointer);
-        }
     }
 
     fn relocate_symbol(&self, mut s: ReadSymbol) -> ReadSymbol {
@@ -560,7 +533,6 @@ impl ReadBlock {
 }
 
 pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
-    block: ReadBlock,
     data: &mut Data,
     path: &Path,
     config: &Config,
@@ -570,8 +542,7 @@ pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
     let mut writer = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);
     data.write_strings(&mut writer);
     data.write_relocations(&mut writer);
-    //ReadBlock::update_relocations(data, &mut writer);
-    ReadBlock::update_data(data);
+    data.update_data();
     let mut blocks = Blocks::new(data, &mut writer, config);
     blocks.build(data, &mut writer, config);
     let size = out_data.len();

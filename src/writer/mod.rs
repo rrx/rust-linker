@@ -380,6 +380,13 @@ impl Data {
     pub fn section_index_set(&mut self, name: &str, section_index: SectionIndex) {
         self.section_index.insert(name.to_string(), section_index);
     }
+
+    pub fn write_strings(&mut self, w: &mut Writer) {
+        for (name, _) in self.target.exports.iter() {
+            // allocate string for the symbol table
+            let _string_id = self.statics.string_add(name, w);
+        }
+    }
 }
 
 fn gen_dynamic(data: &Data, config: &Config) -> Vec<Dynamic> {

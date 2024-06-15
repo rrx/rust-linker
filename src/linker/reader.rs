@@ -235,6 +235,12 @@ impl ReadBlock {
     pub fn data(&self, config: &Config) -> crate::Data {
         let mut data = crate::Data::new(self.libs.iter().cloned().collect());
         data.target = self.target.clone();
+
+        for (name, symbol) in data.target.exports.iter() {
+            data.pointers
+                .insert(name.to_string(), symbol.pointer.clone());
+        }
+
         data
     }
 
@@ -374,9 +380,6 @@ impl ReadBlock {
             data.pointers.insert(name, pointer);
         }
 
-        //eprintln!("plt: {:?}", data.dynamics.plt_hash);
-        //eprintln!("pltgot: {:?}", data.dynamics.pltgot_hash);
-
         for (name, symbol) in self.target.locals.iter() {
             match symbol.section {
                 ReadSectionKind::RX
@@ -398,6 +401,15 @@ impl ReadBlock {
             data.pointers.insert(s.name, s.pointer);
         }
     }
+
+    /*
+    fn build_strings(&self, data: &mut Data, w: &mut Writer) {
+        for (name, symbol) in data.target.exports.iter() {
+            // allocate string for the symbol table
+            let _string_id = data.statics.string_add(name, w);
+        }
+    }
+    */
 
     pub fn update_relocations(&self, data: &mut Data, w: &mut Writer) {
         let iter = self
@@ -484,15 +496,6 @@ impl ReadBlock {
             } else {
                 unreachable!("Unable to find symbol for relocation: {}", &r.name)
             }
-        }
-    }
-
-    fn build_strings(&self, data: &mut Data, w: &mut Writer) {
-        for (name, symbol) in data.target.exports.iter() {
-            // allocate string for the symbol table
-            let _string_id = data.statics.string_add(name, w);
-            data.pointers
-                .insert(name.to_string(), symbol.pointer.clone());
         }
     }
 
@@ -662,7 +665,8 @@ pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
     let mut out_data = Vec::new();
     let endian = object::Endianness::Little;
     let mut writer = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);
-    block.build_strings(data, &mut writer);
+    //block.build_strings(data, &mut writer);
+    data.write_strings(&mut writer);
     block.update_relocations(data, &mut writer);
     block.update_data(data);
     let mut blocks = Blocks::new(data, &mut writer, config);

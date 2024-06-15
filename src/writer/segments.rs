@@ -31,14 +31,10 @@ impl Blocks {
             blocks.push(Box::new(RelaDynSection::new(GotSectionKind::GOTPLT)));
         }
 
-        //blocks.push(Box::new(BlockSectionP::new(ReadSectionKind::ROData, block)));
-        //blocks.push(ReadSectionKind::ROData.block());
         blocks.push(Box::new(data.target.ro.clone()));
-        //blocks.push(ReadSectionKind::RX.block());
         blocks.push(Box::new(data.target.rx.clone()));
         blocks.push(Box::new(PltSection::new(".plt")));
         blocks.push(Box::new(PltGotSection::new(".plt.got")));
-        //blocks.push(ReadSectionKind::RW.block());
         blocks.push(Box::new(data.target.rw.clone()));
 
         if data.is_dynamic() {
@@ -48,20 +44,19 @@ impl Blocks {
         }
 
         // bss is the last alloc block
-        //blocks.push(ReadSectionKind::Bss.block());
         blocks.push(Box::new(data.target.bss.clone()));
 
-        if data.add_symbols {
+        if data.config.add_symbols {
             blocks.push(Box::new(SymTabSection::default()));
         }
 
         assert!(w.strtab_needed());
-        if data.add_symbols && w.strtab_needed() {
+        if data.config.add_symbols && w.strtab_needed() {
             blocks.push(Box::new(StrTabSection::new()));
         }
 
         // shstrtab needs to be allocated last, once all headers are reserved
-        if data.add_symbols {
+        if data.config.add_symbols {
             blocks.push(Box::new(ShStrTabSection::default()));
         }
 
@@ -75,7 +70,7 @@ impl Blocks {
 
         // RESERVE SECTION HEADERS
         // section headers are optional
-        if data.add_section_headers {
+        if data.config.add_section_headers {
             self.reserve_section_index(data, w);
         }
 
@@ -86,7 +81,7 @@ impl Blocks {
         // finalize the layout
         self.reserve(data, w);
 
-        if data.add_section_headers {
+        if data.config.add_section_headers {
             w.reserve_section_headers();
         }
 
@@ -97,7 +92,7 @@ impl Blocks {
         self.write(data, w);
 
         // SECTION HEADERS
-        if data.add_section_headers {
+        if data.config.add_section_headers {
             self.write_section_headers(&data, w);
         }
     }

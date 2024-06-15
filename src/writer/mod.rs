@@ -223,6 +223,20 @@ impl Target {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Config {
+    add_section_headers: bool,
+    add_symbols: bool,
+}
+impl Config {
+    pub fn new() -> Self {
+        Self {
+            add_section_headers: true,
+            add_symbols: true,
+        }
+    }
+}
+
 pub struct Data {
     arch: Architecture,
     interp: String,
@@ -245,9 +259,7 @@ pub struct Data {
     hash: TrackSection,
     symtab: TrackSection,
     section_dynamic: TrackSection,
-
-    add_section_headers: bool,
-    add_symbols: bool,
+    pub config: Config,
     pub target: Target,
 }
 
@@ -262,6 +274,7 @@ impl Data {
             .collect();
         let base = 0x80000;
         Self {
+            config: Config::new(),
             arch: Architecture::X86_64,
             is_64: true,
             // default gnu loader
@@ -281,8 +294,6 @@ impl Data {
             section_dynamic: TrackSection::default(),
             pointers: HashMap::new(),
 
-            add_section_headers: true,
-            add_symbols: true,
             debug: HashSet::new(),
 
             // Tables

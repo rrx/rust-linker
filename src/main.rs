@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("Missing files");
     }
 
+    let config = Config::new();
     let mut reader = Reader::new();
     for path in args.inputs.iter() {
         let p = Path::new(&path);
@@ -27,9 +28,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let ext = p.extension().unwrap().to_str().unwrap();
         println!("ext: {}", ext);
         if ext == "a" {
-            reader.add_archive(&Path::new(&path))?;
+            reader.add_archive(&Path::new(&path), &config)?;
         } else {
-            reader.add(&Path::new(&path))?;
+            reader.add(&Path::new(&path), &config)?;
         }
     }
 

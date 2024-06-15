@@ -17,35 +17,6 @@ use crate::*;
 
 pub type SymbolMap = HashMap<String, ReadSymbol>;
 
-#[derive(Debug)]
-pub struct Reader {
-    // blocks
-    blocks: Vec<ReadBlock>,
-
-    // link block
-    block: ReadBlock,
-
-    //got: HashSet<String>,
-    //plt: HashSet<String>,
-    debug: HashSet<DebugFlag>,
-}
-
-impl Reader {
-    pub fn new() -> Self {
-        Self {
-            blocks: vec![],
-            block: ReadBlock::new("exe"),
-            //got: HashSet::new(),
-            //plt: HashSet::new(),
-            debug: HashSet::new(),
-        }
-    }
-
-    pub fn debug_add(&mut self, f: &DebugFlag) {
-        self.debug.insert(f.clone());
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ReadSectionKind {
     RX,
@@ -566,16 +537,36 @@ pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
     Ok(())
 }
 
+#[derive(Debug)]
+pub struct Reader {
+    // blocks
+    blocks: Vec<ReadBlock>,
+
+    // link block
+    block: ReadBlock,
+}
+
 impl Reader {
-    pub fn add(&mut self, path: &std::path::Path) -> Result<(), Box<dyn Error>> {
+    pub fn new() -> Self {
+        Self {
+            blocks: vec![],
+            block: ReadBlock::new("exe"),
+        }
+    }
+
+    pub fn add(&mut self, path: &std::path::Path, config: &Config) -> Result<(), Box<dyn Error>> {
         let buf = std::fs::read(path)?;
-        self.elf_read(path.to_str().unwrap(), &buf)?;
+        self.elf_read(path.to_str().unwrap(), &buf, config)?;
         Ok(())
     }
 
-    pub fn add_archive(&mut self, path: &std::path::Path) -> Result<(), Box<dyn Error>> {
+    pub fn add_archive(
+        &mut self,
+        path: &std::path::Path,
+        config: &Config,
+    ) -> Result<(), Box<dyn Error>> {
         let buf = std::fs::read(path)?;
-        self.add_archive_buf(path.to_str().unwrap(), &buf)?;
+        self.add_archive_buf(path.to_str().unwrap(), &buf, config)?;
         Ok(())
     }
 
@@ -583,6 +574,7 @@ impl Reader {
         &mut self,
         archive_name: &str,
         buf: &[u8],
+        config: &Config,
     ) -> Result<(), Box<dyn Error>> {
         log::debug!("Archive: {}", archive_name);
         let archive = object::read::archive::ArchiveFile::parse(buf)?;
@@ -598,24 +590,29 @@ impl Reader {
             let (offset, size) = m.file_range();
             let obj_buf = &buf[offset as usize..(offset + size) as usize];
             log::debug!("Member: {}, {:?}", &name, &m);
-            self.elf_read(name, &obj_buf)?;
+            self.elf_read(name, &obj_buf, config)?;
         }
         Ok(())
     }
 
-    fn elf_read(&mut self, name: &str, buf: &[u8]) -> Result<(), Box<dyn Error>> {
-        let block = self.read(name, buf)?;
+    fn elf_read(&mut self, name: &str, buf: &[u8], config: &Config) -> Result<(), Box<dyn Error>> {
+        let block = self.read(name, buf, config)?;
         self.block.add_block(block);
         Ok(())
     }
 
-    pub fn read<'a>(&mut self, name: &str, buf: &'a [u8]) -> Result<ReadBlock, Box<dyn Error>> {
+    pub fn read<'a>(
+        &mut self,
+        name: &str,
+        buf: &'a [u8],
+        config: &Config,
+    ) -> Result<ReadBlock, Box<dyn Error>> {
         let b: elf::ElfFile<'a, FileHeader64<object::Endianness>> =
             object::read::elf::ElfFile::parse(buf)?;
         let block = match b.kind() {
             ObjectKind::Relocatable | ObjectKind::Executable => {
                 dump_header(&b)?;
-                self.relocatable(name.to_string(), &b)?
+                self.relocatable(name.to_string(), &b, config)?
             }
             ObjectKind::Dynamic => self.dynamic(&b, name)?,
             _ => unimplemented!("{:?}", b.kind()),
@@ -650,6 +647,7 @@ impl Reader {
         &mut self,
         name: String,
         b: &elf::ElfFile<'a, A, B>,
+        config: &Config,
     ) -> Result<ReadBlock, Box<dyn Error>> {
         let mut block = ReadBlock::new(&name);
 
@@ -658,7 +656,7 @@ impl Reader {
         for section in b.sections() {
             let kind = ReadSectionKind::new_section_kind(section.kind());
 
-            if self.debug.contains(&DebugFlag::HashTables) && section.name()? == ".hash" {
+            if config.debug.contains(&DebugFlag::HashTables) && section.name()? == ".hash" {
                 let data = section.uncompressed_data()?;
                 dump_hash(&data);
             }

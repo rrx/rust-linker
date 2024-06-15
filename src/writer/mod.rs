@@ -206,13 +206,20 @@ pub enum DebugFlag {
 pub struct Config {
     add_section_headers: bool,
     add_symbols: bool,
+    pub debug: HashSet<DebugFlag>,
 }
+
 impl Config {
     pub fn new() -> Self {
         Self {
             add_section_headers: true,
             add_symbols: true,
+            debug: HashSet::new(),
         }
+    }
+
+    pub fn debug_add(&mut self, f: &DebugFlag) {
+        self.debug.insert(f.clone());
     }
 }
 

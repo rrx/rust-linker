@@ -170,7 +170,7 @@ impl Blocks {
         //data.pointer_set("__data_start".to_string(), 0);
         let mut out_data = Vec::new();
         let endian = Endianness::Little;
-        let mut w = object::write::elf::Writer::new(endian, config.is_64, &mut out_data);
+        let mut w = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);
 
         //block.build_strings(&mut data, &mut w);
         for b in blocks.iter_mut() {

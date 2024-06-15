@@ -523,11 +523,7 @@ impl ReadBlock {
     }
 }
 
-pub fn write<Elf: object::read::elf::FileHeader<Endian = object::Endianness>>(
-    data: &mut Data,
-    path: &Path,
-    config: &Config,
-) -> Result<(), Box<dyn Error>> {
+pub fn write(data: &mut Data, path: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
     let mut out_data = Vec::new();
     let endian = object::Endianness::Little;
     let mut writer = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);

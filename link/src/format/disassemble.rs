@@ -5,16 +5,15 @@ use object::Relocation;
 use std::collections::HashMap;
 
 pub fn print_bytes(buf: &[u8], _base: usize) {
-    use pretty_hex::*;
-    let cfg = HexConfig {
+    let cfg = pretty_hex::HexConfig {
         title: false,
         ascii: true,
         width: 16,
         group: 2,
         chunk: 4,
-        ..HexConfig::default()
+        ..pretty_hex::HexConfig::default()
     };
-    eprintln!("{}", config_hex(&buf.to_vec(), cfg));
+    eprintln!("{}", pretty_hex::config_hex(&buf.to_vec(), cfg));
 }
 
 /*

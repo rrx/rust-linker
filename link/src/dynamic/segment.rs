@@ -110,7 +110,7 @@ impl UnlinkedCodeSegmentInner {
                     (_, SymbolScope::Dynamic | SymbolScope::Unknown | SymbolScope::Linkage) => {
                         relocations.push(CodeRelocation {
                             name,
-                            name_id: None,
+                            //name_id: None,
                             offset: reloc_offset,
                             r: r.into(),
                         });
@@ -119,7 +119,7 @@ impl UnlinkedCodeSegmentInner {
                     (SymbolKind::Data, SymbolScope::Compilation) => {
                         relocations.push(CodeRelocation {
                             name,
-                            name_id: None,
+                            //name_id: None,
                             offset: reloc_offset,
                             r: r.into(),
                         });
@@ -133,7 +133,7 @@ impl UnlinkedCodeSegmentInner {
                         let name = section.name()?.to_string();
                         relocations.push(CodeRelocation {
                             name,
-                            name_id: None,
+                            //name_id: None,
                             offset: reloc_offset,
                             r: r.into(),
                         });
@@ -405,7 +405,7 @@ impl UnlinkedCodeSegmentInner {
                             // | SymbolScope::Linkage | SymbolScope::Unknown => {
                             relocations.push(CodeRelocation {
                                 name,
-                                name_id: None,
+                                //name_id: None,
                                 offset: reloc_offset,
                                 r: r.into(),
                             });
@@ -418,7 +418,7 @@ impl UnlinkedCodeSegmentInner {
                         (SymbolKind::Data, SymbolScope::Compilation) => {
                             relocations.push(CodeRelocation {
                                 name,
-                                name_id: None,
+                                //name_id: None,
                                 offset: reloc_offset,
                                 r: r.into(),
                             });
@@ -431,7 +431,7 @@ impl UnlinkedCodeSegmentInner {
                             let name = section.name()?.to_string();
                             relocations.push(CodeRelocation {
                                 name,
-                                name_id: None,
+                                //name_id: None,
                                 offset: reloc_offset,
                                 r: r.into(),
                             });

@@ -34,6 +34,7 @@ pub struct PatchBlock {
     pub(crate) internal: HashMap<String, RelocationPointer>,
     pub(crate) relocations: Vec<CodeRelocation>,
 }
+
 impl PatchBlock {
     pub fn patch(
         self,

@@ -1,9 +1,6 @@
 use crate::format::*;
 use object::{RelocationEncoding, RelocationKind};
 
-const R_X86_64_GOTPCREL: u32 = 0x29; //41;
-const R_X86_64_REX_GOTP: u32 = 0x2a; //42;
-
 use object::elf;
 use object::Architecture;
 //use std::error::Error;

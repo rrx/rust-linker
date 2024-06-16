@@ -24,8 +24,11 @@ impl Blocks {
             blocks.push(Box::new(InterpSection::new(&data)));
         }
 
-        blocks.push(Box::new(HashSection::new()));
-        //blocks.push(Box::new(GnuHashSection::new()));
+        if config.use_gnuhash {
+            blocks.push(Box::new(GnuHashSection::new()));
+        } else {
+            blocks.push(Box::new(HashSection::new()));
+        }
 
         if data.is_dynamic() {
             blocks.push(Box::new(DynSymSection::default()));
@@ -43,7 +46,7 @@ impl Blocks {
         blocks.push(Box::new(data.target.rw.clone()));
 
         if data.is_dynamic() {
-            blocks.push(Box::new(DynamicSection::new(&data, config)));
+            blocks.push(Box::new(DynamicSection::new(config)));
             blocks.push(Box::new(GotSection::new(GotSectionKind::GOT)));
             blocks.push(Box::new(GotSection::new(GotSectionKind::GOTPLT)));
         }
@@ -259,10 +262,6 @@ impl SegmentTracker {
             start_base,
             page_size: 0x1000,
         }
-    }
-
-    pub fn base(&self) -> u64 {
-        self.start_base
     }
 
     pub fn current(&self) -> &Segment {

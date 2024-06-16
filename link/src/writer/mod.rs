@@ -38,7 +38,7 @@ pub struct ProgramHeaderEntry {
 }
 
 pub(crate) struct Library {
-    pub(crate) name: String,
+    //pub(crate) name: String,
     pub(crate) string_id: Option<StringId>,
 }
 
@@ -84,6 +84,7 @@ pub struct TrackSection {
     pub section_index: Option<SectionIndex>,
 }
 
+/*
 pub enum SymbolPointer {
     RX(usize),
     RO(usize),
@@ -92,6 +93,7 @@ pub enum SymbolPointer {
     Got(usize),
     GotPlt(usize),
 }
+*/
 
 #[derive(Debug)]
 pub struct DynamicSymbol {
@@ -208,6 +210,7 @@ pub struct Config {
     is_64: bool,
     add_section_headers: bool,
     add_symbols: bool,
+    use_gnuhash: bool,
     pub debug: HashSet<DebugFlag>,
 }
 
@@ -218,6 +221,7 @@ impl Config {
             is_64: true,
             add_section_headers: true,
             add_symbols: true,
+            use_gnuhash: false,
             debug: HashSet::new(),
         }
     }
@@ -382,7 +386,7 @@ impl Data {
                     let buf = extend_lifetime(name.as_bytes());
                     //let buf = name.as_bytes();
                     Library {
-                        name: name.clone(),
+                        //name: name.clone(),
                         string_id: Some(w.add_dynamic_string(buf)),
                     }
                 }

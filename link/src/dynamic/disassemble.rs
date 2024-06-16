@@ -1,5 +1,5 @@
 use super::*;
-use crate::format::*;
+use crate::format::{disassemble_code, eprint_bytes};
 use std::collections::HashMap;
 
 impl PatchBlock {

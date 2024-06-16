@@ -571,7 +571,7 @@ pub fn code_relocation<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
     };
     Ok(CodeRelocation {
         name,
-        name_id: None,
+        //name_id: None,
         offset: offset as u64,
         r,
     })

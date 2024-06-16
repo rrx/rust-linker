@@ -290,7 +290,7 @@ pub struct DynamicSection {
     config: Config,
 }
 impl DynamicSection {
-    pub fn new(data: &Data, config: &Config) -> Self {
+    pub fn new(config: &Config) -> Self {
         Self {
             index: None,
             offsets: SectionOffset::new("dynamic".into(), AllocSegment::RW, 0x08),

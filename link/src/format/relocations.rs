@@ -1,6 +1,8 @@
-use object::write::StringId;
 use object::{Relocation, RelocationEncoding, RelocationKind, RelocationTarget};
 use std::fmt;
+
+const R_X86_64_GOTPCREL: u32 = 0x29; //41;
+const R_X86_64_REX_GOTP: u32 = 0x2a; //42;
 
 #[derive(Debug, Clone)]
 pub enum PatchEffect {
@@ -58,7 +60,7 @@ impl From<Relocation> for LinkRelocation {
 #[derive(Clone, Debug)]
 pub struct CodeRelocation {
     pub(crate) name: String,
-    pub(crate) name_id: Option<StringId>,
+    //pub(crate) name_id: Option<StringId>,
     pub(crate) offset: u64,
     pub(crate) r: LinkRelocation,
 }

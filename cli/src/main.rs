@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if args.dynamic {
         let mut b = DynamicLink::new();
         for path in args.inputs.iter() {
-            b.add_obj_file("asdf", &Path::new(&path))?;
+            b.add(&Path::new(path))?;
         }
         let version = b.link()?;
         let ret: i64 = version.invoke("main", ())?;

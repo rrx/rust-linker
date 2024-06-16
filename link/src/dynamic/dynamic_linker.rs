@@ -59,6 +59,18 @@ impl DynamicLink {
         self.mem.get_mem_ptr()
     }
 
+    pub fn add(&mut self, path: &std::path::Path) -> Result<(), Box<dyn Error>> {
+        let p = Path::new(&path);
+        println!("p: {}", p.to_str().unwrap());
+        let ext = p.extension().unwrap().to_str().unwrap();
+        println!("ext: {}", ext);
+        match ext {
+            "6" => self.add_library(path.to_str().unwrap(), &Path::new(&path)),
+            "o" => self.add_obj_file(path.to_str().unwrap(), &Path::new(&path)),
+            _ => unimplemented!()
+        }
+    }
+
     pub fn add_library_repo(&mut self, repo: SharedLibraryRepo) -> Result<(), Box<dyn Error>> {
         self.libraries.update(repo);
         Ok(())
@@ -151,17 +163,8 @@ pub(crate) type UnlinkedMap = HashMap<String, UnlinkedCodeSegment>;
 
 pub struct Link {
     pub(crate) unlinked: UnlinkedMap,
-    //dynamic: Option<DynamicLink>,
     libs: HashSet<String>,
 }
-
-/*
-impl Drop for Link {
-    fn drop(&mut self) {
-        self.unlinked.clear();
-    }
-}
-*/
 
 impl Link {
     pub fn new() -> Self {

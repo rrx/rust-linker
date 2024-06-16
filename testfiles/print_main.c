@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int g=1;
-int g2=0;
-int g3=0;
+int g = 1;
+int g2 = 0;
+int g3 = 0;
 int main() {
   puts("XXX1");
   printf("XXX2\n");
@@ -17,7 +17,5 @@ int main() {
   fprintf(stderr, "%p\n", g3);
   fflush(stdout);
   fflush(stderr);
-	return 0;
+  return 0;
 }
-
-

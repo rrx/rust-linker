@@ -65,9 +65,8 @@ impl DynamicLink {
         let ext = p.extension().unwrap().to_str().unwrap();
         println!("ext: {}", ext);
         match ext {
-            "6" => self
-                .link
-                .add_library(path.to_str().unwrap(), &Path::new(&path)),
+            "6" => self.add_library(path.to_str().unwrap(), &Path::new(&path)),
+            "so" => self.add_library(path.to_str().unwrap(), &Path::new(&path)),
             "o" => self
                 .link
                 .add_obj_file(path.to_str().unwrap(), &Path::new(&path)),
@@ -88,7 +87,7 @@ impl DynamicLink {
             let lib = libloading::Library::new(path)?;
             self.libraries.add(name, lib);
             self.link.add_library(name, path)?;
-            log::debug!("Loaded library: {}", &path.to_string_lossy());
+            log::info!("Loaded library: {}", &path.to_string_lossy());
         }
         Ok(())
     }
@@ -117,32 +116,39 @@ impl DynamicLink {
 
         // check for missing symbols, and try shared libraries to fill in the details
         let mut missing = HashSet::new();
+        let mut found = HashSet::new();
         for (_name, unlinked) in &self.link.unlinked {
-            let mut children = HashSet::new();
+            //let mut children = HashSet::new();
             //log::debug!("checking: {}", name);
             // ensure all relocations map somewhere
             for (extern_symbol, _s) in &unlinked.externs {
-                if pointers.contains_key(extern_symbol) {
+                if found.contains(extern_symbol) {
+                    continue;
+                } else if pointers.contains_key(extern_symbol) {
+                    found.insert(extern_symbol);
                 } else if self.libraries.search_dynamic(&extern_symbol).is_some() {
-                    log::debug!(" Symbol {} found in shared library", &extern_symbol);
+                    found.insert(extern_symbol);
+                    log::info!(" Symbol {} found in shared library", &extern_symbol);
                 } else {
-                    log::error!(" Symbol {} missing", &extern_symbol);
+                    log::error!(" Symbol {} not found in shared libraries", &extern_symbol);
                     missing.insert(extern_symbol.clone());
                 }
             }
 
             for r in &unlinked.relocations {
                 //log::debug!("\tReloc: {}", &symbol_name);
-                if pointers.contains_key(&r.name) {
-                    children.insert(r.name.clone());
+                if found.contains(&r.name) {
+                    continue;
+                } else if pointers.contains_key(&r.name) {
+                    //children.insert(r.name.clone());
                 } else if unlinked.internal.contains_key(&r.name) {
                     //children.insert(r.name.clone());
                 } else if self.libraries.search_dynamic(&r.name).is_some() {
-                    children.insert(r.name.clone());
-                    log::debug!(" Symbol {} found in shared library", &r.name);
+                    //children.insert(r.name.clone());
+                    log::info!(" Relocation Symbol {} found in shared library", &r.name);
                 } else {
                     log::debug!("{:?}", &unlinked.internal);
-                    log::error!(" Symbol {} missing", &r.name);
+                    log::error!(" Symbol {} not found", &r.name);
                     missing.insert(r.name.clone());
                 }
             }
@@ -158,6 +164,7 @@ impl DynamicLink {
         }
     }
 }
+
 pub(crate) type UnlinkedMap = HashMap<String, UnlinkedCodeSegment>;
 
 pub struct Link {
@@ -285,11 +292,24 @@ mod tests {
     }
 
     #[test]
+    fn linker_main() {
+        let mut b = DynamicLink::new();
+        //b.add(Path::new("/usr/lib/x86_64-linux-musl/libc.so"))
+        b.add(Path::new("libc.so.6")).unwrap();
+        b.add(Path::new("../build/clang-glibc/print_main.o"))
+            .unwrap();
+        let collection = b.link().unwrap();
+        let ret: *const () = collection.invoke("main", ()).unwrap();
+        log::debug!("ret: {:#08x}", ret as usize);
+        assert!(ret.is_null());
+    }
+
+    #[test]
     fn linker_livelink() {
         let mut b = DynamicLink::new();
         b.add_library("libc", Path::new("/usr/lib/x86_64-linux-musl/libc.so"))
             .unwrap();
-        b.add_library("libc", Path::new("../build/clang-glibc/live.so"))
+        b.add_library("live", Path::new("../build/clang-glibc/live.so"))
             .unwrap();
 
         // unable to link, missing symbol

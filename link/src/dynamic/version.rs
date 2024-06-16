@@ -3,11 +3,13 @@ use crate::format::*;
 use std::collections::HashMap;
 use std::error::Error;
 use std::ptr::NonNull;
-use std::sync::{Arc, Mutex};
 
+/*
+use std::sync::{Arc, Mutex};
 #[derive(Clone)]
 pub struct LinkVersionSync(pub Arc<Mutex<LinkVersion>>);
-unsafe impl Send for LinkVersionSync {}
+//unsafe impl Send for LinkVersionSync {}
+
 impl LinkVersionSync {
     pub fn new(version: LinkVersion) -> Self {
         Self(Arc::new(Mutex::new(version)))
@@ -16,6 +18,7 @@ impl LinkVersionSync {
         self.0.as_ref().lock().unwrap().invoke(name, ())
     }
 }
+*/
 
 #[derive(Clone)]
 pub struct LinkVersion {

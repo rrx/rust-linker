@@ -6,7 +6,7 @@ pub struct Blocks {
 }
 
 impl Blocks {
-    pub fn build(data: &mut Data, w: &mut Writer, config: &Config) {
+    pub fn build(data: &mut Data, w: &mut Writer, config: &AOTConfig) {
         // preparation
         Data::write_strings(data, w);
         data.write_relocations(w);
@@ -132,7 +132,7 @@ impl Blocks {
     /// generate a temporary list of program headers
     pub fn generate_ph(
         blocks: &mut Vec<Box<dyn ElfBlock>>,
-        config: &Config,
+        config: &AOTConfig,
     ) -> Vec<ProgramHeaderEntry> {
         // build a list of sections that are loaded
         // this is a hack to get tracker to build a correct list of program headers

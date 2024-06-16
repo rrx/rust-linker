@@ -1,13 +1,13 @@
-pub mod blocks;
-pub mod disassemble;
-pub mod dynamic_linker;
-pub mod libraries;
-pub mod memory;
-pub mod process_maps;
-pub mod relocations;
-pub mod segment;
-mod table;
-pub mod version;
+pub(crate) mod blocks;
+pub(crate) mod disassemble;
+pub(crate) mod dynamic_linker;
+pub(crate) mod libraries;
+pub(crate) mod memory;
+pub(crate) mod process_maps;
+pub(crate) mod relocations;
+pub(crate) mod segment;
+pub(crate) mod table;
+pub(crate) mod version;
 
 pub use blocks::*;
 pub use disassemble::*;

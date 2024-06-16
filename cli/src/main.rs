@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("Missing files");
     }
 
-    let config = Config::new();
+    let config = AOTConfig::new();
 
     if args.dynamic {
         let mut b = DynamicLink::new();

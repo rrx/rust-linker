@@ -1,5 +1,6 @@
-pub mod disassemble;
-pub mod relocations;
+pub(crate) mod disassemble;
+pub(crate) mod relocations;
+
 pub use disassemble::*;
 pub use relocations::*;
 

@@ -227,7 +227,7 @@ impl ReadBlock {
         }
     }
 
-    pub fn data(self, _config: &Config) -> Data {
+    pub fn data(self, _config: &AOTConfig) -> Data {
         let mut data = Data::new(self.libs.iter().cloned().collect());
         data.target = self.target;
 
@@ -239,7 +239,11 @@ impl ReadBlock {
         data
     }
 
-    pub fn add(&mut self, path: &std::path::Path, config: &Config) -> Result<(), Box<dyn Error>> {
+    pub fn add(
+        &mut self,
+        path: &std::path::Path,
+        config: &AOTConfig,
+    ) -> Result<(), Box<dyn Error>> {
         let p = Path::new(&path);
         println!("p: {}", p.to_str().unwrap());
         let ext = p.extension().unwrap().to_str().unwrap();
@@ -255,7 +259,7 @@ impl ReadBlock {
     pub fn add_object(
         &mut self,
         path: &std::path::Path,
-        config: &Config,
+        config: &AOTConfig,
     ) -> Result<(), Box<dyn Error>> {
         let buf = std::fs::read(path)?;
         self.read(path.to_str().unwrap(), &buf, config)?;
@@ -265,7 +269,7 @@ impl ReadBlock {
     pub fn add_archive(
         &mut self,
         path: &std::path::Path,
-        config: &Config,
+        config: &AOTConfig,
     ) -> Result<(), Box<dyn Error>> {
         let buf = std::fs::read(path)?;
         self.add_archive_buf(path.to_str().unwrap(), &buf, config)?;
@@ -276,7 +280,7 @@ impl ReadBlock {
         &mut self,
         archive_name: &str,
         buf: &[u8],
-        config: &Config,
+        config: &AOTConfig,
     ) -> Result<(), Box<dyn Error>> {
         log::debug!("Archive: {}", archive_name);
         let archive = object::read::archive::ArchiveFile::parse(buf)?;
@@ -301,7 +305,7 @@ impl ReadBlock {
         &mut self,
         name: &str,
         buf: &'a [u8],
-        config: &Config,
+        config: &AOTConfig,
     ) -> Result<(), Box<dyn Error>> {
         let b: elf::ElfFile<'a, FileHeader64<object::Endianness>> =
             object::read::elf::ElfFile::parse(buf)?;
@@ -342,7 +346,7 @@ impl ReadBlock {
         &mut self,
         name: String,
         b: &elf::ElfFile<'a, A, B>,
-        config: &Config,
+        config: &AOTConfig,
     ) -> Result<(), Box<dyn Error>> {
         log::debug!("relocatable: {}", &name);
 

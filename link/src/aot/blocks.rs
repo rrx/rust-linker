@@ -287,10 +287,10 @@ impl ElfBlock for InterpSection {
 pub struct DynamicSection {
     index: Option<SectionIndex>,
     offsets: SectionOffset,
-    config: Config,
+    config: AOTConfig,
 }
 impl DynamicSection {
-    pub fn new(config: &Config) -> Self {
+    pub fn new(config: &AOTConfig) -> Self {
         Self {
             index: None,
             offsets: SectionOffset::new("dynamic".into(), AllocSegment::RW, 0x08),

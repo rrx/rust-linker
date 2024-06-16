@@ -1,18 +1,17 @@
 use crate::format::*;
-use object::elf;
 use object::{
     Object, ObjectSection, ObjectSymbol, ObjectSymbolTable, RelocationTarget, SectionKind,
     SymbolFlags, SymbolKind, SymbolScope, SymbolSection,
 };
 
 use std::error::Error;
-use std::fmt;
 use std::sync::Arc;
 
 use std::collections::HashMap;
 
 use super::*;
 
+/*
 pub enum SymbolType {
     Func,
     Object,
@@ -31,19 +30,10 @@ impl CodeSymbol {
     }
 }
 
-impl fmt::Display for CodeSymbol {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Symbol addr: {:6}, size: {:6}, kind: {:?}, def: {:?}: {}",
-            self.address, self.size, self.kind, self.def, self.name
-        )
-    }
-}
+*/
 
-pub struct GotEntry {}
-
-pub struct PltEntry {}
+//pub struct GotEntry {}
+//pub struct PltEntry {}
 
 pub type UnlinkedCodeSegment = Arc<UnlinkedCodeSegmentInner>;
 
@@ -56,31 +46,10 @@ pub struct UnlinkedCodeSegmentInner {
     pub(crate) internal: im::HashMap<String, CodeSymbol>,
     pub(crate) externs: im::HashMap<String, CodeSymbol>,
     pub(crate) relocations: Vec<CodeRelocation>,
-    pub(crate) symbols: Vec<CodeSymbol>,
+    //pub(crate) symbols: Vec<CodeSymbol>,
 }
 
 impl UnlinkedCodeSegmentInner {
-    pub fn read_archive(archive_name: &str, buf: &[u8]) -> Result<Vec<Self>, Box<dyn Error>> {
-        log::debug!("Archive: {}", archive_name);
-        let archive = object::read::archive::ArchiveFile::parse(buf)?;
-        log::debug!(
-            "Archive: {}, size: {}, kind: {:?}",
-            archive_name,
-            buf.len(),
-            archive.kind()
-        );
-        let mut segments = vec![];
-        for result in archive.members() {
-            let m = result?;
-            let name = std::str::from_utf8(&m.name())?;
-            let (offset, size) = m.file_range();
-            let obj_buf = &buf[offset as usize..(offset + size) as usize];
-            log::debug!("Member: {}, {:?}", &name, &m);
-            segments.extend(Self::create_segments(name, obj_buf)?);
-        }
-        Ok(segments)
-    }
-
     pub fn create_segments_elf(_link_name: &str, buf: &[u8]) -> Result<Vec<Self>, Box<dyn Error>> {
         use object::elf::FileHeader64;
         use object::read::elf;
@@ -465,7 +434,7 @@ impl UnlinkedCodeSegmentInner {
                     externs: externs.clone(),
                     defined,
                     internal: internal.clone(),
-                    symbols: vec![],
+                    //symbols: vec![],
                     relocations,
                 });
             }

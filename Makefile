@@ -27,12 +27,18 @@ gcc_dynamic:
 		build/clang-glibc/print_main.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
+gcc_ref:
+	${CLANG} build/clang-glibc/print_main.o -o build/clang-glibc/print_main
+	readelf -aW build/clang-glibc/print_main
+	exec build/clang-glibc/print_main
+
 gcc:
 	cargo run -- \
 		-o tmp/out.exe \
 		build/clang-glibc/print_main.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o 
+	readelf -aW tmp/out.exe
 	exec tmp/out.exe
 
 

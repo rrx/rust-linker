@@ -202,9 +202,7 @@ impl ReadSymbol {
 #[derive(Debug)]
 pub struct ReadBlock {
     name: String,
-    // dynamic libraries referenced
     pub target: Target,
-    //pub libs: HashSet<String>,
     local_index: usize,
 }
 
@@ -492,7 +490,7 @@ impl ReadBlock {
                 }
             }
         }
-        eprintln!("{} symbols read from {}", count, section.name()?);
+        log::debug!("{} symbols read from {}", count, section.name()?);
 
         match kind {
             ReadSectionKind::Bss => {

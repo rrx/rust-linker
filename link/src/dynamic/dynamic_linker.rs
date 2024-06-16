@@ -65,8 +65,15 @@ impl DynamicLink {
         let ext = p.extension().unwrap().to_str().unwrap();
         println!("ext: {}", ext);
         match ext {
-            "6" => self.add_library(path.to_str().unwrap(), &Path::new(&path)),
-            "o" => self.add_obj_file(path.to_str().unwrap(), &Path::new(&path)),
+            "6" => self
+                .link
+                .add_library(path.to_str().unwrap(), &Path::new(&path)),
+            "o" => self
+                .link
+                .add_obj_file(path.to_str().unwrap(), &Path::new(&path)),
+            "a" => self
+                .link
+                .add_archive_file(path.to_str().unwrap(), &Path::new(&path)),
             _ => unimplemented!(),
         }
     }
@@ -84,14 +91,6 @@ impl DynamicLink {
             log::debug!("Loaded library: {}", &path.to_string_lossy());
         }
         Ok(())
-    }
-
-    pub fn add_obj_file(&mut self, name: &str, path: &Path) -> Result<(), Box<dyn Error>> {
-        self.link.add_obj_file(name, path)
-    }
-
-    pub fn add_obj_buf(&mut self, name: &str, buf: &[u8]) -> Result<(), Box<dyn Error>> {
-        self.link.add_obj_buf(name, buf)
     }
 
     pub fn link(&mut self) -> Result<LinkVersion, Box<dyn Error>> {
@@ -170,14 +169,15 @@ impl Link {
     pub fn new() -> Self {
         Self {
             unlinked: HashMap::new(),
-            //dynamic: None,
             libs: HashSet::default(),
         }
     }
 
+    /*
     pub fn remove(&mut self, name: &str) {
         self.unlinked.remove(&name.to_string());
     }
+    */
 
     pub fn add_library(&mut self, _name: &str, path: &Path) -> Result<(), Box<dyn Error>> {
         self.libs.insert(path.to_string_lossy().to_string());
@@ -192,7 +192,31 @@ impl Link {
 
     pub fn add_archive_file(&mut self, name: &str, path: &Path) -> Result<(), Box<dyn Error>> {
         let buf = fs::read(path)?;
-        let segments = UnlinkedCodeSegmentInner::read_archive(name, buf.as_slice())?;
+        self.add_archive_buf(name, buf.as_slice())
+    }
+
+    pub fn add_archive_buf(
+        &mut self,
+        archive_name: &str,
+        buf: &[u8],
+    ) -> Result<(), Box<dyn Error>> {
+        log::debug!("Archive: {}", archive_name);
+        let archive = object::read::archive::ArchiveFile::parse(buf)?;
+        log::debug!(
+            "Archive: {}, size: {}, kind: {:?}",
+            archive_name,
+            buf.len(),
+            archive.kind()
+        );
+        let mut segments = vec![];
+        for result in archive.members() {
+            let m = result?;
+            let name = std::str::from_utf8(&m.name())?;
+            let (offset, size) = m.file_range();
+            let obj_buf = &buf[offset as usize..(offset + size) as usize];
+            log::debug!("Member: {}, {:?}", &name, &m);
+            segments.extend(UnlinkedCodeSegmentInner::create_segments(name, obj_buf)?);
+        }
         self.add_segments(segments);
         Ok(())
     }
@@ -219,8 +243,7 @@ mod tests {
     fn linker_segfault() {
         let mut b = DynamicLink::new();
         b.add_library("test", Path::new("libsigsegv.so")).unwrap();
-        b.add_obj_file("test", Path::new("../build/clang-glibc/segfault.o"))
-            .unwrap();
+        b.add(Path::new("../build/clang-glibc/segfault.o")).unwrap();
         let _version = b.link().unwrap();
         // XXX: This isn't working yet
         //let ret: i64 = version.invoke("handlers_init", ()).unwrap();
@@ -232,8 +255,7 @@ mod tests {
     #[test]
     fn linker_global_long() {
         let mut b = DynamicLink::new();
-        b.add_obj_file("test", Path::new("../build/clang-glibc/live.o"))
-            .unwrap();
+        b.add(Path::new("../build/clang-glibc/live.o")).unwrap();
         let collection = b.link().unwrap();
 
         let ret: i64 = collection.invoke("call_live", (3,)).unwrap();
@@ -254,7 +276,7 @@ mod tests {
         let mut b = DynamicLink::new();
         b.add_library("gz", Path::new("../build/testlibs/libz.so"))
             .unwrap();
-        b.add_obj_file("test", Path::new("../build/clang-glibc/link_shared.o"))
+        b.add(Path::new("../build/clang-glibc/link_shared.o"))
             .unwrap();
         let collection = b.link().unwrap();
         let ret: *const () = collection.invoke("call_z", ()).unwrap();
@@ -271,17 +293,16 @@ mod tests {
             .unwrap();
 
         // unable to link, missing symbol
-        b.add_obj_file("test1", Path::new("../build/clang-glibc/testfunction.o"))
+        b.add(Path::new("../build/clang-glibc/testfunction.o"))
             .unwrap();
         assert_eq!(false, b.link().is_ok());
 
         // provide missing symbol
-        b.add_obj_file("asdf", Path::new("../build/clang-glibc/asdf.o"))
-            .unwrap();
+        b.add(Path::new("../build/clang-glibc/asdf.o")).unwrap();
         assert_eq!(true, b.link().is_ok());
 
         // links fine
-        b.add_obj_file("simple", Path::new("../build/clang-glibc/simplefunction.o"))
+        b.add(Path::new("../build/clang-glibc/simplefunction.o"))
             .unwrap();
         assert_eq!(true, b.link().is_ok());
 

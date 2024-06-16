@@ -1,5 +1,4 @@
 use clap::Parser;
-use link::dynamic::*;
 use link::*;
 use std::error::Error;
 use std::path::Path;

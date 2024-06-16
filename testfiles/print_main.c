@@ -4,7 +4,7 @@
 int g = 1;
 int g2 = 0;
 int g3 = 0;
-int main() {
+int main(int argc, const char **argv) {
   puts("XXX1");
   printf("XXX2\n");
   fprintf(stdout, "XXX3\n");
@@ -17,5 +17,8 @@ int main() {
   fprintf(stderr, "%p\n", g3);
   fflush(stdout);
   fflush(stderr);
+  for (int i = 0; i < argc; i++) {
+    printf("arg %d: %s\n", i, argv[i]);
+  }
   return 0;
 }

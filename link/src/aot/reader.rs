@@ -8,7 +8,7 @@ use object::write::StringId;
 use object::{
     Object, ObjectKind, ObjectSection, ObjectSymbol, RelocationTarget, SectionKind, SymbolKind,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
 
@@ -46,14 +46,13 @@ impl ReadSectionKind {
         }
     }
 
-    pub fn alloc(&self) -> Option<AllocSegment> {
+    pub fn block(&self) -> GeneralSection {
         match self {
-            ReadSectionKind::RX => Some(AllocSegment::RX),
-            ReadSectionKind::RW => Some(AllocSegment::RW),
-            //ReadSectionKind::ROStrings => Some(AllocSegment::RO),
-            ReadSectionKind::ROData => Some(AllocSegment::RO),
-            ReadSectionKind::Bss => Some(AllocSegment::RW),
-            _ => None,
+            Self::ROData => GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
+            Self::RW => GeneralSection::new(AllocSegment::RW, ".data", 0x10),
+            Self::RX => GeneralSection::new(AllocSegment::RX, ".text", 0x10),
+            Self::Bss => GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
+            _ => unimplemented!(),
         }
     }
 
@@ -85,6 +84,22 @@ impl ReadSectionKind {
         }
     }
 }
+
+/*
+    pub fn alloc(&self) -> Option<AllocSegment> {
+        match self {
+            ReadSectionKind::RX => Some(AllocSegment::RX),
+            ReadSectionKind::RW => Some(AllocSegment::RW),
+            //ReadSectionKind::ROStrings => Some(AllocSegment::RO),
+            ReadSectionKind::ROData => Some(AllocSegment::RO),
+            ReadSectionKind::Bss => Some(AllocSegment::RW),
+            _ => None,
+        }
+    }
+
+
+}
+*/
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SymbolSource {
@@ -199,7 +214,7 @@ impl ReadSymbol {
 pub struct ReadBlock {
     name: String,
     // dynamic libraries referenced
-    target: Target,
+    pub target: Target,
     //pub libs: HashSet<String>,
     local_index: usize,
 }
@@ -225,19 +240,6 @@ impl ReadBlock {
             //libs: HashSet::new(),
             local_index: 0,
         }
-    }
-
-    pub fn data(mut self, _config: &AOTConfig) -> (Data, Target) {
-        //self.target.lib_names = self.libs.iter().cloned().collect();
-        let mut data = Data::new();
-        //data.target = self.target;
-
-        for (name, symbol) in self.target.exports.iter() {
-            data.pointers
-                .insert(name.to_string(), symbol.pointer.clone());
-        }
-
-        (data, self.target)
     }
 
     pub fn add(

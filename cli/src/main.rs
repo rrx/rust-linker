@@ -41,13 +41,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         block.dump();
 
-        let (mut data, target) = block.data(&config);
+        let mut data = Data::new();
         if let Some(interp) = args.interp {
             data = data.interp(interp);
         }
 
         let output = args.output.unwrap_or("a.out".to_string());
-        Data::write(data, target, Path::new(&output), &config)?;
+        Data::write(data, block.target, Path::new(&output), &config)?;
     }
 
     Ok(())

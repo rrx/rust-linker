@@ -110,12 +110,8 @@ deps:
 	cargo modules generate graph --package link --lib --orphans | dot -Tpng > link.png && open link.png
 	cargo depgraph --build-deps --workspace-only | dot -Tpng > crates.png && open crates.png
 
-CFLAGS=-fPIC -fno-direct-access-external-data ${NIX_CFLAGS_COMPILE}
+CFLAGS=-fPIC -fno-direct-access-external-data
 CFLAGS_MUSL=-I/usr/include/x86_64-linux-musl ${CFLAGS}
-
-functions2:
-	zig build
-	$(CLANG) ${CFLAGS} -c testfiles/empty_main.c -o ./build/clang-glibc/empty_main.o
 
 functions:
 	mkdir -p build/clang-glibc build/clang-musl build/gcc-glibc build/testlibs

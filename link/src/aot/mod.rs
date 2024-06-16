@@ -23,17 +23,3 @@ pub use segments::*;
 pub use statics::*;
 pub use target::*;
 pub use utils::*;
-
-/*
-use object::elf;
-use object::write::elf::{SectionIndex, SymbolIndex, Writer};
-use object::write::StringId;
-use object::Endianness;
-use object::SymbolKind;
-use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::fmt;
-use std::path::Path;
-
-use crate::format::*;
-*/

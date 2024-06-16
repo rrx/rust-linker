@@ -227,16 +227,16 @@ impl ReadBlock {
         }
     }
 
-    pub fn data(self, _config: &AOTConfig) -> Data {
+    pub fn data(self, _config: &AOTConfig) -> (Data, Target) {
         let mut data = Data::new(self.libs.iter().cloned().collect());
-        data.target = self.target;
+        //data.target = self.target;
 
-        for (name, symbol) in data.target.exports.iter() {
+        for (name, symbol) in self.target.exports.iter() {
             data.pointers
                 .insert(name.to_string(), symbol.pointer.clone());
         }
 
-        data
+        (data, self.target)
     }
 
     pub fn add(

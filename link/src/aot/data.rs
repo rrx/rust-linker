@@ -59,7 +59,7 @@ pub struct Data {
     pub(crate) hash: TrackSection,
     pub(crate) symtab: TrackSection,
     pub(crate) section_dynamic: TrackSection,
-    pub target: Target,
+    //pub target: Target,
 }
 
 impl Data {
@@ -87,8 +87,7 @@ impl Data {
             // Tables
             dynamics: Dynamics::new(),
             statics: Statics::new(),
-
-            target: Target::new(),
+            //target: Target::new(),
         }
     }
 
@@ -150,7 +149,7 @@ impl Data {
         self.section_index.insert(name.to_string(), section_index);
     }
 
-    pub fn write_strings(data: &mut Data, w: &mut Writer) {
+    pub fn write_strings(data: &mut Data, target: &Target, w: &mut Writer) {
         // add libraries if they are configured
         data.libs = data
             .lib_names
@@ -168,7 +167,7 @@ impl Data {
             })
             .collect();
 
-        for (name, symbol) in data.target.exports.iter() {
+        for (name, symbol) in target.exports.iter() {
             // allocate string for the symbol table
             let _string_id = data.statics.string_add(name, w);
             data.pointers
@@ -178,15 +177,14 @@ impl Data {
         }
     }
 
-    pub(crate) fn write_relocations(&mut self, w: &mut Writer) {
-        let iter = self
-            .target
+    pub(crate) fn write_relocations(&mut self, target: &Target, w: &mut Writer) {
+        let iter = target
             .ro
             .relocations()
             .iter()
-            .chain(self.target.rw.relocations().iter())
-            .chain(self.target.rx.relocations().iter())
-            .chain(self.target.bss.relocations().iter());
+            .chain(target.rw.relocations().iter())
+            .chain(target.rx.relocations().iter())
+            .chain(target.bss.relocations().iter());
 
         // add the relocations to the sets
         // we only want to add a relocation to either got or gotplt
@@ -213,7 +211,7 @@ impl Data {
         }
 
         for r in iter {
-            if let Some(s) = self.target.lookup(&r.name) {
+            if let Some(s) = target.lookup(&r.name) {
                 // we don't know the section yet, we just know which kind
                 let def = match s.bind {
                     SymbolBind::Local => CodeSymbolDefinition::Local,
@@ -264,12 +262,12 @@ impl Data {
         }
     }
 
-    pub(crate) fn update_data(&mut self) {
+    pub(crate) fn update_data(&mut self, target: &Target) {
         for (name, _, pointer) in self.dynamics.symbols() {
             self.pointers.insert(name, pointer);
         }
 
-        for (name, symbol) in self.target.locals.iter() {
+        for (name, symbol) in target.locals.iter() {
             match symbol.section {
                 ReadSectionKind::RX
                 //| ReadSectionKind::ROStrings
@@ -286,16 +284,21 @@ impl Data {
         // Add static symbols to data
         let locals = vec!["_DYNAMIC"];
         for symbol_name in locals {
-            let s = self.target.lookup_static(symbol_name).unwrap();
+            let s = target.lookup_static(symbol_name).unwrap();
             self.pointers.insert(s.name, s.pointer);
         }
     }
 
-    pub fn write(data: &mut Data, path: &Path, config: &AOTConfig) -> Result<(), Box<dyn Error>> {
+    pub fn write(
+        data: Data,
+        target: Target,
+        path: &Path,
+        config: &AOTConfig,
+    ) -> Result<(), Box<dyn Error>> {
         let mut out_data = Vec::new();
         let endian = object::Endianness::Little;
         let mut writer = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);
-        Blocks::build(data, &mut writer, config);
+        Blocks::build(data, target, &mut writer, config);
         let size = out_data.len();
         std::fs::write(path, out_data)?;
         eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());

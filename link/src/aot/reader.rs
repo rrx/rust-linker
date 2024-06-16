@@ -46,14 +46,8 @@ impl ReadSectionKind {
         }
     }
 
-    pub fn block(&self) -> GeneralSection {
-        match self {
-            Self::ROData => GeneralSection::new(AllocSegment::RO, ".rodata", 0x10),
-            Self::RW => GeneralSection::new(AllocSegment::RW, ".data", 0x10),
-            Self::RX => GeneralSection::new(AllocSegment::RX, ".text", 0x10),
-            Self::Bss => GeneralSection::new(AllocSegment::RW, ".bss", 0x10),
-            _ => unimplemented!(),
-        }
+    pub fn section(&self) -> GeneralSection {
+        return GeneralSection::new(self.alloc().unwrap(), self.section_name(), 0x10);
     }
 
     pub fn section_index(&self, data: &Data) -> Option<SectionIndex> {
@@ -83,9 +77,7 @@ impl ReadSectionKind {
             _ => ResolvePointer::Resolved(address),
         }
     }
-}
 
-/*
     pub fn alloc(&self) -> Option<AllocSegment> {
         match self {
             ReadSectionKind::RX => Some(AllocSegment::RX),
@@ -96,10 +88,7 @@ impl ReadSectionKind {
             _ => None,
         }
     }
-
-
 }
-*/
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SymbolSource {

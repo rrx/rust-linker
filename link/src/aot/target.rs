@@ -2,7 +2,7 @@ use super::*;
 use crate::format::{disassemble_code_with_symbols, print_bytes, Symbol};
 use std::collections::HashSet;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Target {
     pub libs: HashSet<String>,
     pub dynamic: SymbolMap,
@@ -25,10 +25,10 @@ impl Target {
             locals: SymbolMap::new(),
             exports: SymbolMap::new(),
             dynamic: SymbolMap::new(),
-            ro: ReadSectionKind::ROData.block(),
-            rw: ReadSectionKind::RW.block(),
-            rx: ReadSectionKind::RX.block(),
-            bss: ReadSectionKind::Bss.block(),
+            ro: ReadSectionKind::ROData.section(),
+            rw: ReadSectionKind::RW.section(),
+            rx: ReadSectionKind::RX.section(),
+            bss: ReadSectionKind::Bss.section(),
             //got: GeneralSection::new(AllocSegment::RW, ".got", 0x10),
             //gotplt: GeneralSection::new(AllocSegment::RW, ".got.plt", 0x10),
             unresolved: HashSet::new(),

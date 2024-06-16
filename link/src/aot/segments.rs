@@ -43,6 +43,8 @@ impl Blocks {
         data.write_relocations(&target, w);
         data.update_data(&target);
 
+        let is_dynamic = target.is_dynamic();
+
         let mut blocks: Vec<Box<dyn ElfBlock>> = vec![];
 
         blocks.push(Box::new(FileHeader::default()));
@@ -67,20 +69,20 @@ impl Blocks {
             blocks.push(Box::new(RelaDynSection::new(GotSectionKind::GOTPLT)));
         }
 
-        blocks.push(Box::new(target.ro.clone()));
-        blocks.push(Box::new(target.rx.clone()));
+        blocks.push(Box::new(target.ro));
+        blocks.push(Box::new(target.rx));
         blocks.push(Box::new(PltSection::new(".plt")));
         blocks.push(Box::new(PltGotSection::new(".plt.got")));
-        blocks.push(Box::new(target.rw.clone()));
+        blocks.push(Box::new(target.rw));
 
-        if target.is_dynamic() {
+        if is_dynamic {
             blocks.push(Box::new(DynamicSection::new(config)));
             blocks.push(Box::new(GotSection::new(GotSectionKind::GOT)));
             blocks.push(Box::new(GotSection::new(GotSectionKind::GOTPLT)));
         }
 
         // bss is the last alloc block
-        blocks.push(Box::new(target.bss.clone()));
+        blocks.push(Box::new(target.bss));
 
         if config.add_symbols {
             blocks.push(Box::new(SymTabSection::default()));

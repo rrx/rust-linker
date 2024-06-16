@@ -120,7 +120,7 @@ impl DynamicLink {
         for (_name, unlinked) in &self.link.unlinked {
             //let mut children = HashSet::new();
             //log::debug!("checking: {}", name);
-            // ensure all relocations map somewhere
+            // ensure all externs and relocations map somewhere
             for (extern_symbol, _s) in &unlinked.externs {
                 if found.contains(extern_symbol) {
                     continue;
@@ -300,7 +300,7 @@ mod tests {
             .unwrap();
         let collection = b.link().unwrap();
         let ret: *const () = collection.invoke("main", ()).unwrap();
-        log::debug!("ret: {:#08x}", ret as usize);
+        log::info!("ret: {:#08x}", ret as usize);
         assert!(ret.is_null());
     }
 

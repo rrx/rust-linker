@@ -64,7 +64,7 @@ pub fn build_version(link: &mut DynamicLink) -> Result<LinkVersion, Box<dyn Erro
     // create data and code patch blocks
     let mut blocks = vec![];
     for (_name, unlinked) in &link.link.unlinked {
-        let name = format!("{}.data", &unlinked.name);
+        let name = format!("{}:data", &unlinked.name);
 
         use object::SectionKind as K;
         match unlinked.kind {
@@ -239,7 +239,7 @@ pub fn build_version(link: &mut DynamicLink) -> Result<LinkVersion, Box<dyn Erro
     let mut linked = im::HashMap::new();
     for (block_name, block) in blocks {
         let patched_block = block.patch(patch_source.clone(), got.clone(), plt.clone())?;
-        //patched_block.disassemble();
+        patched_block.disassemble();
         linked.insert(block_name.clone(), patched_block);
     }
 

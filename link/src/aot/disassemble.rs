@@ -1,6 +1,5 @@
 use super::*;
 use crate::format::*;
-use crate::writer::*;
 use binary_heap_plus::BinaryHeap;
 use capstone::prelude::*;
 

@@ -1,6 +1,5 @@
 use super::*;
 use crate::format::{disassemble_code_with_symbols, print_bytes, Symbol};
-use crate::writer::{AllocSegment, ResolvePointer};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]

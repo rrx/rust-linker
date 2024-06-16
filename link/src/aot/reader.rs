@@ -1,6 +1,5 @@
 // read elf file
 use crate::format::*;
-use crate::writer::Data;
 use object::elf::FileHeader64;
 use object::read::elf;
 use object::read::elf::ProgramHeader;
@@ -14,7 +13,6 @@ use std::error::Error;
 use std::path::Path;
 
 use super::*;
-use crate::writer::*;
 
 pub type SymbolMap = HashMap<String, ReadSymbol>;
 

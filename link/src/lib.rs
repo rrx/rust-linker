@@ -1,8 +1,7 @@
+pub mod aot;
 pub mod dynamic;
 mod format;
-pub mod linker;
-mod writer;
+//mod writer;
 
+pub use aot::{Config, Data, ReadBlock};
 pub use dynamic::DynamicLink;
-pub use linker::ReadBlock;
-pub use writer::{Config, Data};

@@ -211,8 +211,8 @@ pub struct InterpSection {
 }
 
 impl InterpSection {
-    pub fn new(data: &Data) -> Self {
-        let interp = data.interp.as_bytes().to_vec();
+    pub fn new(interp: &str) -> Self {
+        let interp = interp.as_bytes().to_vec();
         let cstr = std::ffi::CString::new(interp).unwrap();
         Self {
             alloc: AllocSegment::RO,

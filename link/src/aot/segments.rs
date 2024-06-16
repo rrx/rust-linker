@@ -49,10 +49,7 @@ impl Blocks {
         blocks.push(Box::new(ProgramHeader::default()));
 
         if data.is_dynamic() {
-            // BufferSection doesn't implement the program header, we really need
-            // the dedicated interp section code to make that work
-            // interp is an exception
-            blocks.push(Box::new(InterpSection::new(&data)));
+            blocks.push(Box::new(InterpSection::new(&data.interp)));
         }
 
         if config.use_gnuhash {

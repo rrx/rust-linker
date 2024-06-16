@@ -1,5 +1,29 @@
 use super::*;
 
+#[derive(Debug, Clone)]
+pub struct ProgramHeaderEntry {
+    pub p_type: u32,
+    pub p_flags: u32,
+    pub p_offset: u64,
+    pub p_vaddr: u64,
+    pub p_paddr: u64,
+    pub p_filesz: u64,
+    pub p_memsz: u64,
+    pub p_align: u64,
+}
+
+pub(crate) struct Library {
+    //pub(crate) name: String,
+    pub(crate) string_id: Option<StringId>,
+}
+
+#[derive(Eq, Hash, PartialEq, Debug)]
+pub enum AddressKey {
+    SectionIndex(SectionIndex),
+    Section(String),
+    PltGot(String),
+}
+
 pub struct Data {
     pub interp: String,
     pub(crate) lib_names: Vec<String>,
@@ -261,5 +285,93 @@ impl Data {
         std::fs::write(path, out_data)?;
         eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ResolvePointer {
+    Resolved(u64),
+    Section(String, u64),
+    Got(usize),
+    GotPlt(usize),
+    Plt(usize),
+    PltGot(usize),
+}
+
+impl fmt::Display for ResolvePointer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Resolved(p) => write!(f, "Abs({:#0x})", p),
+            Self::Section(name, p) => write!(f, "Section({},{:#0x})", name, p),
+            _ => write!(f, "{:?}", self),
+        }
+    }
+}
+
+impl ResolvePointer {
+    pub fn relocate(self, base: u64) -> Self {
+        match self {
+            Self::Section(section_name, offset) => Self::Section(section_name, offset + base),
+            Self::Resolved(address) => Self::Resolved(address + base),
+            _ => unimplemented!("{:?}", self),
+        }
+    }
+
+    pub fn resolve(&self, data: &Data) -> Option<u64> {
+        //eprintln!("X: {:?}", self);
+        //eprintln!("X: {:?}", &data.addr);
+        match self {
+            Self::Resolved(x) => Some(*x),
+            Self::Section(section_name, offset) => {
+                if let Some(base) = data
+                    .addr
+                    .get(&AddressKey::Section(section_name.to_string()))
+                {
+                    Some(base + offset)
+                } else {
+                    None
+                }
+            }
+
+            Self::Got(index) => {
+                if let Some(base) = data.addr_get_by_name(".got") {
+                    let size = std::mem::size_of::<usize>() as u64;
+                    Some(base + (*index as u64) * size)
+                } else {
+                    None
+                }
+            }
+
+            Self::GotPlt(index) => {
+                if let Some(base) = data.addr_get_by_name(".got.plt") {
+                    let size = std::mem::size_of::<usize>() as u64;
+                    // first 3 entries in the got.plt are already used
+                    Some(base + (*index as u64 + 3) * size)
+                } else {
+                    None
+                }
+            }
+
+            Self::Plt(index) => {
+                if let Some(base) = data.addr_get_by_name(".plt") {
+                    // each entry in small model is 0x10 in size
+                    let size = 0x10;
+                    // skip the stub (+1)
+                    Some(base + (*index as u64 + 1) * size)
+                } else {
+                    None
+                }
+            }
+
+            Self::PltGot(index) => {
+                if let Some(base) = data.addr_get_by_name(".plt.got") {
+                    // each entry in small model is 0x8 in size
+                    let size = 0x08;
+                    Some(base + (*index as u64 * size))
+                } else {
+                    None
+                }
+            }
+        }
     }
 }

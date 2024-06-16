@@ -1284,3 +1284,95 @@ impl ElfBlock for PltGotSection {
         self.section.write_section_header(data, w);
     }
 }
+
+struct Dynamic {
+    tag: u32,
+    // Ignored if `string` is set.
+    val: u64,
+    string: Option<object::write::StringId>,
+}
+
+fn gen_dynamic(data: &Data, config: &AOTConfig) -> Vec<Dynamic> {
+    let mut out = vec![];
+    for lib in data.libs.iter() {
+        out.push(Dynamic {
+            tag: elf::DT_NEEDED,
+            val: 0,
+            string: lib.string_id,
+        });
+    }
+    out.push(Dynamic {
+        tag: elf::DT_HASH,
+        val: data.hash.addr.unwrap(),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_STRTAB,
+        val: data.dynstr.addr.unwrap(),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_SYMTAB,
+        val: data.dynsym.addr.unwrap(),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_STRSZ,
+        val: data.dynstr.size.unwrap() as u64,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_SYMENT,
+        val: config.symbol_size() as u64,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_DEBUG,
+        val: 0,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_PLTGOT,
+        val: *data
+            .addr
+            .get(&AddressKey::Section(".got.plt".to_string()))
+            .unwrap_or(&0),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_PLTRELSZ,
+        val: data.relaplt.size.unwrap() as u64,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_PLTREL,
+        val: 7,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_JMPREL,
+        val: data.addr_get(".rela.plt"),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_RELA,
+        val: data.addr_get(".rela.dyn"),
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_RELASZ,
+        val: data.reladyn.size.unwrap() as u64,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_RELAENT,
+        val: config.rel_size(true) as u64,
+        string: None,
+    });
+    out.push(Dynamic {
+        tag: elf::DT_NULL,
+        val: 0,
+        string: None,
+    });
+    out
+}

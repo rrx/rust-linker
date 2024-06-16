@@ -1,4 +1,12 @@
 use super::*;
+use crate::format::*;
+use object::write::elf::{SectionIndex, Writer};
+use object::write::StringId;
+use object::SymbolKind;
+use std::collections::{HashMap, HashSet};
+use std::error::Error;
+use std::fmt;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct ProgramHeaderEntry {
@@ -22,6 +30,13 @@ pub enum AddressKey {
     SectionIndex(SectionIndex),
     Section(String),
     PltGot(String),
+}
+
+#[derive(Default)]
+pub struct TrackSection {
+    pub size: Option<usize>,
+    pub addr: Option<u64>,
+    pub section_index: Option<SectionIndex>,
 }
 
 pub struct Data {

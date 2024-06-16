@@ -1,4 +1,8 @@
 use super::*;
+use object::elf;
+use object::write::elf::{SectionIndex, SymbolIndex, Writer};
+use object::write::StringId;
+use std::collections::HashMap;
 
 pub trait WriterEx {
     fn reserve_start_section(&mut self, offsets: &SectionOffset) -> usize;

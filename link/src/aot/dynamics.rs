@@ -1,4 +1,5 @@
 use super::*;
+use crate::format::*;
 use object::write::elf::Sym;
 use object::write::elf::{SymbolIndex, Writer};
 use object::write::StringId;

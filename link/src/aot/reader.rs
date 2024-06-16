@@ -200,7 +200,7 @@ pub struct ReadBlock {
     name: String,
     // dynamic libraries referenced
     target: Target,
-    pub libs: HashSet<String>,
+    //pub libs: HashSet<String>,
     local_index: usize,
 }
 
@@ -222,13 +222,14 @@ impl ReadBlock {
         Self {
             name: name.to_string(),
             target,
-            libs: HashSet::new(),
+            //libs: HashSet::new(),
             local_index: 0,
         }
     }
 
-    pub fn data(self, _config: &AOTConfig) -> (Data, Target) {
-        let mut data = Data::new(self.libs.iter().cloned().collect());
+    pub fn data(mut self, _config: &AOTConfig) -> (Data, Target) {
+        //self.target.lib_names = self.libs.iter().cloned().collect();
+        let mut data = Data::new();
         //data.target = self.target;
 
         for (name, symbol) in self.target.exports.iter() {
@@ -338,7 +339,7 @@ impl ReadBlock {
             }
         }
         eprintln!("{} symbols read from {}", count, name);
-        self.libs.insert(name.to_string());
+        self.target.libs.insert(name.to_string());
         Ok(())
     }
 
@@ -423,7 +424,7 @@ impl ReadBlock {
             self.target.insert_dynamic(s);
         }
 
-        self.libs.extend(block.libs.into_iter());
+        self.target.libs.extend(block.target.libs.into_iter());
 
         // update BSS
         /*

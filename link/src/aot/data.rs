@@ -41,7 +41,6 @@ pub struct TrackSection {
 
 pub struct Data {
     pub interp: String,
-    pub(crate) lib_names: Vec<String>,
     pub(crate) libs: Vec<Library>,
     pub dynamics: Dynamics,
     pub statics: Statics,
@@ -63,11 +62,10 @@ pub struct Data {
 }
 
 impl Data {
-    pub fn new(lib_names: Vec<String>) -> Self {
+    pub fn new() -> Self {
         Self {
             // default gnu loader
             interp: "/lib64/ld-linux-x86-64.so.2".to_string(),
-            lib_names,
             libs: vec![],
             ph: vec![],
             addr: HashMap::new(),
@@ -98,10 +96,6 @@ impl Data {
     pub fn interp(mut self, interp: String) -> Self {
         self.interp = interp;
         self
-    }
-
-    pub(crate) fn is_dynamic(&self) -> bool {
-        self.lib_names.len() > 0
     }
 
     pub fn pointer_set(&mut self, name: String, p: u64) {
@@ -151,8 +145,8 @@ impl Data {
 
     pub fn write_strings(data: &mut Data, target: &Target, w: &mut Writer) {
         // add libraries if they are configured
-        data.libs = data
-            .lib_names
+        data.libs = target
+            .libs
             .iter()
             .map(|name| {
                 // hack to deal with string lifetimes

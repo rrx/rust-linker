@@ -48,7 +48,7 @@ impl Blocks {
         blocks.push(Box::new(FileHeader::default()));
         blocks.push(Box::new(ProgramHeader::default()));
 
-        if data.is_dynamic() {
+        if target.is_dynamic() {
             blocks.push(Box::new(InterpSection::new(&data.interp)));
         }
 
@@ -58,7 +58,7 @@ impl Blocks {
             blocks.push(Box::new(HashSection::new()));
         }
 
-        if data.is_dynamic() {
+        if target.is_dynamic() {
             blocks.push(Box::new(DynSymSection::default()));
             if w.dynstr_needed() {
                 blocks.push(Box::new(DynStrSection::default()));
@@ -73,7 +73,7 @@ impl Blocks {
         blocks.push(Box::new(PltGotSection::new(".plt.got")));
         blocks.push(Box::new(target.rw.clone()));
 
-        if data.is_dynamic() {
+        if target.is_dynamic() {
             blocks.push(Box::new(DynamicSection::new(config)));
             blocks.push(Box::new(GotSection::new(GotSectionKind::GOT)));
             blocks.push(Box::new(GotSection::new(GotSectionKind::GOTPLT)));
@@ -165,7 +165,7 @@ impl Blocks {
         // build a list of sections that are loaded
         // this is a hack to get tracker to build a correct list of program headers
         // without having to go through the blocks and do reservations
-        let mut data = Data::new(vec![]);
+        let mut data = Data::new();
         //data.addr_set(".got.plt", 0);
         //data.pointer_set("_start".to_string(), 0);
         //data.pointer_set("__data_start".to_string(), 0);

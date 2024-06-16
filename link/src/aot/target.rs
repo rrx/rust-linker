@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub struct Target {
+    pub libs: HashSet<String>,
     pub dynamic: SymbolMap,
     pub locals: SymbolMap,
     pub exports: SymbolMap,
@@ -20,6 +21,7 @@ pub struct Target {
 impl Target {
     pub fn new() -> Self {
         Self {
+            libs: HashSet::new(),
             locals: SymbolMap::new(),
             exports: SymbolMap::new(),
             dynamic: SymbolMap::new(),
@@ -32,6 +34,10 @@ impl Target {
             unresolved: HashSet::new(),
             unknown: SymbolMap::new(),
         }
+    }
+
+    pub(crate) fn is_dynamic(&self) -> bool {
+        self.libs.len() > 0
     }
 
     pub fn lookup_static(&self, name: &str) -> Option<ReadSymbol> {

@@ -4,6 +4,7 @@ default: test
 
 fmt:
 	cargo fmt
+	clang-format -i testfiles/*.c
 
 test: functions examples
 	cargo test -- --nocapture

@@ -1,9 +1,9 @@
 // See: https://feepingcreature.github.io/handling.html
 //
 #define __USE_GNU
-#include <ucontext.h>
 #include <signal.h>
 #include <stdio.h>
+#include <ucontext.h>
 
 void seghandle_userspace() {
   // note: because we set up a proper stackframe,
@@ -21,32 +21,49 @@ void seghandle_userspace() {
 }
 
 enum X86Registers {
-  GS = 0, FS, ES, DS, EDI, ESI, EBP, ESP, EBX, EDX, ECX, EAX,
-  TRAPNO, ERR, EIP, CS, EFL, UESP, SS
+  GS = 0,
+  FS,
+  ES,
+  DS,
+  EDI,
+  ESI,
+  EBP,
+  ESP,
+  EBX,
+  EDX,
+  ECX,
+  EAX,
+  TRAPNO,
+  ERR,
+  EIP,
+  CS,
+  EFL,
+  UESP,
+  SS
 };
 
-void seghandle(int sig, void* si, void* unused) {
-  ucontext_t* uc = (ucontext_t*) unused;
+void seghandle(int sig, void *si, void *unused) {
+  ucontext_t *uc = (ucontext_t *)unused;
   // No. I refuse to use triple-pointers.
   // Just pretend ref a = v; is V* ap = &v;
   // and then substitute a with (*ap).
   gregset_t *gregs = &uc->uc_mcontext.gregs;
-  long *eip = (void*) gregs[EIP];
-  long **esp = (void**) gregs[ESP];
+  long *eip = (void *)gregs[EIP];
+  long **esp = (void **)gregs[ESP];
 
   // imitate the effects of "call seghandle_userspace"
-  esp --; // decrement stackpointer.
-          // remember: stack grows down!
+  esp--; // decrement stackpointer.
+         // remember: stack grows down!
   *esp = eip;
 
   // set up OS for call via return, like in the attack
-  eip = (void*) &seghandle_userspace;
+  eip = (void *)&seghandle_userspace;
 }
 
 void setup_segfault_handler() {
   struct sigaction sa;
 
-  sigemptyset (&sa.sa_mask);
+  sigemptyset(&sa.sa_mask);
   sa.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONSTACK;
   sa.sa_sigaction = &seghandle;
   if (sigaction(SIGSEGV, &sa, 0x0) == -1) {
@@ -57,5 +74,5 @@ void setup_segfault_handler() {
 
 int main() {
   setup_segfault_handler();
-  *(int*) NULL = 0;
+  *(int *)NULL = 0;
 }

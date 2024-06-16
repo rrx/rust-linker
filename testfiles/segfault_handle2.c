@@ -1,50 +1,38 @@
+#include <setjmp.h>
 #include <signal.h>
 #include <stdio.h>
-#include <setjmp.h>
 
-//Declaring global jmp_buf variable to be used by both main and signal handler
+// Declaring global jmp_buf variable to be used by both main and signal handler
 jmp_buf buf;
 
+void magic_handler(int s) {
 
-void magic_handler(int s)
-{
+  switch (s) {
 
-    switch(s)
-    {
+  case SIGSEGV:
+    printf("\nSegmentation fault signal caught! Attempting recovery..");
+    longjmp(buf, 1);
+    break;
+  }
 
-        case SIGSEGV:
-        printf("\nSegmentation fault signal caught! Attempting recovery..");
-        longjmp(buf, 1);
-        break;
-    }
-
-    printf("\nAfter switch. Won't be reached");
-
+  printf("\nAfter switch. Won't be reached");
 }
 
+int main(void) {
 
+  int *p = NULL;
 
-int main(void) 
-{
+  signal(SIGSEGV, magic_handler);
 
-    int *p = NULL;
+  if (!setjmp(buf)) {
 
-    signal(SIGSEGV, magic_handler);
+    // Trying to dereference a null pointer will cause a segmentation fault,
+    // which is handled by our magic_handler now.
+    *p = 0xdead;
 
-    if(!setjmp(buf))
-    {
+  } else {
+    printf("\nSuccessfully recovered! Welcome back in main!!\n\n");
+  }
 
-         //Trying to dereference a null pointer will cause a segmentation fault, 
-         //which is handled by our magic_handler now.
-         *p=0xdead;
-
-    }
-    else
-    {
-        printf("\nSuccessfully recovered! Welcome back in main!!\n\n"); 
-    }
-
-
-
-    return 0;
+  return 0;
 }

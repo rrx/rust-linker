@@ -67,7 +67,7 @@ impl DynamicLink {
         match ext {
             "6" => self.add_library(path.to_str().unwrap(), &Path::new(&path)),
             "o" => self.add_obj_file(path.to_str().unwrap(), &Path::new(&path)),
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 

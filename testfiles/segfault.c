@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <time.h>
+#include <unistd.h>
 
 extern long simple_function();
 
@@ -33,5 +33,3 @@ void handlers_init(void *ptr, int size) {
   /*sigsegv_install_handler (&handler);*/
   /*segfault_me();*/
 }
-
-

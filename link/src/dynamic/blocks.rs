@@ -1,5 +1,5 @@
 use super::*;
-use crate::memory::*;
+use crate::format::*;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io;
@@ -65,4 +65,75 @@ impl PatchBlock {
         self.block = self.block.make_exec_block()?;
         Ok(self)
     }
+}
+
+pub fn patch_code(
+    block: PatchBlock,
+    pointers: PatchSymbolPointers,
+    _got: TableVersion,
+    _plt: TableVersion,
+) -> PatchBlock {
+    log::debug!(
+        "patching code {} at base {:#08x}",
+        &block.name,
+        block.block.as_ptr() as usize
+    );
+
+    for r in &block.relocations {
+        let patch_base = block.block.as_ptr();
+        let addr = pointers
+            .get(&r.name)
+            .expect(&format!("missing symbol: {}", &r.name))
+            .as_ptr() as *const u8;
+        log::debug!(
+            "r ptr: {:#08x}:{:#08x}: {}",
+            patch_base as usize,
+            addr as usize,
+            &r.name
+        );
+
+        r.patch(patch_base as *mut u8, patch_base as *mut u8, addr);
+    }
+
+    block
+}
+
+pub fn patch_data(
+    block: PatchBlock,
+    pointers: PatchSymbolPointers,
+    got: TableVersion,
+    _plt: TableVersion,
+) -> PatchBlock {
+    log::debug!(
+        "patching data {} at base {:#08x}",
+        &block.name,
+        block.block.as_ptr() as usize
+    );
+
+    for r in &block.relocations {
+        let patch_base = block.block.as_ptr();
+        let addr = match r.effect() {
+            PatchEffect::AddToGot => got.get(&r.name).unwrap().as_ptr(),
+            _ => {
+                if let Some(p) = pointers.get(&r.name) {
+                    p.as_ptr() as *const u8
+                } else if let Some(p) = block.internal.get(&r.name) {
+                    p.as_ptr() as *const u8
+                } else {
+                    unreachable!("symbol not found:{}", &r.name)
+                }
+            }
+        };
+
+        log::debug!(
+            "r ptr: {:#08x}:{:#08x}:{:?}:{}",
+            patch_base as usize,
+            addr as usize,
+            r.effect(),
+            &r.name
+        );
+
+        r.patch(patch_base as *mut u8, patch_base as *mut u8, addr);
+    }
+    block
 }

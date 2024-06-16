@@ -1,5 +1,3 @@
-//use std::error::Error;
-
 use object::elf;
 use object::write::elf::Sym;
 use object::write::elf::{SectionIndex, SymbolIndex, Writer};
@@ -12,18 +10,17 @@ use std::fmt;
 use std::mem;
 use std::path::Path;
 
-use super::*;
+use crate::format::*;
+use crate::linker::*;
 
 mod blocks;
 mod dynamics;
-mod section;
 mod segments;
 mod statics;
 mod utils;
 
 pub use blocks::*;
 pub use dynamics::*;
-pub use section::*;
 pub use segments::*;
 pub use statics::*;
 pub use utils::*;
@@ -374,12 +371,13 @@ impl Data {
         self.section_index.insert(name.to_string(), section_index);
     }
 
-    fn write_strings(&mut self, w: &mut Writer) {
+    pub fn write_strings(data: &mut Data, w: &mut Writer) {
         // add libraries if they are configured
-        self.libs = self
+        data.libs = data
             .lib_names
             .iter()
             .map(|name| {
+                // hack to deal with string lifetimes
                 unsafe {
                     let buf = extend_lifetime(name.as_bytes());
                     //let buf = name.as_bytes();
@@ -391,13 +389,13 @@ impl Data {
             })
             .collect();
 
-        for (name, symbol) in self.target.exports.iter() {
+        for (name, symbol) in data.target.exports.iter() {
             // allocate string for the symbol table
-            let _string_id = self.statics.string_add(name, w);
-            self.pointers
+            let _string_id = data.statics.string_add(name, w);
+            data.pointers
                 .insert(name.to_string(), symbol.pointer.clone());
-            let section_index = symbol.section.section_index(self);
-            self.statics.symbol_add(symbol, section_index, w);
+            let section_index = symbol.section.section_index(data);
+            data.statics.symbol_add(symbol, section_index, w);
         }
     }
 
@@ -514,11 +512,11 @@ impl Data {
         }
     }
 
-    pub fn write(self, path: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
+    pub fn write(data: &mut Data, path: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
         let mut out_data = Vec::new();
         let endian = object::Endianness::Little;
         let mut writer = object::write::elf::Writer::new(endian, config.is_64(), &mut out_data);
-        Blocks::build(self, &mut writer, config);
+        Blocks::build(data, &mut writer, config);
         let size = out_data.len();
         std::fs::write(path, out_data)?;
         eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());

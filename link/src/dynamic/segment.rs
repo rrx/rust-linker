@@ -1,3 +1,4 @@
+use crate::format::*;
 use object::elf;
 use object::{
     Object, ObjectSection, ObjectSymbol, ObjectSymbolTable, RelocationTarget, SectionKind,
@@ -11,32 +12,6 @@ use std::sync::Arc;
 use std::collections::HashMap;
 
 use super::*;
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum CodeSymbolDefinition {
-    Extern,
-    Defined,
-    Local,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum CodeSymbolKind {
-    Text,
-    Data,
-    Section,
-    Unknown,
-}
-
-#[derive(Clone, Debug)]
-pub struct CodeSymbol {
-    pub(crate) name: String,
-    pub(crate) size: u64,
-    pub(crate) address: u64,
-    pub(crate) kind: CodeSymbolKind,
-    pub(crate) def: CodeSymbolDefinition,
-    pub(crate) st_info: u8,
-    pub(crate) st_other: u8,
-}
 
 pub enum SymbolType {
     Func,

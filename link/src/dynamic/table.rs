@@ -1,4 +1,4 @@
-use crate::memory::*;
+use super::*;
 
 #[derive(Clone)]
 pub struct SmartBlock {

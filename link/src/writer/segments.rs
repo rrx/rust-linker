@@ -6,9 +6,9 @@ pub struct Blocks {
 }
 
 impl Blocks {
-    pub fn build(mut data: Data, w: &mut Writer, config: &Config) {
+    pub fn build(data: &mut Data, w: &mut Writer, config: &Config) {
         // preparation
-        data.write_strings(w);
+        Data::write_strings(data, w);
         data.write_relocations(w);
         data.update_data();
 
@@ -74,17 +74,17 @@ impl Blocks {
         // section headers are optional
         if config.add_section_headers {
             for b in blocks.iter_mut() {
-                b.reserve_section_index(&mut data, w);
+                b.reserve_section_index(data, w);
             }
         }
 
         // RESERVE SYMBOLS - requires section headers
-        Self::reserve_symbols(&mut data, w);
+        Self::reserve_symbols(data, w);
 
         // RESERVE blocks - finalize the layout
         for b in blocks.iter_mut() {
             let pos = w.reserved_len();
-            b.reserve(&mut data, w);
+            b.reserve(data, w);
             let after = w.reserved_len();
             log::debug!(
                 "reserve: {}, {:#0x}, {:#0x},  {:?}",
@@ -100,7 +100,7 @@ impl Blocks {
         }
 
         // UPDATE PROGRAM HEADERS
-        data.ph = Self::program_headers(&blocks, &mut data);
+        data.ph = Self::program_headers(&blocks, data);
 
         // WRITE blocks
         for b in blocks.iter() {

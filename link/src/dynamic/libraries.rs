@@ -49,7 +49,7 @@ impl Library {
         // call the main function
 
         // make sure we dereference the pointer!
-        let ptr = self.lookup(name).ok_or(crate::LinkError::SymbolNotFound)?;
+        let ptr = self.lookup(name).ok_or(LinkError::SymbolNotFound)?;
         unsafe {
             type MyFunc<P, T> = unsafe extern "cdecl" fn(P) -> T;
             log::debug!("invoking {} @ {:#08x}", name, ptr.as_ptr() as usize);
@@ -193,6 +193,6 @@ mod tests {
         // adding them a second time, should do nothing
         libs.add_to_namespace("musl2", musl_path, musl_n).unwrap();
         libs.add_to_namespace("libc4", libc_path, musl_n).unwrap();
-        crate::eprint_process_maps();
+        eprint_process_maps();
     }
 }

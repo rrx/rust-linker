@@ -1,4 +1,6 @@
 // read elf file
+use crate::format::*;
+use crate::writer::Data;
 use object::elf::FileHeader64;
 use object::read::elf;
 use object::read::elf::ProgramHeader;
@@ -227,8 +229,8 @@ impl ReadBlock {
         }
     }
 
-    pub fn data(self, _config: &Config) -> crate::Data {
-        let mut data = crate::Data::new(self.libs.iter().cloned().collect());
+    pub fn data(self, _config: &Config) -> Data {
+        let mut data = Data::new(self.libs.iter().cloned().collect());
         data.target = self.target;
 
         for (name, symbol) in data.target.exports.iter() {

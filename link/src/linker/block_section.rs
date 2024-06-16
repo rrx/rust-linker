@@ -1,5 +1,6 @@
+use super::code_relocation;
+use crate::format::*;
 use crate::writer::*;
-use crate::*;
 use object::read::elf;
 use object::write::elf::{SectionIndex, Writer};
 use object::write::StringId;

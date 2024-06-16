@@ -1,12 +1,10 @@
+use super::*;
+use crate::format::*;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-
-use std::fs;
-
-use super::*;
-use crate::*;
 
 pub struct DynamicLink {
     pub(crate) libraries: SharedLibraryRepo,
@@ -218,7 +216,7 @@ mod tests {
     fn linker_segfault() {
         let mut b = DynamicLink::new();
         b.add_library("test", Path::new("libsigsegv.so")).unwrap();
-        b.add_obj_file("test", Path::new("build/clang-glibc/segfault.o"))
+        b.add_obj_file("test", Path::new("../build/clang-glibc/segfault.o"))
             .unwrap();
         let _version = b.link().unwrap();
         // XXX: This isn't working yet
@@ -231,7 +229,7 @@ mod tests {
     #[test]
     fn linker_global_long() {
         let mut b = DynamicLink::new();
-        b.add_obj_file("test", Path::new("build/clang-glibc/live.o"))
+        b.add_obj_file("test", Path::new("../build/clang-glibc/live.o"))
             .unwrap();
         let collection = b.link().unwrap();
 
@@ -251,9 +249,9 @@ mod tests {
     #[test]
     fn linker_shared() {
         let mut b = DynamicLink::new();
-        b.add_library("gz", Path::new("build/testlibs/libz.so"))
+        b.add_library("gz", Path::new("../build/testlibs/libz.so"))
             .unwrap();
-        b.add_obj_file("test", Path::new("build/clang-glibc/link_shared.o"))
+        b.add_obj_file("test", Path::new("../build/clang-glibc/link_shared.o"))
             .unwrap();
         let collection = b.link().unwrap();
         let ret: *const () = collection.invoke("call_z", ()).unwrap();
@@ -266,21 +264,21 @@ mod tests {
         let mut b = DynamicLink::new();
         b.add_library("libc", Path::new("/usr/lib/x86_64-linux-musl/libc.so"))
             .unwrap();
-        b.add_library("libc", Path::new("./build/clang-glibc/live.so"))
+        b.add_library("libc", Path::new("../build/clang-glibc/live.so"))
             .unwrap();
 
         // unable to link, missing symbol
-        b.add_obj_file("test1", Path::new("./build/clang-glibc/testfunction.o"))
+        b.add_obj_file("test1", Path::new("../build/clang-glibc/testfunction.o"))
             .unwrap();
         assert_eq!(false, b.link().is_ok());
 
         // provide missing symbol
-        b.add_obj_file("asdf", Path::new("./build/clang-glibc/asdf.o"))
+        b.add_obj_file("asdf", Path::new("../build/clang-glibc/asdf.o"))
             .unwrap();
         assert_eq!(true, b.link().is_ok());
 
         // links fine
-        b.add_obj_file("simple", Path::new("./build/clang-glibc/simplefunction.o"))
+        b.add_obj_file("simple", Path::new("../build/clang-glibc/simplefunction.o"))
             .unwrap();
         assert_eq!(true, b.link().is_ok());
 

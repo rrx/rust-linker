@@ -96,8 +96,8 @@ doc:
 	cargo doc --all --no-deps
 
 deps:
-	cargo modules generate graph --package link --with-traits --with-orphans | dot -Tpng > modules.png ; open modules.png
-	cargo depgraph --build-deps --workspace-only | dot -Tpng > crates.png ; open crates.png
+	cargo modules generate graph --package link --lib --orphans | dot -Tpng > link.png && open link.png
+	cargo depgraph --build-deps --workspace-only | dot -Tpng > crates.png && open crates.png
 
 CFLAGS=-fPIC -fno-direct-access-external-data ${NIX_CFLAGS_COMPILE}
 CFLAGS_MUSL=-I/usr/include/x86_64-linux-musl ${CFLAGS}

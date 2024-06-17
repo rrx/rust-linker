@@ -1,10 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// .data
 int g = 1;
+
+// .bss
 int g2 = 0;
 int g3 = 0;
 
+// link from another object file
 long asdf(long);
 
 int main(int argc, const char **argv) {

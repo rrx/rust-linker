@@ -17,6 +17,7 @@ pub struct AOTConfig {
     pub add_section_headers: bool,
     pub add_symbols: bool,
     pub use_gnuhash: bool,
+    pub verbose: bool,
     pub debug: HashSet<DebugFlag>,
 }
 
@@ -27,6 +28,7 @@ impl AOTConfig {
             add_section_headers: true,
             add_symbols: true,
             use_gnuhash: false,
+            verbose: false,
             debug: HashSet::new(),
         }
     }

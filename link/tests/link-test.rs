@@ -3,31 +3,103 @@ use std::path::{Path, PathBuf};
 use test_log::test;
 
 //#[test]
-// not working yet
+// not working yet, hangs
 fn test_start() {
     let mut b = DynamicLink::new();
-    b.add_obj_file("start", &temp_path("start.o")).unwrap();
+    b.add(&temp_path("start.o")).unwrap();
     let version = b.link().unwrap();
     let ret: i64 = version.invoke("_start", ()).unwrap();
     assert_eq!(0, ret);
 }
 
 #[test]
-fn test_live_shared() {
+fn linker_shared() {
+    let mut b = DynamicLink::new();
+    b.add(Path::new("../build/testlibs/libz.so")).unwrap();
+    b.add(&temp_path("link_shared.o")).unwrap();
+    let collection = b.link().unwrap();
+    let ret: *const () = collection.invoke("call_z", ()).unwrap();
+    log::debug!("ret: {:#08x}", ret as usize);
+    assert!(ret.is_null());
+}
+
+//#[test]
+// segfaults
+fn linker_main() {
+    let mut b = DynamicLink::new();
+    b.add(Path::new("libc.so.6")).unwrap();
+    b.add(&temp_path("print_main.o")).unwrap();
+    let collection = b.link().unwrap();
+    let ret: *const () = collection.invoke("main", ()).unwrap();
+    log::info!("ret: {:#08x}", ret as usize);
+    assert!(ret.is_null());
+}
+
+#[test]
+fn linker_livelink() {
+    let mut b = DynamicLink::new();
+    b.add_library("libc", Path::new("/usr/lib/x86_64-linux-musl/libc.so"))
+        .unwrap();
+    b.add_library("live", Path::new("../build/clang-glibc/live.so"))
+        .unwrap();
+
+    // unable to link, missing symbol
+    b.add(Path::new("../build/clang-glibc/testfunction.o"))
+        .unwrap();
+    assert_eq!(false, b.link().is_ok());
+
+    // provide missing symbol
+    b.add(Path::new("../build/clang-glibc/asdf.o")).unwrap();
+    assert_eq!(true, b.link().is_ok());
+
+    // links fine
+    b.add(Path::new("../build/clang-glibc/simplefunction.o"))
+        .unwrap();
+    assert_eq!(true, b.link().is_ok());
+
+    let collection = b.link().unwrap();
+    let ret: i64 = collection.invoke("func", ()).unwrap();
+    log::debug!("ret: {}", ret);
+    assert_eq!(10001, ret);
+
+    let ret: i64 = collection.invoke("simple", ()).unwrap();
+    log::debug!("ret: {}", ret);
+    assert_eq!(10012, ret);
+
+    let ret: i64 = collection.invoke("call_external", ()).unwrap();
+    log::debug!("ret: {}", ret);
+    assert_eq!(4, ret);
+
+    let ret: i64 = collection.invoke("asdf", (2,)).unwrap();
+    log::debug!("ret: {}", ret);
+    assert_eq!(3, ret);
+}
+
+#[test]
+fn linker_global_long() {
     let mut b = DynamicLink::new();
     b.add_library("t1", &temp_path("live.so")).unwrap();
-    let version = b.link().unwrap();
-    let ret: i64 = version.invoke("call_live", (3,)).unwrap();
+    let collection = b.link().unwrap();
+
+    let ret: i64 = collection.invoke("call_live", (3,)).unwrap();
     log::debug!("ret: {:#08x}", ret);
     assert_eq!(0x11, ret);
+
+    let ret: i64 = collection.invoke("simple_function", ()).unwrap();
+    log::debug!("ret: {:#08x}", ret);
+    assert_eq!(1, ret);
+
+    let ret: i64 = collection.invoke("func2", (2,)).unwrap();
+    log::debug!("ret: {:#08x}", ret);
+    assert_eq!(3, ret);
 }
 
 #[test]
 fn test_load_from_shared() {
     let mut b = DynamicLink::new();
     b.add_library("live", &temp_path("live.so")).unwrap();
-    b.add_obj_file("globals", &temp_path("globals.o")).unwrap();
-    b.add_obj_file("call", &temp_path("call_extern.o")).unwrap();
+    b.add(&temp_path("globals.o")).unwrap();
+    b.add(&temp_path("call_extern.o")).unwrap();
     let version = b.link().unwrap();
 
     let x = version.lookup("x").unwrap().as_ptr();
@@ -46,19 +118,18 @@ fn test_load_from_shared() {
 #[test]
 fn test_live_static() {
     let mut b = DynamicLink::new();
-    b.add_obj_file("t1", &temp_path("live.o")).unwrap();
+    b.add(&temp_path("live.o")).unwrap();
     let version = b.link().unwrap();
     let ret: i64 = version.invoke("call_live", (3,)).unwrap();
     log::debug!("ret: {:#08x}", ret);
     assert_eq!(0x11, ret);
 }
 
-//#[test]
-// not working yet
+#[test]
 fn test_empty_main() {
     let mut b = DynamicLink::new();
-    b.add_obj_file("main", &temp_path("empty_main.o")).unwrap();
-    b.add_library("libc", Path::new("/usr/lib/x86_64-linux-musl/libc.so"))
+    b.add(&temp_path("empty_main.o")).unwrap();
+    b.add_library("libc", &temp_path("/lib/x86_64-linux-gnu/libc.so.6"))
         .unwrap();
     let version = b.link().unwrap();
 
@@ -68,27 +139,22 @@ fn test_empty_main() {
 
     let main_ptr = version.lookup("main").unwrap().as_ptr();
     log::debug!("ptr: {:#08x}", main_ptr as usize);
-    let main_ptr = 0;
 
-    let init_ptr = version.lookup("_init").unwrap().as_ptr();
-    log::debug!("init_ptr: {:#08x}", init_ptr as usize);
-    let init_ptr = 0;
-
-    let (base, _size) = b.get_mem_ptr();
-    let ret: i64 = version
-        .invoke("initialize", (base, main_ptr, init_ptr))
-        .unwrap();
-    assert_eq!(0, ret);
+    //let init_ptr = version.lookup("_init").unwrap().as_ptr();
+    //log::debug!("init_ptr: {:#08x}", init_ptr as usize);
 }
 
-// not working yet
-//#[test]
-fn test_segfault() {
+#[test]
+fn linker_segfault() {
     let mut b = DynamicLink::new();
-    b.add_library("t2", &temp_path("libsigsegv.so")).unwrap();
-    b.add_obj_file("t3", &temp_path("segfault.o")).unwrap();
-    let version = b.link().unwrap();
-    let _ret: i64 = version.invoke("handlers_init", ()).unwrap();
+    b.add_library("test", Path::new("libsigsegv.so")).unwrap();
+    b.add(&temp_path("segfault.o")).unwrap();
+    let _version = b.link().unwrap();
+    // XXX: This isn't working yet
+    //let ret: i64 = version.invoke("handlers_init", ()).unwrap();
+    //let ret: i64 = version.invoke("segfault_me", ()).unwrap();
+    //log::debug!("ret: {:#08x}", ret);
+    //assert_eq!(13, ret);
 }
 
 #[test]
@@ -97,7 +163,7 @@ fn test_libuv() {
     b.add_library("libc", Path::new("/lib/x86_64-linux-gnu/libc.so.6"))
         .unwrap();
     b.add_library("libuv", Path::new("libuv.so")).unwrap();
-    b.add_obj_file("test", &temp_path("uvtest.o")).unwrap();
+    b.add(&temp_path("uvtest.o")).unwrap();
     let version = b.link().unwrap();
     let ret: i64 = version.invoke("uvtest", ()).unwrap();
     log::debug!("ret: {:#08x}", ret);
@@ -118,25 +184,21 @@ fn test_libc() {
     let mut b = DynamicLink::new();
     b.add_library("libc", &temp_path("/lib/x86_64-linux-gnu/libc.so.6"))
         .unwrap();
-    b.add_obj_file("stuff", &temp_path("print_stuff.o"))
-        .unwrap();
-    b.add_obj_file("string", &temp_path("print_string.o"))
-        .unwrap();
+    b.add(&temp_path("print_stuff.o")).unwrap();
+    b.add(&temp_path("print_string.o")).unwrap();
     let version = b.link().unwrap();
     test_lib_print(version.clone());
     test_print_stuff(version.clone());
     test_print_string(version);
 }
 
-//#[test]
+#[test]
 fn test_libc_musl() {
     let mut b = DynamicLink::new();
-    b.add_library("libc", &temp_path("/usr/lib/x86_64-linux-musl/libc.so"))
+    b.add(&temp_path("/usr/lib/x86_64-linux-musl/libc.so"))
         .unwrap();
-    b.add_obj_file("stuff", &temp_path("print_stuff.o"))
-        .unwrap();
-    b.add_obj_file("string", &temp_path("print_string.o"))
-        .unwrap();
+    b.add(&temp_path("print_stuff.o")).unwrap();
+    b.add(&temp_path("print_string.o")).unwrap();
 
     // if we link with live.so, it will try to load the system libc, which conflicts with musl
     // it's random which one loads when we dlsym.
@@ -155,10 +217,8 @@ fn test_multi_libc() {
         .unwrap();
     b.add_library("musl", &temp_path("/usr/lib/x86_64-linux-musl/libc.so"))
         .unwrap();
-    b.add_obj_file("stuff", &temp_path("print_stuff.o"))
-        .unwrap();
-    b.add_obj_file("string", &temp_path("print_string.o"))
-        .unwrap();
+    b.add(&temp_path("print_stuff.o")).unwrap();
+    b.add(&temp_path("print_string.o")).unwrap();
 
     let version = b.link().unwrap();
     test_lib_print(version.clone());
@@ -173,8 +233,7 @@ fn test_string() {
         .unwrap();
     //b.add_library("libc", &temp_path("/usr/lib/x86_64-linux-musl/libc.so"))
     //.unwrap();
-    b.add_obj_file("string", &temp_path("print_string.o"))
-        .unwrap();
+    b.add(&temp_path("print_string.o")).unwrap();
 
     let version = b.link().unwrap();
     test_print_string(version.clone());
@@ -284,7 +343,7 @@ fn test_lib_print(version: LinkVersion) {
 
 fn temp_path(filename: &str) -> Box<Path> {
     let mut p = PathBuf::new();
-    p.push("./build/clang-glibc");
+    p.push("../build/clang-glibc");
     p.push(filename);
     p.into_boxed_path()
 }

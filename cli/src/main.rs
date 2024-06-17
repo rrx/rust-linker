@@ -9,6 +9,10 @@ struct Args {
     #[arg(long)]
     dynamic: bool,
     #[arg(short, long)]
+    verbose: bool,
+    #[arg(long)]
+    link: bool,
+    #[arg(short, long)]
     interp: Option<String>,
     #[arg(short, long)]
     output: Option<String>,
@@ -23,7 +27,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("Missing files");
     }
 
-    let config = AOTConfig::new();
+    let mut config = AOTConfig::new();
+    if args.verbose {
+        config.verbose = true;
+    }
 
     if args.dynamic {
         let mut b = DynamicLink::new();
@@ -37,19 +44,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut exe = ReadBlock::new("exe");
         for path in args.inputs.iter() {
             let block = ReadBlock::from_path(Path::new(&path), &config)?;
+            block.dump();
             exe.add_block(block);
             //block.add(&Path::new(&path), &config)?;
         }
 
-        exe.dump();
-
-        let mut data = Data::new();
-        if let Some(interp) = args.interp {
-            data = data.interp(interp);
+        if args.verbose {
+            exe.dump();
         }
 
-        let output = args.output.unwrap_or("a.out".to_string());
-        Data::write(data, exe.target, Path::new(&output), &config)?;
+        if args.link {
+            let mut data = Data::new();
+            if let Some(interp) = args.interp {
+                data = data.interp(interp);
+            }
+
+            let output = args.output.unwrap_or("a.out".to_string());
+            Data::write(data, exe.target, Path::new(&output), &config)?;
+        }
     }
 
     Ok(())

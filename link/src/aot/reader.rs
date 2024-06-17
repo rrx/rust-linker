@@ -228,9 +228,7 @@ impl ReadBlock {
         config: &AOTConfig,
     ) -> Result<(), Box<dyn Error>> {
         let p = Path::new(&path);
-        println!("p: {}", p.to_str().unwrap());
         let ext = p.extension().unwrap().to_str().unwrap();
-        println!("ext: {}", ext);
         if ext == "a" {
             self.add_archive(&Path::new(&path), &config)?;
         } else {
@@ -254,6 +252,9 @@ impl ReadBlock {
         path: &std::path::Path,
         config: &AOTConfig,
     ) -> Result<(), Box<dyn Error>> {
+        if config.verbose {
+            eprintln!("Reading Archive: {}", path.to_str().unwrap());
+        }
         let buf = std::fs::read(path)?;
         self.add_archive_buf(path.to_str().unwrap(), &buf, config)?;
         Ok(())
@@ -294,10 +295,10 @@ impl ReadBlock {
             object::read::elf::ElfFile::parse(buf)?;
         match b.kind() {
             ObjectKind::Relocatable | ObjectKind::Executable => {
-                dump_header(&b)?;
+                //dump_header(&b)?;
                 self.relocatable(name.to_string(), &b, config)?
             }
-            ObjectKind::Dynamic => self.dynamic(&b, name)?,
+            ObjectKind::Dynamic => self.dynamic(&b, name, config)?,
             _ => unimplemented!("{:?}", b.kind()),
         };
         Ok(())
@@ -307,8 +308,12 @@ impl ReadBlock {
         &mut self,
         b: &elf::ElfFile<'a, A, B>,
         name: &str,
+        config: &AOTConfig,
     ) -> Result<(), Box<dyn Error>> {
         let mut count = 0;
+        if config.verbose {
+            eprintln!("Reading Dynamic: {}", name);
+        }
         for symbol in b.dynamic_symbols() {
             let mut s = read_symbol(&b, 0, &symbol)?;
             s.pointer = ResolvePointer::Resolved(0);
@@ -320,7 +325,7 @@ impl ReadBlock {
                 self.target.insert_dynamic(s);
             }
         }
-        eprintln!("{} symbols read from {}", count, name);
+        log::debug!("{} symbols read from {}", count, name);
         self.target.libs.insert(name.to_string());
         Ok(())
     }
@@ -331,8 +336,9 @@ impl ReadBlock {
         b: &elf::ElfFile<'a, A, B>,
         config: &AOTConfig,
     ) -> Result<(), Box<dyn Error>> {
-        log::debug!("relocatable: {}", &name);
-
+        if config.verbose {
+            eprintln!("Reading Relocatable: {}", name);
+        }
         for section in b.sections() {
             let kind = ReadSectionKind::new_section_kind(section.kind());
 
@@ -504,8 +510,9 @@ impl ReadBlock {
     }
 
     pub fn dump(&self) {
-        eprintln!("Block: {}", &self.name);
+        eprintln!("Dump Block: {}", &self.name);
         self.target.dump();
+        eprintln!("End Dump: {}", &self.name);
     }
 }
 

@@ -15,7 +15,7 @@ empty_dynamic:
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
 empty:
-	cargo run -- \
+	cargo run -- -v --link \
 		-o tmp/empty.exe \
 		build/clang-glibc/empty_main.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
@@ -34,50 +34,50 @@ gcc_ref:
 		-o build/clang-glibc/print_main \
 		build/clang-glibc/print_main.o \
 		build/clang-glibc/asdf.o
-	readelf -aW build/clang-glibc/print_main
+	readelf -sW build/clang-glibc/print_main
 	exec build/clang-glibc/print_main
 
 gcc:
-	cargo run -- \
+	cargo run -- -v --link \
 		-o tmp/gcc.exe \
 		build/clang-glibc/print_main.o \
 		build/clang-glibc/asdf.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o 
-	readelf -aW tmp/gcc.exe
+	readelf -sW tmp/gcc.exe
 	exec tmp/gcc.exe
 
 dup:
-	cargo run -- \
-		-o tmp/out.exe \
+	cargo run -- -v --link \
+		-o tmp/dup.exe \
 		build/clang-glibc/print_main.o \
 		build/clang-glibc/asdf.o \
 		build/clang-glibc/asdf2.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o 
-	readelf -aW tmp/out.exe
-	exec tmp/out.exe
+	readelf -aW tmp/dup.exe
+	exec tmp/dup.exe
 
 sdl:
-	cargo run -- \
-		-o tmp/out.exe \
+	cargo run -- -v --link \
+		-o tmp/sdl.exe \
 		build/clang-glibc/sdltest.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/libSDL2.so \
 		/usr/lib/x86_64-linux-gnu/crt1.o
 	@echo RUN
-	exec tmp/out.exe ./testfiles/grumpy-cat.bmp
+	exec tmp/sdl.exe ./testfiles/grumpy-cat.bmp
 
 musl:
-	cargo run -- \
+	cargo run -- -v --link \
 		--interp /usr/lib/ld-musl-x86_64.so.1 \
-		-o tmp/out.exe \
+		-o tmp/musl.exe \
 		build/clang-musl/empty_main.o \
 		/usr/lib/x86_64-linux-musl/libc.so \
 		/usr/lib/x86_64-linux-musl/crt1.o \
 		/usr/lib/x86_64-linux-musl/crti.o \
 		/usr/lib/x86_64-linux-musl/crtn.o
-	exec tmp/out.exe
+	exec tmp/musl.exe
 
 examples: gcc empty musl dup
 
@@ -171,7 +171,7 @@ functions:
 	#$(CLANG) -fPIC -shared ./tmp/liblive.a -o ./tmp/live.so
 	#$(CLANG) -shared -fpic -Wl,--no-undefined testfiles/live.c -o ./build/clang-glibc/live.so
 
-	#$(CLANG) ${CFLAGS} -c -nostdlib testfiles/start.c -o ./tmp/start.o
+	$(CLANG) ${CFLAGS} -c -nostdlib testfiles/start.c -o ./build/clang-glibc/start.o
 	#$(CLANG) -nostdlib testfiles/globals.c testfiles/start.c -o ./tmp/start
 	$(CLANG) ${CFLAGS} -shared testfiles/live.c -o ./build/clang-glibc/live.so
 	$(CLANG) ${CFLAGS} -nostdlib -shared testfiles/globals.c -o ./build/clang-glibc/globals.so

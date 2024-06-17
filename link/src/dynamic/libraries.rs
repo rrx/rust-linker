@@ -195,4 +195,35 @@ mod tests {
         libs.add_to_namespace("libc4", libc_path, musl_n).unwrap();
         eprint_process_maps();
     }
+
+    fn test_shared_lib(lib: SharedLibrary) {
+        let _stdout_ptr = lib.lookup("stdout").unwrap().as_ptr() as *const usize;
+        //let ret: i64 = lib.invoke("printf", ("asdf1\n",)).unwrap();
+        //println!("ret1 {:?}", ret);
+
+        let s = "asdf2\n";
+        let c_str = CString::new(s).unwrap();
+        let ret: i64 = lib.invoke("printf", (c_str.as_ptr(),)).unwrap();
+        println!("ret2 {:?}", ret);
+        assert_eq!(s.len() as i64, ret);
+
+        //let ret: i64 = lib.invoke("fflush", (stdout_ptr,)).unwrap();
+        //println!("ret3 {:?}", ret);
+    }
+
+    #[test]
+    fn test_lib_load() {
+        let mut repo = SharedLibraryRepo::default();
+        let libc_path = Path::new("/lib/x86_64-linux-gnu/libc.so.6");
+        let musl_path = Path::new("/usr/lib/x86_64-linux-musl/libc.so");
+        let _musl_n = repo.add_to_new_namespace("musl", musl_path).unwrap();
+        let _libc_n = repo.add_to_new_namespace("libc", libc_path).unwrap();
+
+        println!("TEST MUSL");
+        let musl = repo.get("musl").unwrap();
+        test_shared_lib(musl);
+        println!("TEST GNULIBC");
+        let libc = repo.get("libc").unwrap();
+        test_shared_lib(libc);
+    }
 }

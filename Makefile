@@ -10,12 +10,12 @@ test: functions examples
 	cargo test -- --nocapture
 
 empty_dynamic:
-	cargo run -- --dynamic \
+	cargo run --bin dynamic -- \
 		build/clang-glibc/empty_main.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
 empty:
-	cargo run -- -v --link \
+	cargo run --bin link -- -v --link \
 		-o tmp/empty.exe \
 		build/clang-glibc/empty_main.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
@@ -24,7 +24,7 @@ empty:
 	exec tmp/empty.exe
 
 gcc_dynamic:
-	cargo run -- --dynamic \
+	cargo run --bin dynamic -- \
 		build/clang-glibc/print_main.o \
 		/usr/lib/x86_64-linux-gnu/crt1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
@@ -38,7 +38,7 @@ gcc_ref:
 	exec build/clang-glibc/print_main
 
 gcc:
-	cargo run -- -v --link \
+	cargo run --bin link -- -v --link \
 		-o tmp/gcc.exe \
 		build/clang-glibc/print_main.o \
 		build/clang-glibc/asdf.o \
@@ -48,7 +48,7 @@ gcc:
 	exec tmp/gcc.exe
 
 dup:
-	cargo run -- -v --link \
+	cargo run --bin link -- -v --link \
 		-o tmp/dup.exe \
 		build/clang-glibc/print_main.o \
 		build/clang-glibc/asdf.o \
@@ -59,7 +59,7 @@ dup:
 	exec tmp/dup.exe
 
 sdl:
-	cargo run -- -v --link \
+	cargo run --bin link -- -v --link \
 		-o tmp/sdl.exe \
 		build/clang-glibc/sdltest.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
@@ -69,7 +69,7 @@ sdl:
 	exec tmp/sdl.exe ./testfiles/grumpy-cat.bmp
 
 musl:
-	cargo run -- -v --link \
+	cargo run --bin link -- -v --link \
 		--interp /usr/lib/ld-musl-x86_64.so.1 \
 		-o tmp/musl.exe \
 		build/clang-musl/empty_main.o \
@@ -99,7 +99,7 @@ x:
 	exec tmp/x.exe
 
 read: gcc
-	cargo run --example read -- tmp/out.exe
+	cargo run --bin read -- tmp/gcc.exe
 	#readelf -aW tmp/out.exe
 	#objdump -d -j .plt tmp/out.exe
 	#objdump -s -j .got -j .got.plt tmp/out.exe

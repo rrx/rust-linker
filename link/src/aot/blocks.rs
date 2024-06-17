@@ -1070,6 +1070,12 @@ impl ElfBlock for GotSection {
     fn write_section_header(&self, _: &Data, w: &mut Writer) {
         let sh_flags = self.alloc().section_header_flags() as u64;
         let sh_addralign = self.section.offsets.align;
+
+        let es = match self.kind {
+            GotSectionKind::GOT => 0x08,
+            GotSectionKind::GOTPLT => 0x08,
+        };
+
         w.write_section_header(&object::write::elf::SectionHeader {
             name: self.section.name_id,
             sh_type: elf::SHT_PROGBITS,
@@ -1078,7 +1084,7 @@ impl ElfBlock for GotSection {
             sh_offset: self.section.offsets.file_offset,
             sh_info: 0,
             sh_link: 0,
-            sh_entsize: 0,
+            sh_entsize: es,
             sh_addralign,
             sh_size: self.section.offsets.size,
         });
@@ -1117,7 +1123,7 @@ impl ElfBlock for PltSection {
         self.section.bytes.resize(size, 0);
         let align = self.section.offsets.align as usize;
 
-        println!("plt align: {}", align);
+        println!("plt align: {}, size: {}", align, size);
         let file_offset = w.reserve_start_section(&self.section.offsets);
         self.section.offsets.size = size as u64;
         w.reserve(self.section.bytes.len(), align);
@@ -1209,8 +1215,20 @@ impl ElfBlock for PltSection {
         w.write(stub.as_slice());
     }
 
-    fn write_section_header(&self, data: &Data, w: &mut Writer) {
-        self.section.write_section_header(data, w);
+    fn write_section_header(&self, _data: &Data, w: &mut Writer) {
+        w.write_section_header(&object::write::elf::SectionHeader {
+            name: self.section.name_id,
+            sh_type: object::elf::SHT_PROGBITS,
+            sh_flags: self.section.offsets.alloc.section_header_flags() as u64,
+            sh_addr: self.section.offsets.address,
+            sh_offset: self.section.offsets.file_offset,
+            sh_info: 0,
+            sh_link: 0,
+            sh_entsize: 0x10, // entity size for .plt is 0x10
+            sh_addralign: self.section.offsets.align,
+            sh_size: self.section.offsets.size as u64,
+        });
+        println!("write size: {}:{}", self.name(), self.section.offsets.size);
     }
 }
 
@@ -1244,7 +1262,7 @@ impl ElfBlock for PltGotSection {
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let pltgot = data.dynamics.pltgot_objects();
         let size = (pltgot.len()) * self.entry_size;
-        self.section.size = size;
+        //self.section.size = size;
         let file_offset = w.reserve_start_section(&self.section.offsets);
         self.section.offsets.size = size as u64;
         w.reserve(size, 1);
@@ -1296,8 +1314,20 @@ impl ElfBlock for PltGotSection {
         }
     }
 
-    fn write_section_header(&self, data: &Data, w: &mut Writer) {
-        self.section.write_section_header(data, w);
+    fn write_section_header(&self, _data: &Data, w: &mut Writer) {
+        w.write_section_header(&object::write::elf::SectionHeader {
+            name: self.section.name_id,
+            sh_type: object::elf::SHT_PROGBITS,
+            sh_flags: self.section.offsets.alloc.section_header_flags() as u64,
+            sh_addr: self.section.offsets.address,
+            sh_offset: self.section.offsets.file_offset,
+            sh_info: 0,
+            sh_link: 0,
+            sh_entsize: 0x08, // entity size for .plt.got is 0x08
+            sh_addralign: self.section.offsets.align,
+            sh_size: self.section.offsets.size as u64,
+        });
+        println!("write size: {}:{}", self.name(), self.section.offsets.size);
     }
 }
 

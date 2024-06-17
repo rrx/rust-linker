@@ -25,7 +25,9 @@ impl GeneralSection {
         let mut symbols = vec![];
         for (name, p) in data.pointers.iter() {
             let addr = p.resolve(data).unwrap();
-            if addr >= self.offsets.address && addr <= (self.offsets.address + self.size as u64) {
+            if addr >= self.offsets.address
+                && addr <= (self.offsets.address + self.offsets.size as u64)
+            {
                 //eprintln!("b: {}, {:#0x}", name, addr);
                 symbols.push((name, addr));
             }

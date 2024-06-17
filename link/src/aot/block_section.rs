@@ -32,7 +32,7 @@ pub struct GeneralSection {
     pub(crate) name: &'static str,
     pub(crate) name_id: Option<StringId>,
     pub(crate) section_index: Option<SectionIndex>,
-    pub(crate) size: usize,
+    //pub(crate) size: usize,
     pub(crate) bytes: Vec<u8>,
     pub(crate) relocations: Vec<CodeRelocation>,
     pub(crate) offsets: SectionOffset,
@@ -58,7 +58,7 @@ fn resolve_r(data: &Data, r: &CodeRelocation) -> Option<u64> {
 
 impl BlockSection for GeneralSection {
     fn size(&self) -> usize {
-        self.size
+        self.offsets.size as usize
     }
 
     fn bytes(&self) -> &[u8] {
@@ -74,7 +74,7 @@ impl BlockSection for GeneralSection {
     }
 
     fn extend_size(&mut self, s: usize) {
-        self.size += s;
+        self.offsets.size += s as u64;
     }
 
     fn extend_bytes(&mut self, bytes: &[u8]) {
@@ -130,8 +130,9 @@ impl ElfBlock for GeneralSection {
                 sh_link: 0,
                 sh_entsize: 0,
                 sh_addralign: self.offsets.align,
-                sh_size: self.size as u64,
+                sh_size: self.offsets.size as u64,
             });
+            println!("write size: {}:{}", self.name(), self.offsets.size);
         }
     }
 }
@@ -143,7 +144,7 @@ impl GeneralSection {
             name,
             name_id: None,
             section_index: None,
-            size: 0,
+            //size: 0,
             bytes: vec![],
             relocations: vec![],
             offsets: SectionOffset::new(name.into(), alloc, align),

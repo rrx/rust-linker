@@ -228,13 +228,12 @@ impl ReadBlock {
         config: &AOTConfig,
     ) -> Result<(), Box<dyn Error>> {
         let p = Path::new(&path);
-        let ext = p.extension().unwrap().to_str().unwrap();
-        if ext == "a" {
-            self.add_archive(&Path::new(&path), &config)?;
-        } else {
-            self.add_object(&Path::new(&path), &config)?;
+        if let Some(ext) = p.extension() {
+            if ext.to_str().unwrap() == "a" {
+                return self.add_archive(&Path::new(&path), &config);
+            }
         }
-        Ok(())
+        self.add_object(&Path::new(&path), &config)
     }
 
     pub fn add_object(

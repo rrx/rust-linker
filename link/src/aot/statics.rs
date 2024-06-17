@@ -1,11 +1,7 @@
 use super::*;
 use object::elf;
 use object::write::elf::Sym;
-use object::write::elf::{
-    SectionIndex,
-    //SymbolIndex,
-    Writer,
-};
+use object::write::elf::{SectionIndex, SymbolIndex, Writer};
 use object::write::StringId;
 
 use std::collections::HashMap;
@@ -15,10 +11,11 @@ struct StaticStringIndex {
     string_id: StringId,
 }
 
+#[derive(Debug)]
 struct StaticSymbolIndex {
     //index: usize,
-    //string_id: StringId,
-    //symbol_index: Option<SymbolIndex>,
+    string_id: StringId,
+    symbol_index: Option<SymbolIndex>,
     section_index: Option<SectionIndex>,
     symbol: ReadSymbol,
 }
@@ -86,6 +83,7 @@ impl Statics {
 
         for name in self.symbols.iter() {
             let track = self.symbol_hash.get(name).unwrap();
+            eprintln!("sym: {}: {:?}", name, track);
             //eprintln!("t: {:?}", track.symbol);
             let mut s = track.symbol.get_static_symbol(data);
             s.section = track.section_index;
@@ -102,19 +100,22 @@ impl Statics {
         w: &mut Writer,
     ) {
         if let Some(_track) = self.symbol_hash.get(&symbol.name) {
+            eprintln!("already added: {:?}: {:?}", symbol, section_index);
         } else {
-            //let string_id = self.string_add(&symbol.name, w);
-            let _symbol_index = Some(w.reserve_symbol_index(section_index));
+            let string_id = self.string_add(&symbol.name, w);
+            let symbol_index = Some(w.reserve_symbol_index(section_index));
             //let index = self.symbols.len();
             self.symbols.push(symbol.name.to_string());
 
             let track = StaticSymbolIndex {
                 //index,
-                //string_id,
-                //symbol_index,
+                string_id,
+                symbol_index,
                 section_index,
                 symbol: symbol.clone(),
             };
+            eprintln!("add: {:?}: {:?}", symbol, section_index);
+            eprintln!("track: {:?}", track);
 
             self.symbol_hash.insert(symbol.name.to_string(), track);
         }

@@ -111,6 +111,8 @@ impl Blocks {
             }
         }
 
+        Data::write_exports(&mut data, &target.exports, w);
+
         // RESERVE SYMBOLS - requires section headers
         Self::reserve_symbols(&mut data, w);
 
@@ -206,6 +208,7 @@ impl Blocks {
 
     fn reserve_symbols(data: &mut Data, w: &mut Writer) {
         let syms = vec![
+            /*
             (
                 "data_start",
                 ".data",
@@ -218,6 +221,7 @@ impl Blocks {
                 SymbolBind::Global,
                 object::SymbolKind::Unknown,
             ),
+            */
             (
                 "__bss_start",
                 ".bss",

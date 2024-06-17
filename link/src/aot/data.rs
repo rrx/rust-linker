@@ -143,6 +143,16 @@ impl Data {
         self.section_index.insert(name.to_string(), section_index);
     }
 
+    pub fn write_exports(data: &mut Data, exports: &SymbolMap, w: &mut Writer) {
+        println!("ADD EXPORTS");
+        for (name, symbol) in exports.iter() {
+            data.pointers
+                .insert(name.to_string(), symbol.pointer.clone());
+            let section_index = symbol.section.section_index(data);
+            data.statics.symbol_add(symbol, section_index, w);
+        }
+    }
+
     pub fn write_strings(data: &mut Data, target: &mut Target, w: &mut Writer) {
         // These need to be declared
         let locals = vec![("_DYNAMIC", ".dynamic")];
@@ -153,6 +163,12 @@ impl Data {
             let pointer = ResolvePointer::Section(section_name, 0);
             let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
             target.insert_local(symbol);
+        }
+
+        // write strings first
+        for (name, _) in target.exports.iter() {
+            // allocate string for the symbol table
+            let _string_id = data.statics.string_add(name, w);
         }
 
         // add libraries if they are configured
@@ -171,15 +187,6 @@ impl Data {
                 }
             })
             .collect();
-
-        for (name, symbol) in target.exports.iter() {
-            // allocate string for the symbol table
-            let _string_id = data.statics.string_add(name, w);
-            data.pointers
-                .insert(name.to_string(), symbol.pointer.clone());
-            let section_index = symbol.section.section_index(data);
-            data.statics.symbol_add(symbol, section_index, w);
-        }
     }
 
     pub(crate) fn write_relocations(&mut self, target: &Target, w: &mut Writer) {

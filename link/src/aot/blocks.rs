@@ -504,7 +504,12 @@ impl ElfBlock for RelaDynSection {
         let relocations = data.dynamics.relocations(self.kind);
 
         let sh_addralign = self.offsets.align;
-        let sh_info = SectionIndex::default().0;
+
+        let sh_info = match self.kind {
+            GotSectionKind::GOT => SectionIndex::default().0,
+            GotSectionKind::GOTPLT => data.section_index_get(".got.plt").0,
+        };
+
         let sh_link = data.dynsym.section_index.unwrap().0;
         let sh_entsize = w.rel_size(self.is_rela) as u64;
 
@@ -517,7 +522,7 @@ impl ElfBlock for RelaDynSection {
         w.write_section_header(&object::write::elf::SectionHeader {
             name: self.name_id,
             sh_type,
-            sh_flags: elf::SHF_INFO_LINK.into(),
+            sh_flags: self.kind.rel_flags().into(),
             sh_addr: self.offsets.address,
             sh_offset: self.offsets.file_offset,
             sh_info,
@@ -964,6 +969,13 @@ impl GotSectionKind {
         }
     }
 
+    pub fn rel_flags(&self) -> u32 {
+        match self {
+            Self::GOT => elf::SHF_ALLOC,
+            Self::GOTPLT => elf::SHF_ALLOC | elf::SHF_INFO_LINK,
+        }
+    }
+
     pub fn start_index(&self) -> usize {
         match self {
             Self::GOT => 0,
@@ -1006,11 +1018,11 @@ pub struct GotSection {
     section: GeneralSection,
 }
 impl GotSection {
-    pub fn new(kind: GotSectionKind) -> Self {
+    pub fn new(kind: GotSectionKind, align: u64) -> Self {
         let name = kind.section_name();
         Self {
             kind,
-            section: GeneralSection::new(AllocSegment::RW, name, 0x10),
+            section: GeneralSection::new(AllocSegment::RW, name, align),
         }
     }
 }
@@ -1210,7 +1222,7 @@ pub struct PltGotSection {
 impl PltGotSection {
     pub fn new(name: &'static str) -> Self {
         Self {
-            section: GeneralSection::new(AllocSegment::RX, name, 0x10),
+            section: GeneralSection::new(AllocSegment::RX, name, 0x08),
             entry_size: 0x08,
         }
     }

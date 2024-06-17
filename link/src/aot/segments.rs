@@ -77,8 +77,8 @@ impl Blocks {
 
         if is_dynamic {
             blocks.push(Box::new(DynamicSection::new(config)));
-            blocks.push(Box::new(GotSection::new(GotSectionKind::GOT)));
-            blocks.push(Box::new(GotSection::new(GotSectionKind::GOTPLT)));
+            blocks.push(Box::new(GotSection::new(GotSectionKind::GOT, 0x10)));
+            blocks.push(Box::new(GotSection::new(GotSectionKind::GOTPLT, 0x08)));
         }
 
         // bss is the last alloc block

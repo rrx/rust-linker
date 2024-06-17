@@ -4,7 +4,12 @@
 int g = 1;
 int g2 = 0;
 int g3 = 0;
+
+long asdf(long);
+
 int main(int argc, const char **argv) {
+  /*long y = asdf(1);*/
+  /*printf("y %d\n", y);*/
   puts("XXX1");
   printf("XXX2\n");
   fprintf(stdout, "XXX3\n");

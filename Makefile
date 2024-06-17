@@ -16,31 +16,47 @@ empty_dynamic:
 
 empty:
 	cargo run -- \
-		-o tmp/out.exe \
+		-o tmp/empty.exe \
 		build/clang-glibc/empty_main.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o
-	exec tmp/out.exe
+	readelf -aW tmp/empty.exe
+	exec tmp/empty.exe
 
 gcc_dynamic:
 	cargo run -- --dynamic \
 		build/clang-glibc/print_main.o \
+		/usr/lib/x86_64-linux-gnu/crt1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
 gcc_ref:
-	${CLANG} build/clang-glibc/print_main.o -o build/clang-glibc/print_main
+	${CLANG} \
+		-o build/clang-glibc/print_main \
+		build/clang-glibc/print_main.o \
+		build/clang-glibc/asdf.o
 	readelf -aW build/clang-glibc/print_main
 	exec build/clang-glibc/print_main
 
 gcc:
 	cargo run -- \
+		-o tmp/gcc.exe \
+		build/clang-glibc/print_main.o \
+		build/clang-glibc/asdf.o \
+		/usr/lib/x86_64-linux-gnu/libc.so.6 \
+		/usr/lib/x86_64-linux-gnu/crt1.o 
+	readelf -aW tmp/gcc.exe
+	exec tmp/gcc.exe
+
+dup:
+	cargo run -- \
 		-o tmp/out.exe \
 		build/clang-glibc/print_main.o \
+		build/clang-glibc/asdf.o \
+		build/clang-glibc/asdf2.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o 
 	readelf -aW tmp/out.exe
 	exec tmp/out.exe
-
 
 sdl:
 	cargo run -- \
@@ -63,7 +79,7 @@ musl:
 		/usr/lib/x86_64-linux-musl/crtn.o
 	exec tmp/out.exe
 
-examples: gcc empty musl
+examples: gcc empty musl dup
 
 dump:
 	readelf -aW tmp/out.exe
@@ -125,6 +141,7 @@ functions:
 	$(CLANG) ${CFLAGS} -c testfiles/testfunction.c -o ./build/clang-glibc/testfunction.o
 	$(CLANG) ${CFLAGS} -c testfiles/simplefunction.c -o ./build/clang-glibc/simplefunction.o
 	$(CLANG) ${CFLAGS} -c testfiles/asdf.c -o ./build/clang-glibc/asdf.o
+	$(CLANG) ${CFLAGS} -c testfiles/asdf2.c -o ./build/clang-glibc/asdf2.o
 	$(CLANG) ${CFLAGS} -c testfiles/segfault.c -o ./build/clang-glibc/segfault.o
 	$(CLANG) ${CFLAGS} -c testfiles/link_shared.c -o ./build/clang-glibc/link_shared.o
 	$(CLANG) ${CFLAGS} -c testfiles/live.c -o ./build/clang-glibc/live.o

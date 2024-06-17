@@ -143,7 +143,18 @@ impl Data {
         self.section_index.insert(name.to_string(), section_index);
     }
 
-    pub fn write_strings(data: &mut Data, target: &Target, w: &mut Writer) {
+    pub fn write_strings(data: &mut Data, target: &mut Target, w: &mut Writer) {
+        // These need to be declared
+        let locals = vec![("_DYNAMIC", ".dynamic")];
+
+        for (symbol_name, section_name) in locals {
+            let symbol_name = symbol_name.to_string();
+            let section_name = section_name.to_string();
+            let pointer = ResolvePointer::Section(section_name, 0);
+            let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
+            target.insert_local(symbol);
+        }
+
         // add libraries if they are configured
         data.libs = target
             .libs
@@ -296,6 +307,8 @@ impl Data {
         let size = out_data.len();
         std::fs::write(path, out_data)?;
         eprintln!("Wrote {} bytes to {}", size, path.to_string_lossy());
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
         Ok(())
     }
 }

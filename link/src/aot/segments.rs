@@ -37,9 +37,9 @@ pub struct Blocks {
 }
 
 impl Blocks {
-    pub fn build(mut data: Data, target: Target, w: &mut Writer, config: &AOTConfig) {
+    pub fn build(mut data: Data, mut target: Target, w: &mut Writer, config: &AOTConfig) {
         // preparation
-        Data::write_strings(&mut data, &target, w);
+        Data::write_strings(&mut data, &mut target, w);
         data.write_relocations(&target, w);
         data.update_data(&target);
 

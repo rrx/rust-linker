@@ -34,12 +34,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         let ret: i64 = version.invoke("main", ())?;
         std::process::exit(ret as i32);
     } else {
-        let mut block = ReadBlock::new("exe");
+        let mut exe = ReadBlock::new("exe");
         for path in args.inputs.iter() {
-            block.add(&Path::new(&path), &config)?;
+            let block = ReadBlock::from_path(Path::new(&path), &config)?;
+            exe.add_block(block);
+            //block.add(&Path::new(&path), &config)?;
         }
 
-        block.dump();
+        exe.dump();
 
         let mut data = Data::new();
         if let Some(interp) = args.interp {
@@ -47,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         let output = args.output.unwrap_or("a.out".to_string());
-        Data::write(data, block.target, Path::new(&output), &config)?;
+        Data::write(data, exe.target, Path::new(&output), &config)?;
     }
 
     Ok(())

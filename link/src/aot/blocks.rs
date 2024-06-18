@@ -376,7 +376,6 @@ pub struct RelaDynSection {
     kind: GotSectionKind,
     name_id: Option<StringId>,
     count: usize,
-    //relocation_names: HashMap<String, StringId>,
     offsets: SectionOffset,
     is_rela: bool,
 }
@@ -388,7 +387,6 @@ impl RelaDynSection {
             kind,
             name_id: None,
             count: 0,
-            //relocation_names: HashMap::default(),
             offsets: SectionOffset::new(name, AllocSegment::RO, 0x08),
             is_rela: true,
         }
@@ -603,9 +601,9 @@ impl ElfBlock for SymTabSection {
         self.count = data.statics.symbol_count();
         let symbols = data.statics.gen_symbols(data);
 
-        //for (i, x) in symbols.iter().enumerate() {
-        //println!("static: {}:{:?}", i, x);
-        //}
+        for (i, x) in symbols.iter().enumerate() {
+            log::debug!("static: {}:{:?}", i, x);
+        }
 
         assert_eq!(symbols.len(), self.count);
         assert_eq!(symbols.len() + 1, w.symbol_count() as usize);
@@ -1234,7 +1232,6 @@ impl ElfBlock for PltSection {
             sh_addralign: self.section.offsets.align,
             sh_size: self.section.offsets.size as u64,
         });
-        //println!("write size: {}:{}", self.name(), self.section.offsets.size);
     }
 }
 
@@ -1268,7 +1265,6 @@ impl ElfBlock for PltGotSection {
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let pltgot = data.dynamics.pltgot_objects();
         let size = (pltgot.len()) * self.entry_size;
-        //self.section.size = size;
         let file_offset = w.reserve_start_section(&self.section.offsets);
         self.section.offsets.size = size as u64;
         w.reserve(size, 1);
@@ -1332,7 +1328,6 @@ impl ElfBlock for PltGotSection {
             sh_addralign: self.section.offsets.align,
             sh_size: self.section.offsets.size as u64,
         });
-        //println!("write size: {}:{}", self.name(), self.section.offsets.size);
     }
 }
 

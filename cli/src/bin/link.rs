@@ -38,7 +38,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         //block.add(&Path::new(&path), &config)?;
         exe.add(&Path::new(&path), &config)?;
     }
-    //exe.resolve();
+
+    exe.resolve();
 
     if args.verbose {
         //exe.dump();

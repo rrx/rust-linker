@@ -211,6 +211,7 @@ impl Data {
             //} else if r.is_plt() {
             //gotplt.insert(r.name.clone());
             //} else {
+            //
             match r.effect() {
                 PatchEffect::AddToGot => {
                     got.insert(r.name.clone());
@@ -223,6 +224,47 @@ impl Data {
         }
 
         for r in iter {
+            if let Some(s) = target.lookup_dynamic(&r.name) {
+                let assign = match s.kind {
+                    SymbolKind::Text => {
+                        if s.is_static() {
+                            if r.is_plt() {
+                                GotPltAssign::GotPltWithPlt
+                            } else {
+                                GotPltAssign::Got
+                            }
+                        } else if got.contains(&r.name) {
+                            if r.is_plt() {
+                                GotPltAssign::GotWithPltGot
+                            } else {
+                                GotPltAssign::Got
+                            }
+                        } else if gotplt.contains(&r.name) {
+                            GotPltAssign::GotPltWithPlt
+                        } else {
+                            GotPltAssign::None
+                        }
+                    }
+                    SymbolKind::Data => GotPltAssign::Got,
+                    //_ => unimplemented!("{:?}, {}", s, r)
+                    _ => GotPltAssign::None,
+                };
+
+                let pointer = self.dynamics.relocation_add(&s, assign, r, w);
+                log::info!("reloc0 {}, {:?}, {:?}, {:?}", &r, assign, s.bind, pointer);
+                continue;
+            }
+
+            // static plt relatives
+            if let Some(s) = target.lookup_static(&r.name) {
+                if r.is_plt() {
+                    log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
+                    continue;
+                }
+            } else {
+                unreachable!("Unable to find symbol for relocation: {}", &r.name);
+            }
+
             if let Some(s) = target.lookup(&r.name) {
                 // we don't know the section yet, we just know which kind
                 let def = match s.bind {
@@ -257,16 +299,16 @@ impl Data {
                 };
 
                 if s.source == SymbolSource::Dynamic {
-                    log::debug!("reloc {}", &r);
+                    log::info!("reloc2 {}", &r);
                     self.dynamics.relocation_add(&s, assign, r, w);
                 } else if def != CodeSymbolDefinition::Local {
-                    log::debug!("reloc2 {}", &r);
+                    log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                     if assign == GotPltAssign::None {
                     } else {
                         self.dynamics.relocation_add(&s, assign, r, w);
                     }
                 } else {
-                    log::debug!("reloc3 {}", &r);
+                    log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                 }
             } else {
                 unreachable!("Unable to find symbol for relocation: {}", &r.name)

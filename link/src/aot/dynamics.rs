@@ -10,7 +10,7 @@ struct TrackStringIndex {
     string_id: StringId,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum GotPltAssign {
     Got,           // object
     GotWithPltGot, // function
@@ -23,7 +23,7 @@ struct TrackSymbolIndex {
     string_id: Option<StringId>,
     symbol_index: Option<SymbolIndex>,
     symbol: ReadSymbol,
-    pointer: ResolvePointer,
+    //pointer: ResolvePointer,
 }
 
 pub struct Dynamics {
@@ -83,7 +83,7 @@ impl Dynamics {
     pub fn lookup(&self, r: &CodeRelocation) -> Option<ResolvePointer> {
         if r.is_got() {
             if let Some(track) = self.symbol_hash.get(&r.name) {
-                Some(track.pointer.clone())
+                Some(track.symbol.pointer.clone())
             } else {
                 None
             }
@@ -93,7 +93,7 @@ impl Dynamics {
             } else if let Some(symbol) = self.pltgot_hash.get(&r.name) {
                 Some(symbol.pointer.clone())
             } else if let Some(track) = self.symbol_hash.get(&r.name) {
-                Some(track.pointer.clone())
+                Some(track.symbol.pointer.clone())
             } else {
                 None
             }
@@ -149,11 +149,11 @@ impl Dynamics {
         assign: GotPltAssign,
         r: &CodeRelocation,
         w: &mut Writer,
-    ) {
+    ) -> ResolvePointer {
         let name = &symbol.name;
 
-        if let Some(_track) = self.symbol_hash.get(name) {
-            ()
+        if let Some(track) = self.symbol_hash.get(name) {
+            track.symbol.pointer.clone()
         } else {
             //eprintln!("sym: {:?}", symbol);
             log::debug!(target: "symbols", "r: {:?}, {}", assign, r);
@@ -161,16 +161,19 @@ impl Dynamics {
 
             match assign {
                 GotPltAssign::Got => {
-                    symbol.pointer = ResolvePointer::Got(self.got_index);
+                    let pointer = ResolvePointer::Got(self.got_index);
+                    symbol.pointer = pointer.clone();
 
                     self.r_got.push(symbol.clone());
 
                     self.got_index += 1;
                     self.symbol_add(symbol, w);
+                    pointer
                 }
 
                 GotPltAssign::GotWithPltGot => {
-                    symbol.pointer = ResolvePointer::PltGot(self.pltgot_index);
+                    let pointer = ResolvePointer::PltGot(self.pltgot_index);
+                    symbol.pointer = pointer.clone();
                     self.pltgot.push(symbol.clone());
                     self.pltgot_hash.insert(name.to_string(), symbol.clone());
                     self.pltgot_index += 1;
@@ -180,10 +183,12 @@ impl Dynamics {
 
                     self.got_index += 1;
                     self.symbol_add(symbol, w);
+                    pointer
                 }
 
                 GotPltAssign::GotPltWithPlt => {
-                    symbol.pointer = ResolvePointer::Plt(self.plt_index);
+                    let pointer = ResolvePointer::Plt(self.plt_index);
+                    symbol.pointer = pointer.clone();
                     self.plt.push(symbol.clone());
                     self.plt_hash.insert(name.to_string(), symbol.clone());
                     self.plt_index += 1;
@@ -191,9 +196,10 @@ impl Dynamics {
                     self.r_gotplt.push(symbol.clone());
                     self.gotplt_index += 1;
                     self.symbol_add(symbol, w);
+                    pointer
                 }
                 _ => unreachable!(),
-            };
+            }
         }
     }
 
@@ -217,7 +223,7 @@ impl Dynamics {
             //index,
             string_id,
             symbol_index,
-            pointer: symbol.pointer.clone(),
+            //pointer: symbol.pointer.clone(),
             symbol,
             //relative,
         };
@@ -229,7 +235,7 @@ impl Dynamics {
     pub fn symbol_lookup(&self, name: &str) -> Option<ResolvePointer> {
         self.symbol_hash
             .get(name)
-            .map(|track| track.pointer.clone())
+            .map(|track| track.symbol.pointer.clone())
     }
 
     pub fn symbol_get(&self, name: &str, data: &Data) -> Option<(SymbolIndex, Sym)> {
@@ -271,7 +277,11 @@ impl Dynamics {
         let mut out = vec![];
         for name in self.symbols.iter() {
             let track = self.symbol_hash.get(name).unwrap();
-            out.push((name.to_string(), track.symbol_index, track.pointer.clone()));
+            out.push((
+                name.to_string(),
+                track.symbol_index,
+                track.symbol.pointer.clone(),
+            ));
         }
         out
     }

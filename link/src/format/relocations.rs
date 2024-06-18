@@ -266,14 +266,14 @@ impl CodeRelocation {
                     );
 
                     //log::info!(
-                            //"pltrel {}: patch:{:#08x} patchv:{:#08x} addend:{:#08x} addr:{:#08x} symbol:{:#08x}",
-                            //&self.name,
-                            //patch as usize,
-                            //std::ptr::read(patch),
-                            //self.r.addend,
-                            //addr as isize,
-                            //symbol_address as isize,
-                            //);
+                    //"pltrel {}: patch:{:#08x} patchv:{:#08x} addend:{:#08x} addr:{:#08x} symbol:{:#08x}",
+                    //&self.name,
+                    //patch as usize,
+                    //std::ptr::read(patch),
+                    //self.r.addend,
+                    //addr as isize,
+                    //symbol_address as isize,
+                    //);
                 }
             }
             _ => unimplemented!(),

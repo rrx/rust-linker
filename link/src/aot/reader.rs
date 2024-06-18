@@ -388,12 +388,11 @@ impl ReadBlock {
     }
 
     pub fn resolve(&mut self) {
-        // exports
-        let exports = self.target.exports.drain().collect::<Vec<_>>();
-        for (_name, s) in exports.into_iter() {
-            let s = self.relocate_symbol(s);
-            //eprintln!("E: {:?}", (&self.name, _name, &s));
-            self.target.insert_export(s);
+        for r in self.target.rx.relocations.iter() {
+            eprintln!("E: {:?}", (&self.name, &r));
+            if let Some(s) = self.target.lookup_static(&r.name) {
+                eprintln!("S: {:?}", (&self.name, &s));
+            }
         }
     }
 

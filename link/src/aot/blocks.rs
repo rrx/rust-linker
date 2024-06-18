@@ -604,7 +604,7 @@ impl ElfBlock for SymTabSection {
         let symbols = data.statics.gen_symbols(data);
 
         //for (i, x) in symbols.iter().enumerate() {
-            //println!("static: {}:{:?}", i, x);
+        //println!("static: {}:{:?}", i, x);
         //}
 
         assert_eq!(symbols.len(), self.count);

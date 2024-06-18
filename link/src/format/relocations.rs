@@ -105,11 +105,10 @@ impl CodeRelocation {
         // pointer to address
         addr: *const u8,
     ) {
-        log::debug!("{}", self);
-        log::debug!("patch_base: {:#08x}", patch_base as usize);
-        log::debug!("v_base:  {:#08x}", v_base as usize);
-        log::debug!("addr:    {:#08x}", addr as usize);
-        log::debug!("offset:  {:#08x}", self.offset);
+        //log::info!("{}", self);
+        //log::info!("patch_base: {:#08x}", patch_base as usize);
+        //log::info!("v_base:  {:#08x}", v_base as usize);
+        //log::info!("offset:  {:#08x}", self.offset);
         match self.r.kind {
             RelocationKind::Elf(R_X86_64_GOTPCREL) => {
                 unsafe {
@@ -125,7 +124,7 @@ impl CodeRelocation {
                     (patch as *mut u32).replace(value as u32);
                     log::debug!("patch: {:#08x}", patch as usize);
 
-                    log::debug!(
+                    log::info!(
                         "rel got {}: patch {:#08x}:{:#08x}=>{:#08x} addend:{:#08x} addr:{:#08x}",
                         &self.name,
                         patch as usize,
@@ -160,7 +159,7 @@ impl CodeRelocation {
 
                     (patch as *mut u32).replace(value as u32);
 
-                    log::debug!(
+                    log::info!(
                         "rel got {}: patch {:#08x}:{:#08x}=>{:#08x} addend:{:#08x} addr:{:#08x}",
                         &self.name,
                         patch as usize,
@@ -203,7 +202,7 @@ impl CodeRelocation {
                         _ => unimplemented!(),
                     };
 
-                    log::debug!(
+                    log::info!(
                         "rel absolute {}: patch {:#16x}:{:#16x}=>{:#16x} addend:{:#08x} addr:{:#08x}, vaddr:{:#08x}",
                         name, patch, before, adjusted as usize, self.r.addend, addr as u64, vaddr as usize
                     );
@@ -233,7 +232,7 @@ impl CodeRelocation {
                     //let patch = patch as *mut u32;
                     //*patch = relative_address as u32;
 
-                    log::debug!(
+                    log::info!(
                         "rel relative {}: patch {:#08x}:{:#08x}=>{:#08x} addend:{:#08x} addr:{:#08x}, vaddr:{:#08x}",
                         &self.name, patch as usize, before, relative_address as usize, self.r.addend, addr as u64, vaddr as usize
                     );
@@ -254,21 +253,27 @@ impl CodeRelocation {
                     let v = v_base.offset(self.offset as isize);
 
                     let symbol_address = addr as isize + self.r.addend as isize - v as isize;
+                    let before = std::ptr::read(patch as *const u32);
 
                     // patch as 32 bit
                     let patch = patch as *mut u32;
                     //*patch = symbol_address as u32;
                     std::ptr::write(patch as *mut u32, symbol_address as u32);
 
-                    log::debug!(
-                            "rel {}: patch:{:#08x} patchv:{:#08x} addend:{:#08x} addr:{:#08x} symbol:{:#08x}",
-                            &self.name,
-                            patch as usize,
-                            std::ptr::read(patch),
-                            self.r.addend,
-                            addr as isize,
-                            symbol_address as isize,
-                            );
+                    log::info!(
+                        "plt relative {}: patch {:#08x}:{:#08x}=>{:#08x} addend:{:#08x} addr:{:#08x}",
+                        &self.name, patch as usize, before, symbol_address as usize, self.r.addend, addr as u64
+                    );
+
+                    //log::info!(
+                            //"pltrel {}: patch:{:#08x} patchv:{:#08x} addend:{:#08x} addr:{:#08x} symbol:{:#08x}",
+                            //&self.name,
+                            //patch as usize,
+                            //std::ptr::read(patch),
+                            //self.r.addend,
+                            //addr as isize,
+                            //symbol_address as isize,
+                            //);
                 }
             }
             _ => unimplemented!(),

@@ -32,14 +32,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut exe = ReadBlock::new("exe");
     for path in args.inputs.iter() {
-        let block = ReadBlock::from_path(Path::new(&path), &config)?;
+        //let block = ReadBlock::from_path(Path::new(&path), &config)?;
         //block.dump();
-        exe.add_block(block);
+        //exe.add_block(block);
         //block.add(&Path::new(&path), &config)?;
+        exe.add(&Path::new(&path), &config)?;
     }
+    //exe.resolve();
 
     if args.verbose {
-        exe.dump();
+        //exe.dump();
     }
 
     if args.link {

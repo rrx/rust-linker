@@ -83,7 +83,7 @@ impl Statics {
 
         for name in self.symbols.iter() {
             let track = self.symbol_hash.get(name).unwrap();
-            eprintln!("sym: {}: {:?}", name, track);
+            //eprintln!("sym: {}: {:?}", name, track);
             //eprintln!("t: {:?}", track.symbol);
             let mut s = track.symbol.get_static_symbol(data);
             s.section = track.section_index;
@@ -114,8 +114,8 @@ impl Statics {
                 section_index,
                 symbol: symbol.clone(),
             };
-            eprintln!("add: {:?}: {:?}", symbol, section_index);
-            eprintln!("track: {:?}", track);
+            //eprintln!("add: {:?}: {:?}", symbol, section_index);
+            //eprintln!("track: {:?}", track);
 
             self.symbol_hash.insert(symbol.name.to_string(), track);
         }

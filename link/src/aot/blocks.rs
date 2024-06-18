@@ -603,9 +603,9 @@ impl ElfBlock for SymTabSection {
         self.count = data.statics.symbol_count();
         let symbols = data.statics.gen_symbols(data);
 
-        for (i, x) in symbols.iter().enumerate() {
-            println!("static: {}:{:?}", i, x);
-        }
+        //for (i, x) in symbols.iter().enumerate() {
+            //println!("static: {}:{:?}", i, x);
+        //}
 
         assert_eq!(symbols.len(), self.count);
         assert_eq!(symbols.len() + 1, w.symbol_count() as usize);
@@ -1123,7 +1123,7 @@ impl ElfBlock for PltSection {
         self.section.bytes.resize(size, 0);
         let align = self.section.offsets.align as usize;
 
-        println!("plt align: {}, size: {}", align, size);
+        //println!("plt align: {}, size: {}", align, size);
         let file_offset = w.reserve_start_section(&self.section.offsets);
         self.section.offsets.size = size as u64;
         w.reserve(self.section.bytes.len(), align);
@@ -1154,6 +1154,7 @@ impl ElfBlock for PltSection {
         let got_addr = data.addr_get_by_name(".got.plt").unwrap() as isize;
         let vbase = self.section.offsets.address as isize;
 
+        // PLT START
         let mut stub: Vec<u8> = vec![
             // 0x401020: push   0x2fe2(%rip)        # 404008 <_GLOBAL_OFFSET_TABLE_+0x8>
             // got+8 - rip // (0x404000+0x8) - (0x401020 + 0x06)
@@ -1176,7 +1177,8 @@ impl ElfBlock for PltSection {
         let plt_entries_count = data.dynamics.plt_objects().len();
 
         for slot_index in 0..plt_entries_count {
-            let slot: Vec<u8> = vec![
+            // PLT ENTRY
+            let mut slot: Vec<u8> = vec![
                 // # 404018 <puts@GLIBC_2.2.5>, .got.plot 4th entry, GOT[3], jump there
                 // # got.plt[3] = 0x401036, initial value,
                 // which points to the second instruction (push) in this plt entry
@@ -1193,22 +1195,26 @@ impl ElfBlock for PltSection {
                 // 40103b:       e9 e0 ff ff ff          jmp    401020 <_init+0x20>,
                 0xe9, 0xe0, 0xff, 0xff, 0xff,
             ];
-            stub.extend(slot);
 
             let offset = (slot_index + 1) * 0x10;
+
+            // pointer to .got.plt entry
             let rip = vbase + offset as isize + 6;
             let addr = got_addr + (3 + slot_index as isize) * 0x08 - rip;
-            let range = offset as usize + 2..offset as usize + 6;
-            stub.as_mut_slice()[range].copy_from_slice(&(addr as i32).to_le_bytes());
+            let range = 2..6;
+            slot.as_mut_slice()[range].copy_from_slice(&(addr as i32).to_le_bytes());
 
-            let range = offset as usize + 7..offset as usize + 11;
-            stub.as_mut_slice()[range].copy_from_slice(&(slot_index as i32).to_le_bytes());
+            // slot index
+            let range = 7..11;
+            slot.as_mut_slice()[range].copy_from_slice(&(slot_index as i32).to_le_bytes());
 
             // next instruction
             let rip = vbase + offset as isize + 0x10;
             let addr = self.section.offsets.address as isize - rip;
-            let range = offset as usize + 0x0c..offset as usize + 0x0c + 4;
-            stub.as_mut_slice()[range].copy_from_slice(&(addr as i32).to_le_bytes());
+            let range = 0x0c..0x0c + 4;
+            slot.as_mut_slice()[range].copy_from_slice(&(addr as i32).to_le_bytes());
+
+            stub.extend(slot);
         }
 
         // write stub
@@ -1228,7 +1234,7 @@ impl ElfBlock for PltSection {
             sh_addralign: self.section.offsets.align,
             sh_size: self.section.offsets.size as u64,
         });
-        println!("write size: {}:{}", self.name(), self.section.offsets.size);
+        //println!("write size: {}:{}", self.name(), self.section.offsets.size);
     }
 }
 
@@ -1291,7 +1297,6 @@ impl ElfBlock for PltGotSection {
 
         let vbase = self.section.offsets.address as isize;
         let pltgot = data.dynamics.pltgot_objects();
-        eprintln!("Dis");
         for (slot_index, symbol) in pltgot.iter().enumerate() {
             let p = data.dynamics.symbol_lookup(&symbol.name).unwrap();
             let mut slot: [u8; 8] = [0xff, 0x25, 0x00, 0x00, 0x00, 0x00, 0x66, 0x90];
@@ -1327,7 +1332,7 @@ impl ElfBlock for PltGotSection {
             sh_addralign: self.section.offsets.align,
             sh_size: self.section.offsets.size as u64,
         });
-        println!("write size: {}:{}", self.name(), self.section.offsets.size);
+        //println!("write size: {}:{}", self.name(), self.section.offsets.size);
     }
 }
 

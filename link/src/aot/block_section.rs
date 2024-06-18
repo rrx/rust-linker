@@ -132,7 +132,7 @@ impl ElfBlock for GeneralSection {
                 sh_addralign: self.offsets.align,
                 sh_size: self.offsets.size as u64,
             });
-            println!("write size: {}:{}", self.name(), self.offsets.size);
+            //println!("write size: {}:{}", self.name(), self.offsets.size);
         }
     }
 }
@@ -177,8 +177,8 @@ impl GeneralSection {
             if let Some(addr) = resolve_r(data, r) {
                 log::info!(
                     target: "relocations",
-                    "R-{:?}: vbase: {:#0x}, addr: {:#0x}, {}",
-                    self.offsets.alloc, self.offsets.address, addr as usize, &r.name
+                    "R-{:?}: {}, vbase: {:#0x}, addr: {:#0x}",
+                    self.offsets.alloc, &r.name, self.offsets.address, addr as usize,
                 );
                 r.patch(
                     patch_base as *mut u8,

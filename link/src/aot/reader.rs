@@ -387,6 +387,16 @@ impl ReadBlock {
         }
     }
 
+    pub fn resolve(&mut self) {
+        // exports
+        let exports = self.target.exports.drain().collect::<Vec<_>>();
+        for (_name, s) in exports.into_iter() {
+            let s = self.relocate_symbol(s);
+            //eprintln!("E: {:?}", (&self.name, _name, &s));
+            self.target.insert_export(s);
+        }
+    }
+
     pub fn add_block(&mut self, block: ReadBlock) {
         let mut renames = HashMap::new();
 
@@ -403,7 +413,7 @@ impl ReadBlock {
         // exports
         for (_name, s) in block.target.exports.into_iter() {
             let s = self.relocate_symbol(s);
-            //eprintln!("E: {:?}", (&block.name, name, &s));
+            //eprintln!("E: {:?}", (&block.name, _name, &s));
             self.target.insert_export(s);
         }
 

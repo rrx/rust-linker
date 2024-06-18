@@ -20,10 +20,6 @@ pub trait BlockSection {
     fn relocation_add(&mut self, r: CodeRelocation);
     fn extend_size(&mut self, s: usize);
     fn extend_bytes(&mut self, bytes: &[u8]);
-    //fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer);
-    //fn reserve(&mut self, data: &mut Data, w: &mut Writer);
-    //fn write(&self, data: &Data, w: &mut Writer);
-    //fn write_section_header(&self, w: &mut Writer);
 }
 
 #[derive(Debug, Clone)]
@@ -32,21 +28,15 @@ pub struct GeneralSection {
     pub(crate) name: &'static str,
     pub(crate) name_id: Option<StringId>,
     pub(crate) section_index: Option<SectionIndex>,
-    //pub(crate) size: usize,
     pub(crate) bytes: Vec<u8>,
     pub(crate) relocations: Vec<CodeRelocation>,
     pub(crate) offsets: SectionOffset,
 }
 
 fn resolve_r(data: &Data, r: &CodeRelocation) -> Option<u64> {
-    //eprintln!("resolve: {}, kind: {:?}", &r.name, r.r.kind());
-
-    // check if it's in the plt or got, and look it up in dynamics
-    //if r.is_plt() || r.is_got() {
     if let Some(resolve_addr) = data.dynamics.lookup(r) {
         return resolve_addr.resolve(data);
     }
-    //}
 
     // otherwise, just look up the symbol
     if let Some(resolve_addr) = data.pointers.get(&r.name) {
@@ -132,7 +122,6 @@ impl ElfBlock for GeneralSection {
                 sh_addralign: self.offsets.align,
                 sh_size: self.offsets.size as u64,
             });
-            //println!("write size: {}:{}", self.name(), self.offsets.size);
         }
     }
 }
@@ -144,7 +133,6 @@ impl GeneralSection {
             name,
             name_id: None,
             section_index: None,
-            //size: 0,
             bytes: vec![],
             relocations: vec![],
             offsets: SectionOffset::new(name.into(), alloc, align),
@@ -170,9 +158,6 @@ impl GeneralSection {
 
     pub fn apply_relocations(&self, data: &Data) {
         let patch_base = self.bytes.as_ptr();
-        //eprintln!("symbols: {:?}", data.dynamics.symbols());
-        //eprintln!("plt: {:?}", data.dynamics.plt_hash);
-        //eprintln!("pltgot: {:?}", data.dynamics.pltgot_hash);
         for r in self.relocations.iter() {
             if let Some(addr) = resolve_r(data, r) {
                 log::info!(

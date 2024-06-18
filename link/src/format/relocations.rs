@@ -105,10 +105,6 @@ impl CodeRelocation {
         // pointer to address
         addr: *const u8,
     ) {
-        //log::info!("{}", self);
-        //log::info!("patch_base: {:#08x}", patch_base as usize);
-        //log::info!("v_base:  {:#08x}", v_base as usize);
-        //log::info!("offset:  {:#08x}", self.offset);
         match self.r.kind {
             RelocationKind::Elf(R_X86_64_GOTPCREL) => {
                 unsafe {
@@ -225,12 +221,7 @@ impl CodeRelocation {
                     let relative_address = vaddr as isize + self.r.addend as isize - v as isize;
 
                     // patch as 32 bit
-                    //patch.as_mut_slice()[2..6].copy_from_slice(&b);
                     std::ptr::write(patch as *mut u32, relative_address as u32);
-                    //std::slice::from_raw_parts_mut(patch as *mut u32, 1)[0] = relative_address as u32;
-                    //patch.as_slice
-                    //let patch = patch as *mut u32;
-                    //*patch = relative_address as u32;
 
                     log::info!(
                         "rel relative {}: patch {:#08x}:{:#08x}=>{:#08x} addend:{:#08x} addr:{:#08x}, vaddr:{:#08x}",
@@ -264,16 +255,6 @@ impl CodeRelocation {
                         "plt relative {}: patch {:#08x}:{:#08x}=>{:#08x} addend:{:#08x} addr:{:#08x}",
                         &self.name, patch as usize, before, symbol_address as usize, self.r.addend, addr as u64
                     );
-
-                    //log::info!(
-                    //"pltrel {}: patch:{:#08x} patchv:{:#08x} addend:{:#08x} addr:{:#08x} symbol:{:#08x}",
-                    //&self.name,
-                    //patch as usize,
-                    //std::ptr::read(patch),
-                    //self.r.addend,
-                    //addr as isize,
-                    //symbol_address as isize,
-                    //);
                 }
             }
             _ => unimplemented!(),

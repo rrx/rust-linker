@@ -58,7 +58,6 @@ pub struct Data {
     pub(crate) hash: TrackSection,
     pub(crate) symtab: TrackSection,
     pub(crate) section_dynamic: TrackSection,
-    //pub target: Target,
 }
 
 impl Data {
@@ -85,7 +84,6 @@ impl Data {
             // Tables
             dynamics: Dynamics::new(),
             statics: Statics::new(),
-            //target: Target::new(),
         }
     }
 
@@ -206,12 +204,6 @@ impl Data {
         let mut got = HashSet::new();
         let mut gotplt = HashSet::new();
         for r in iter.clone() {
-            //if r.is_got() {
-            //got.insert(r.name.clone());
-            //} else if r.is_plt() {
-            //gotplt.insert(r.name.clone());
-            //} else {
-            //
             match r.effect() {
                 PatchEffect::AddToGot => {
                     got.insert(r.name.clone());
@@ -246,7 +238,6 @@ impl Data {
                         }
                     }
                     SymbolKind::Data => GotPltAssign::Got,
-                    //_ => unimplemented!("{:?}, {}", s, r)
                     _ => GotPltAssign::None,
                 };
 
@@ -294,7 +285,6 @@ impl Data {
                         }
                     }
                     SymbolKind::Data => GotPltAssign::Got,
-                    //_ => unimplemented!("{:?}, {}", s, r)
                     _ => GotPltAssign::None,
                 };
 
@@ -392,8 +382,6 @@ impl ResolvePointer {
     }
 
     pub fn resolve(&self, data: &Data) -> Option<u64> {
-        //eprintln!("X: {:?}", self);
-        //eprintln!("X: {:?}", &data.addr);
         match self {
             Self::Resolved(x) => Some(*x),
             Self::Section(section_name, offset) => {

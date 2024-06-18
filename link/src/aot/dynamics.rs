@@ -23,7 +23,6 @@ struct TrackSymbolIndex {
     string_id: Option<StringId>,
     symbol_index: Option<SymbolIndex>,
     symbol: ReadSymbol,
-    //pointer: ResolvePointer,
 }
 
 pub struct Dynamics {
@@ -155,7 +154,6 @@ impl Dynamics {
         if let Some(track) = self.symbol_hash.get(name) {
             track.symbol.pointer.clone()
         } else {
-            //eprintln!("sym: {:?}", symbol);
             log::debug!(target: "symbols", "r: {:?}, {}", assign, r);
             let mut symbol = symbol.clone();
 
@@ -223,9 +221,7 @@ impl Dynamics {
             //index,
             string_id,
             symbol_index,
-            //pointer: symbol.pointer.clone(),
             symbol,
-            //relative,
         };
 
         self.symbol_hash.insert(name.clone(), track);
@@ -267,7 +263,6 @@ impl Dynamics {
             let track = self.symbol_hash.get(name).unwrap();
             if track.symbol_index.is_some() {
                 let sym = track.symbol.get_dynamic_symbol(data);
-                //let (_symbol_index, sym) = self.symbol_get(name, data).expect(&format!("not found {}", name));
                 w.write_dynamic_symbol(&sym);
             }
         }

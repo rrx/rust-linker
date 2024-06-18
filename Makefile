@@ -33,7 +33,7 @@ gcc_ref:
 	${CLANG} \
 		-o build/clang-glibc/print_main \
 		build/clang-glibc/print_main.o \
-		build/clang-glibc/asdf.o
+		build/clang-glibc/asdf1.o
 	readelf -sW build/clang-glibc/print_main
 	exec build/clang-glibc/print_main
 
@@ -41,7 +41,7 @@ gcc:
 	cargo run --bin link -- -v --link \
 		-o tmp/gcc.exe \
 		build/clang-glibc/print_main.o \
-		build/clang-glibc/asdf.o \
+		build/clang-glibc/asdf1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o 
 	readelf -sW tmp/gcc.exe
@@ -51,7 +51,7 @@ dup:
 	cargo run --bin link -- -v --link \
 		-o tmp/dup.exe \
 		build/clang-glibc/print_main.o \
-		build/clang-glibc/asdf.o \
+		build/clang-glibc/asdf1.o \
 		build/clang-glibc/asdf2.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o 
@@ -140,7 +140,7 @@ functions:
 	cp $(shell python3 scripts/findlib.py libz.so) build/testlibs
 	$(CLANG) ${CFLAGS} -c testfiles/testfunction.c -o ./build/clang-glibc/testfunction.o
 	$(CLANG) ${CFLAGS} -c testfiles/simplefunction.c -o ./build/clang-glibc/simplefunction.o
-	$(CLANG) ${CFLAGS} -c testfiles/asdf.c -o ./build/clang-glibc/asdf.o
+	$(CLANG) ${CFLAGS} -c testfiles/asdf1.c -o ./build/clang-glibc/asdf1.o
 	$(CLANG) ${CFLAGS} -c testfiles/asdf2.c -o ./build/clang-glibc/asdf2.o
 	$(CLANG) ${CFLAGS} -c testfiles/segfault.c -o ./build/clang-glibc/segfault.o
 	$(CLANG) ${CFLAGS} -c testfiles/link_shared.c -o ./build/clang-glibc/link_shared.o

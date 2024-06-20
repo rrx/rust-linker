@@ -47,15 +47,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         exe.dump();
     }
 
+    let mut data = Data::new();
+    if let Some(interp) = args.interp {
+        data = data.interp(interp);
+    }
+
     if args.dynamic {
         let mut link = DynamicLink::new();
-        link.load(&exe)?;
+        link.load(&data, &exe)?;
     } else if args.link {
-        let mut data = Data::new();
-        if let Some(interp) = args.interp {
-            data = data.interp(interp);
-        }
-
         let output = args.output.unwrap_or("a.out".to_string());
         Data::write(data, exe.target, Path::new(&output), &config)?;
     }

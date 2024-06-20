@@ -1,6 +1,7 @@
 use super::*;
+use crate::aot::BlockSection;
 use crate::format::*;
-use crate::ReadBlock;
+use crate::{Data, ReadBlock};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
@@ -12,8 +13,13 @@ pub struct DynamicLink {
     pub(crate) mem: BlockFactory,
     pub(crate) got: Option<TableVersion>,
     pub(crate) plt: Option<TableVersion>,
+    pub(crate) rx: Option<TableVersion>,
+    pub(crate) rw: Option<TableVersion>,
+    pub(crate) ro: Option<TableVersion>,
+    pub(crate) bss: Option<TableVersion>,
     pub(crate) link: Link,
 }
+
 impl Drop for DynamicLink {
     fn drop(&mut self) {
         self.libraries.clear();
@@ -21,6 +27,10 @@ impl Drop for DynamicLink {
         log::debug!("PLT Used: {}", self.plt.as_ref().unwrap().used());
         self.got.take();
         self.plt.take();
+        self.rx.take();
+        self.rw.take();
+        self.ro.take();
+        self.bss.take();
         log::debug!("MEM Used: {}", self.mem.used());
         assert_eq!(self.used(), 0);
     }
@@ -30,10 +40,22 @@ impl DynamicLink {
         let mem = BlockFactory::create(2000).unwrap();
         let got_mem = mem.alloc_block(1024 * 1024).unwrap().make_heap_block();
         let plt_mem = mem.alloc_block(1024 * 1024).unwrap().make_heap_block();
+        let rx_mem = mem.alloc_block(1024 * 1024).unwrap().make_heap_block();
+        let rw_mem = mem.alloc_block(1024 * 1024).unwrap().make_heap_block();
+        let ro_mem = mem.alloc_block(1024 * 1024).unwrap().make_heap_block();
+        let bss_mem = mem.alloc_block(1024 * 1024).unwrap().make_heap_block();
         let got_block = SmartBlock::new(got_mem);
         let plt_block = SmartBlock::new(plt_mem);
+        let rx_block = SmartBlock::new(rx_mem);
+        let rw_block = SmartBlock::new(rw_mem);
+        let ro_block = SmartBlock::new(ro_mem);
+        let bss_block = SmartBlock::new(bss_mem);
         let got = TableVersion::new(got_block.clone());
         let plt = TableVersion::new(plt_block.clone());
+        let rx = TableVersion::new(rx_block.clone());
+        let rw = TableVersion::new(rw_block.clone());
+        let ro = TableVersion::new(ro_block.clone());
+        let bss = TableVersion::new(bss_block.clone());
 
         Self {
             libraries: SharedLibraryRepo::default(),
@@ -41,6 +63,10 @@ impl DynamicLink {
             got: Some(got),
             plt: Some(plt),
             link: Link::new(),
+            rx: Some(rx),
+            rw: Some(rw),
+            ro: Some(ro),
+            bss: Some(bss),
         }
     }
 
@@ -60,8 +86,44 @@ impl DynamicLink {
         self.mem.get_mem_ptr()
     }
 
-    pub fn load(&mut self, block: &ReadBlock) -> Result<(), Box<dyn Error>> {
-        //block
+    pub fn load(&mut self, data: &Data, block: &ReadBlock) -> Result<(), Box<dyn Error>> {
+        let plt_entries_count = data.dynamics.plt_objects().len();
+        // length + 1, to account for the stub.  Each entry is 0x10 in size
+        let plt_size = (1 + plt_entries_count) * 0x10;
+        let plt_align = 0x10;
+
+        for path in block.target.libs.iter() {
+            let p = Path::new(&path);
+            println!("p: {}", p.to_str().unwrap());
+            let ext = p.extension().unwrap().to_str().unwrap();
+            println!("ext: {}", ext);
+            self.add_library(p.to_str().unwrap(), &Path::new(&path));
+        }
+
+        let p_rx = self
+            .rx
+            .as_mut()
+            .unwrap()
+            .create_buffer(block.target.rx.bytes.as_slice());
+        let p = p_rx.as_ptr();
+        let p_rw = self
+            .rw
+            .as_mut()
+            .unwrap()
+            .create_buffer(block.target.rw.bytes.as_slice());
+        let p = p_rw.as_ptr();
+        let p_ro = self
+            .ro
+            .as_mut()
+            .unwrap()
+            .create_buffer(block.target.ro.bytes.as_slice());
+        let p = p_ro.as_ptr();
+        let bss = vec![0; block.target.bss.size()];
+        if bss.len() > 0 {
+            println!("bss size: {}", bss.len());
+            let p_bss = self.bss.as_mut().unwrap().create_buffer(bss.as_slice());
+            let p = p_bss.as_ptr();
+        }
         Ok(())
     }
 

@@ -1117,9 +1117,9 @@ impl ElfBlock for PltSection {
         let plt_entries_count = data.dynamics.plt_objects().len();
 
         // length + 1, to account for the stub.  Each entry is 0x10 in size
-        let size = (1 + plt_entries_count) * 0x10;
+        let size = BuildPltSection::size(data); //(1 + plt_entries_count) * 0x10;
         self.section.bytes.resize(size, 0);
-        let align = self.section.offsets.align as usize;
+        let align = BuildPltSection::align(data); //self.section.offsets.align as usize;
 
         //println!("plt align: {}, size: {}", align, size);
         let file_offset = w.reserve_start_section(&self.section.offsets);
@@ -1149,6 +1149,9 @@ impl ElfBlock for PltSection {
     fn write(&self, data: &Data, w: &mut Writer) {
         w.write_start_section(&self.section.offsets);
 
+        let stub = BuildPltSection::contents(data, self.section.offsets.address as usize);
+
+        /*
         let got_addr = data.addr_get_by_name(".got.plt").unwrap() as isize;
         let vbase = self.section.offsets.address as isize;
 
@@ -1214,6 +1217,7 @@ impl ElfBlock for PltSection {
 
             stub.extend(slot);
         }
+        */
 
         // write stub
         w.write(stub.as_slice());

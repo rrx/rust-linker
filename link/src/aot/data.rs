@@ -60,6 +60,89 @@ pub struct Data {
     pub(crate) section_dynamic: TrackSection,
 }
 
+pub struct BuildPltSection {}
+
+impl BuildPltSection {
+    pub fn size(data: &Data) -> usize {
+        let plt_entries_count = data.dynamics.plt_objects().len();
+        // length + 1, to account for the stub.  Each entry is 0x10 in size
+        (1 + plt_entries_count) * 0x10
+    }
+
+    pub fn align(data: &Data) -> usize {
+        0x10
+    }
+
+    pub fn contents(data: &Data, base: usize) -> Vec<u8> {
+        let got_addr = data.addr_get_by_name(".got.plt").unwrap() as isize;
+        let vbase = base as isize;
+
+        // PLT START
+        let mut stub: Vec<u8> = vec![
+            // 0x401020: push   0x2fe2(%rip)        # 404008 <_GLOBAL_OFFSET_TABLE_+0x8>
+            // got+8 - rip // (0x404000+0x8) - (0x401020 + 0x06)
+            0xff, 0x35, 0xe2, 0x2f, 0x00, 0x00,
+            // 0x401026: jump to GOT[2]
+            // jmp    *0x2fe4(%rip)        # 404010 <_GLOBAL_OFFSET_TABLE_+0x10>
+            0xff, 0x25, 0xe4, 0x2f, 0x00, 0x00,
+            // 40102c:       0f 1f 40 00             nopl   0x0(%rax)
+            0x0f, 0x1f, 0x40, 0x00,
+        ];
+
+        let got1 = got_addr + 0x8 - (vbase + 0x06);
+        let b = (got1 as i32).to_le_bytes();
+        stub.as_mut_slice()[2..6].copy_from_slice(&b);
+
+        let got2 = got_addr + 0x10 - (vbase + 0x0c);
+        let b = (got2 as i32).to_le_bytes();
+        stub.as_mut_slice()[8..12].copy_from_slice(&b);
+
+        let plt_entries_count = data.dynamics.plt_objects().len();
+
+        for slot_index in 0..plt_entries_count {
+            // PLT ENTRY
+            let mut slot: Vec<u8> = vec![
+                // # 404018 <puts@GLIBC_2.2.5>, .got.plot 4th entry, GOT[3], jump there
+                // # got.plt[3] = 0x401036, initial value,
+                // which points to the second instruction (push) in this plt entry
+                // # the dynamic linker will update GOT[3] with the actual address, so this lookup only happens once
+                // 401030:       ff 25 e2 2f 00 00       jmp    *0x2fe2(%rip)        # 404018 <puts@GLIBC_2.2.5>
+                0xff, 0x25, 0xe2, 0x2f, 0x00, 0x00,
+                // # push plt index onto the stack
+                // # this is a reference to the entry in the relocation table defined by DT_JMPREL (.rela.plt)
+                // # that reloc will have type R_X86_64_JUMP_SLOT
+                // # the reloc will have an offset that points to GOT[3], 0x404018 = BASE + 3*0x08
+                // 401036:       68 00 00 00 00          push   $0x0
+                0x68, 0x00, 0x00, 0x00, 0x00,
+                // # jump to stub, which is (i+2)*0x10 relative to rip
+                // 40103b:       e9 e0 ff ff ff          jmp    401020 <_init+0x20>,
+                0xe9, 0xe0, 0xff, 0xff, 0xff,
+            ];
+
+            let offset = (slot_index + 1) * 0x10;
+
+            // pointer to .got.plt entry
+            let rip = vbase + offset as isize + 6;
+            let addr = got_addr + (3 + slot_index as isize) * 0x08 - rip;
+            let range = 2..6;
+            slot.as_mut_slice()[range].copy_from_slice(&(addr as i32).to_le_bytes());
+
+            // slot index
+            let range = 7..11;
+            slot.as_mut_slice()[range].copy_from_slice(&(slot_index as i32).to_le_bytes());
+
+            // next instruction
+            let rip = vbase + offset as isize + 0x10;
+            let addr = vbase as isize - rip; //self.section.offsets.address as isize - rip;
+            let range = 0x0c..0x0c + 4;
+            slot.as_mut_slice()[range].copy_from_slice(&(addr as i32).to_le_bytes());
+
+            stub.extend(slot);
+        }
+        stub
+    }
+}
+
 impl Data {
     pub fn new() -> Self {
         Self {

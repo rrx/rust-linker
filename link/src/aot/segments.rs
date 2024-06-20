@@ -31,10 +31,7 @@ impl AllocSegment {
     }
 }
 
-pub struct Blocks {
-    //pub blocks: Vec<Box<dyn ElfBlock>>,
-    //pub ph: Vec<ProgramHeaderEntry>,
-}
+pub struct Blocks {}
 
 impl Blocks {
     pub fn build(mut data: Data, mut target: Target, w: &mut Writer, config: &AOTConfig) {

@@ -5,6 +5,7 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use crate::ReadBlock;
 
 pub struct DynamicLink {
     pub(crate) libraries: SharedLibraryRepo,
@@ -57,6 +58,11 @@ impl DynamicLink {
 
     pub fn get_mem_ptr(&self) -> (*const u8, usize) {
         self.mem.get_mem_ptr()
+    }
+
+    pub fn load(&mut self, block: &ReadBlock) -> Result<(), Box<dyn Error>> {
+        //block
+        Ok(())
     }
 
     pub fn add(&mut self, path: &std::path::Path) -> Result<(), Box<dyn Error>> {

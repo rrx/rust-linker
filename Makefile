@@ -24,7 +24,7 @@ empty:
 	exec tmp/empty.exe
 
 gcc_dynamic:
-	cargo run --bin dynamic -- \
+	cargo run --bin link -- --dynamic -v \
 		build/clang-glibc/print_main.o \
 		/usr/lib/x86_64-linux-gnu/crt1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6

@@ -1,7 +1,6 @@
 use super::*;
 use binary_heap_plus::BinaryHeap;
 use capstone::prelude::*;
-use object::Relocation;
 use std::collections::HashMap;
 
 pub fn print_bytes(buf: &[u8], _base: usize) {
@@ -15,34 +14,6 @@ pub fn print_bytes(buf: &[u8], _base: usize) {
     };
     eprintln!("{}", pretty_hex::config_hex(&buf.to_vec(), cfg));
 }
-
-/*
-pub fn print_bytes2(buf: &[u8], base: usize) {
-    let N = 16;
-    let chunks = buf.chunks(N).collect::<Vec<_>>();
-    let mut offset = base;
-    for c in chunks.iter() {
-        let numbers = c
-            .iter()
-            .map(|b| format!("{:02x}", *b))
-            .collect::<Vec<_>>()
-            .join(" ");
-        let x = c
-            .iter()
-            .map(|b| {
-                if b.is_ascii_alphanumeric() {
-                    *b
-                } else {
-                    '.' as u8
-                }
-            })
-            .collect::<Vec<_>>();
-        let x = String::from_utf8(x).unwrap();
-        eprintln!(" {:#08x}: {}  {}", offset, numbers, x);
-        offset += N;
-    }
-}
-*/
 
 pub fn eprint_bytes(buf: &[u8]) {
     let x = String::from_utf8(
@@ -120,17 +91,6 @@ impl<'a> Symbol<'a> {
             addr,
             name,
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct Reloc {
-    offset: u64,
-    r: Relocation,
-}
-impl Reloc {
-    pub fn new(offset: u64, r: Relocation) -> Self {
-        Self { offset, r }
     }
 }
 

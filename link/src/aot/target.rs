@@ -104,8 +104,8 @@ impl Target {
         }
 
         eprintln!("RX, size: {:#0x}", self.rx.size());
-        for local in rx_symbols.iter() {
-            eprintln!(" S: {:?}", local);
+        for s in rx_symbols.iter() {
+            eprintln!(" S: {:?}", s);
         }
         for r in self.rx.relocations().iter() {
             eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
@@ -124,8 +124,8 @@ impl Target {
         disassemble_code_with_symbols(self.rx.bytes(), &symbols, &self.rx.relocations());
 
         eprintln!("RO, size: {:#0x}", self.ro.size());
-        for local in ro_symbols.iter() {
-            eprintln!(" S: {:?}", local);
+        for s in ro_symbols.iter() {
+            eprintln!(" S: {:?}", s);
         }
         for r in self.ro.relocations().iter() {
             eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
@@ -133,8 +133,8 @@ impl Target {
         print_bytes(self.ro.bytes(), 0);
 
         eprintln!("RW, size: {:#0x}", self.rw.size());
-        for local in rw_symbols.iter() {
-            eprintln!(" S: {:?}", local);
+        for s in rw_symbols.iter() {
+            eprintln!(" S: {:?}", s);
         }
         for r in self.rw.relocations().iter() {
             eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
@@ -142,8 +142,8 @@ impl Target {
         print_bytes(self.rw.bytes(), 0);
 
         eprintln!("Bss, size: {:#0x}", self.bss.size());
-        for local in bss_symbols.iter() {
-            eprintln!(" S: {:?}", local);
+        for s in bss_symbols.iter() {
+            eprintln!(" S: {:?}", s);
         }
         for r in self.bss.relocations().iter() {
             eprintln!(" R: {}, {:?}", r, self.lookup(&r.name));
@@ -156,8 +156,8 @@ impl Target {
 
         if other_symbols.len() > 0 {
             eprintln!("Other");
-            for local in other_symbols.iter() {
-                eprintln!(" S: {:?}", local);
+            for s in other_symbols.iter() {
+                eprintln!(" S: {:?}", s);
             }
         }
 

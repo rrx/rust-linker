@@ -10,6 +10,8 @@ struct Args {
     verbose: bool,
     #[arg(long)]
     link: bool,
+    #[arg(long)]
+    dynamic: bool,
     #[arg(short, long)]
     interp: Option<String>,
     #[arg(short, long)]
@@ -39,13 +41,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         exe.add(&Path::new(&path), &config)?;
     }
 
-    exe.resolve();
+    //exe.resolve();
 
     if args.verbose {
-        //exe.dump();
+        exe.dump();
     }
 
-    if args.link {
+    if args.dynamic {
+        let mut link = DynamicLink::new();
+        link.load(&exe)?;
+    } else if args.link {
         let mut data = Data::new();
         if let Some(interp) = args.interp {
             data = data.interp(interp);

@@ -1,11 +1,11 @@
 use super::*;
 use crate::format::*;
+use crate::ReadBlock;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use crate::ReadBlock;
 
 pub struct DynamicLink {
     pub(crate) libraries: SharedLibraryRepo,

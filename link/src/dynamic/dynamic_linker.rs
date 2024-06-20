@@ -1,5 +1,5 @@
 use super::*;
-use crate::aot::BlockSection;
+use crate::aot::{BlockSection, BuildGotPltSection, BuildGotSection, BuildPltSection};
 use crate::format::*;
 use crate::{Data, ReadBlock};
 use std::collections::{HashMap, HashSet};
@@ -87,10 +87,14 @@ impl DynamicLink {
     }
 
     pub fn load(&mut self, data: &Data, block: &ReadBlock) -> Result<(), Box<dyn Error>> {
-        let plt_entries_count = data.dynamics.plt_objects().len();
-        // length + 1, to account for the stub.  Each entry is 0x10 in size
-        let plt_size = (1 + plt_entries_count) * 0x10;
-        let plt_align = 0x10;
+        let gotplt_size = BuildGotPltSection::size(data);
+
+        let plt_size = BuildPltSection::size(data); //(1 + plt_entries_count) * 0x10;
+        let plt_align = BuildPltSection::align(data); //0x10;
+
+        let p_gotplt = self.got.as_mut().unwrap().create_buffer_empty(gotplt_size);
+
+        let p_plt = self.plt.as_mut().unwrap().create_buffer_empty(plt_size);
 
         for path in block.target.libs.iter() {
             let p = Path::new(&path);
@@ -98,6 +102,13 @@ impl DynamicLink {
             let ext = p.extension().unwrap().to_str().unwrap();
             println!("ext: {}", ext);
             self.add_library(p.to_str().unwrap(), &Path::new(&path));
+        }
+
+        let p = p_plt.as_ptr() as *mut u8;
+        let stub = BuildPltSection::contents(data, p as usize);
+
+        unsafe {
+            std::ptr::copy(stub.as_slice().as_ptr(), p, stub.len());
         }
 
         let p_rx = self

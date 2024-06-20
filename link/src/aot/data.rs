@@ -60,6 +60,110 @@ pub struct Data {
     pub(crate) section_dynamic: TrackSection,
 }
 
+pub struct BuildGotPltSection {}
+impl BuildGotPltSection {
+    pub fn size(data: &Data) -> usize {
+        let kind = GotSectionKind::GOTPLT;
+        let unapplied = data.dynamics.relocations(kind);
+        let len = unapplied.len() + kind.start_index();
+        let size = len * std::mem::size_of::<usize>();
+        size
+    }
+
+    pub fn align(data: &Data) -> usize {
+        0x08
+    }
+
+    pub fn contents(data: &Data) -> Vec<u8> {
+        let kind = GotSectionKind::GOTPLT;
+        let unapplied = data.dynamics.relocations(kind);
+
+        // populate with predefined values
+        let mut values: Vec<u64> = vec![data.addr_get(".dynamic"), 0, 0];
+        let len = unapplied.len();
+        let plt_addr = data.addr_get(".plt") + 0x16;
+        for i in 0..len {
+            values.push(plt_addr + i as u64 * 0x10);
+        }
+        let mut bytes: Vec<u8> = vec![];
+        for v in values {
+            bytes.extend(v.to_le_bytes().as_slice());
+        }
+        bytes
+    }
+}
+
+pub struct BuildGotSection {}
+impl BuildGotSection {
+    pub fn size(data: &Data) -> usize {
+        let kind = GotSectionKind::GOT;
+        let unapplied = data.dynamics.relocations(kind);
+        let len = unapplied.len() + kind.start_index();
+        let size = len * std::mem::size_of::<usize>();
+        size
+    }
+
+    pub fn align(data: &Data) -> usize {
+        0x08
+    }
+
+    pub fn contents(data: &Data) -> Vec<u8> {
+        let kind = GotSectionKind::GOT;
+        let unapplied = data.dynamics.relocations(kind);
+
+        // just empty
+        let mut bytes: Vec<u8> = vec![];
+        let len = unapplied.len() + kind.start_index();
+        let size = len * std::mem::size_of::<usize>();
+        bytes.resize(size, 0);
+        bytes
+    }
+}
+
+pub struct BuildPltGotSection {}
+
+impl BuildPltGotSection {
+    pub fn entry_size() -> usize {
+        0x08
+    }
+
+    pub fn size(data: &Data) -> usize {
+        let pltgot = data.dynamics.pltgot_objects();
+        let size = (pltgot.len()) * Self::entry_size();
+        size
+    }
+
+    pub fn align(_data: &Data) -> usize {
+        0x08
+    }
+
+    pub fn contents(data: &Data, base: usize) -> Vec<u8> {
+        let vbase = base as isize;
+        let pltgot = data.dynamics.pltgot_objects();
+        let mut bytes: Vec<u8> = vec![];
+        for (slot_index, symbol) in pltgot.iter().enumerate() {
+            let p = data.dynamics.symbol_lookup(&symbol.name).unwrap();
+            let mut slot: [u8; 8] = [0xff, 0x25, 0x00, 0x00, 0x00, 0x00, 0x66, 0x90];
+            let slot_size = slot.len();
+            assert_eq!(slot_size, Self::entry_size());
+
+            //1050:       ff 25 82 2f 00 00       jmp    *0x2f82(%rip)        # 3fd8 <fprintf@GLIBC_2.2.5>
+            //1056:       66 90                   xchg   %ax,%ax
+
+            let gotplt_addr = p.resolve(data).unwrap();
+            let offset = (slot_index as isize) * slot_size as isize;
+            let rip = vbase + offset + 6;
+            let addr = gotplt_addr as isize - rip;
+
+            let offset = slot_index * slot_size;
+            slot.as_mut_slice()[offset + 2..offset + 6]
+                .copy_from_slice(&(addr as i32).to_le_bytes());
+            bytes.extend(slot);
+        }
+        bytes
+    }
+}
+
 pub struct BuildPltSection {}
 
 impl BuildPltSection {
@@ -69,7 +173,7 @@ impl BuildPltSection {
         (1 + plt_entries_count) * 0x10
     }
 
-    pub fn align(data: &Data) -> usize {
+    pub fn align(_data: &Data) -> usize {
         0x10
     }
 

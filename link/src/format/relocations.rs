@@ -117,7 +117,9 @@ impl CodeRelocation {
                     log::debug!("value: {:#04x}", value as u32);
 
                     let before = std::ptr::read(patch);
-                    (patch as *mut u32).replace(value as u32);
+                    //(patch as *mut u32).replace(value as u32);
+                    std::ptr::write(patch as *mut u32, value as u32);
+
                     log::debug!("patch: {:#08x}", patch as usize);
 
                     log::info!(
@@ -153,7 +155,8 @@ impl CodeRelocation {
                     log::debug!("value: {:#04x}", value as u32);
                     log::debug!("addr:  {:#08x}", addr as usize);
 
-                    (patch as *mut u32).replace(value as u32);
+                    //(patch as *mut u32).replace(value as u32);
+                    std::ptr::write(patch as *mut u32, value as u32);
 
                     log::info!(
                         "rel got {}: patch {:#08x}:{:#08x}=>{:#08x} addend:{:#08x} addr:{:#08x}",
@@ -192,7 +195,8 @@ impl CodeRelocation {
                         64 => {
                             // patch as 64 bit
                             let patch = patch_base.offset(self.offset as isize) as *mut u64;
-                            *(patch as *mut u64) = adjusted as u64;
+                            //*(patch as *mut u64) = adjusted as u64;
+                            std::ptr::write(patch as *mut u64, adjusted as u64);
                             patch as u64
                         }
                         _ => unimplemented!(),

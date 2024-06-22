@@ -502,6 +502,7 @@ impl ReadBlock {
         match kind {
             ReadSectionKind::Bss => {
                 self.target.bss.from_section(b, section)?;
+                self.target.bss.extend_size(section.size() as usize);
             }
             ReadSectionKind::RX => {
                 self.target.rx.from_section(b, section)?;

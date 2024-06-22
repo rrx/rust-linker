@@ -64,12 +64,23 @@ impl Library {
 pub struct SharedLibraryRepo {
     map: im::HashMap<String, SharedLibrary>,
 }
+
 impl SharedLibraryRepo {
     pub fn clear(&mut self) {
         self.map.clear();
     }
+
     pub fn update(&mut self, repo: SharedLibraryRepo) {
         self.map = self.map.clone().union(repo.map.clone());
+    }
+
+    pub fn add_library(&mut self, name: &str, path: &Path) -> Result<(), Box<dyn Error>> {
+        unsafe {
+            let lib = libloading::Library::new(path)?;
+            self.add(name, lib);
+            log::info!("Loaded library: {}", &path.to_string_lossy());
+        }
+        Ok(())
     }
 }
 

@@ -70,7 +70,7 @@ impl BuildGotPltSection {
         size
     }
 
-    pub fn align(data: &Data) -> usize {
+    pub fn align(_data: &Data) -> usize {
         0x08
     }
 
@@ -103,7 +103,7 @@ impl BuildGotSection {
         size
     }
 
-    pub fn align(data: &Data) -> usize {
+    pub fn align(_data: &Data) -> usize {
         0x08
     }
 

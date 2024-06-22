@@ -35,6 +35,7 @@ impl Drop for DynamicLink {
         assert_eq!(self.used(), 0);
     }
 }
+
 impl DynamicLink {
     pub fn new() -> Self {
         let mem = BlockFactory::create(2000).unwrap();

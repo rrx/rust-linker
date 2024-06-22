@@ -53,8 +53,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if args.dynamic {
-        let mut link = DynamicLink::new();
-        link.load(&data, &exe)?;
+        link::loader::load_block(&mut data, &exe)?;
+        //let mut link = DynamicLink::new();
+        //link.load(&data, &exe)?;
     } else if args.link {
         let output = args.output.unwrap_or("a.out".to_string());
         Data::write(data, exe.target, Path::new(&output), &config)?;

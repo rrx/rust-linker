@@ -22,22 +22,28 @@ impl GeneralSection {
     }
 
     pub fn disassemble_code(&self, data: &Data, buf: &[u8]) {
+        self.disassemble_code_start(
+            data,
+            buf,
+            self.offsets.address as usize,
+            self.offsets.size as usize,
+        );
+    }
+
+    pub fn disassemble_code_start(&self, data: &Data, buf: &[u8], start: usize, size: usize) {
         let mut symbols = vec![];
         for (name, p) in data.pointers.iter() {
-            let addr = p.resolve(data).unwrap();
-            if addr >= self.offsets.address
-                && addr <= (self.offsets.address + self.offsets.size as u64)
-            {
-                //eprintln!("b: {}, {:#0x}", name, addr);
+            let addr = p.resolve(data).unwrap() as usize;
+            if addr >= start && addr <= (start + size) {
+                eprintln!("b: {}, {:#0x}", name, addr);
                 symbols.push((name, addr));
             }
         }
 
-        //disassemble_code_with_symbols(self.bytes.as_slice(), &symbols, &self.relocations);
-        let mut heap =
-            BinaryHeap::from_vec_cmp(symbols.clone(), |a: &(&String, u64), b: &(&String, u64)| {
-                b.1.cmp(&a.1)
-            });
+        let mut heap = BinaryHeap::from_vec_cmp(
+            symbols.clone(),
+            |a: &(&String, usize), b: &(&String, usize)| b.1.cmp(&a.1),
+        );
 
         let mut r_heap = BinaryHeap::from_vec_cmp(
             self.relocations.clone(),
@@ -55,8 +61,9 @@ impl GeneralSection {
 
         for instr in insts.as_ref() {
             let addr = instr.address();
-            let abs_addr = instr.address() + self.offsets.address; // as u64;
+            let abs_addr = instr.address() as usize + start;
 
+            // relocation heap
             while r_heap.len() > 0 {
                 let next_reloc_addr = r_heap.peek().unwrap().offset;
                 if next_reloc_addr <= addr {
@@ -70,13 +77,14 @@ impl GeneralSection {
                     let p = p0.resolve(data).unwrap();
                     eprintln!(
                         "    Base: {:#0x}, addr: {:#0x}, offset: {:#0x}, p: {:#0x}, p0: {}",
-                        self.offsets.address, addr, r.offset, p, p0
+                        start, addr, r.offset, p, p0
                     );
                 } else {
                     break;
                 }
             }
 
+            // symbol heap
             while heap.len() > 0 {
                 let next_symbol_addr = heap.peek().unwrap().1;
 
@@ -90,7 +98,7 @@ impl GeneralSection {
 
             eprintln!(
                 "  {:#06x} {:#06x} {}\t\t{}",
-                instr.address() + self.offsets.address,
+                instr.address() as usize + start,
                 instr.address(),
                 instr.mnemonic().expect("no mnmemonic found"),
                 instr.op_str().expect("no op_str found")

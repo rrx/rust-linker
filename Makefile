@@ -41,14 +41,12 @@ gcc_dynamic:
 	cargo run --bin link -- --dynamic -v \
 		build/clang-glibc/print_main.o \
 		build/clang-glibc/asdf1.o \
-		/usr/lib/x86_64-linux-gnu/crt1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
 gcc_dynamic_debug:
 	exec rust-gdb --args ./target/debug/link --dynamic -v \
 		build/clang-glibc/print_main.o \
 		build/clang-glibc/asdf1.o \
-		/usr/lib/x86_64-linux-gnu/crt1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
 gcc_ref:

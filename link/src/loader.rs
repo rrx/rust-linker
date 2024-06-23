@@ -342,13 +342,16 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
     data.addr_set(".plt", plt_block.as_ptr() as u64);
 
     let mut v = vec![0u8; 16];
-    for symbol in data.dynamics.plt_objects() {
+    for (i, symbol) in data.dynamics.plt_objects().iter().enumerate() {
+        // offset is from the next instruction - 5 bytes after the current instruction
+        let rip = plt_block.as_ptr() as isize + (i as isize + 1) * 16 + 5;
         let p = lookups.get(&symbol.name).unwrap().resolve(data).unwrap();
         println!("PLT Symbol: {:?}", symbol);
-        println!("PLT Symbol: {:#0x}", p);
+        println!("PLT Symbol: {:#0x}, {:#0x}", p, rip);
+        // E9 cd - JMP rel32
         let mut buf = [0u8; 16];
         buf[0] = 0xe9;
-        let b = (p as u64).to_le_bytes();
+        let b = ((p as isize - rip as isize) as u32).to_le_bytes();
         buf[1..b.len() + 1].copy_from_slice(&b);
         v.extend(buf);
     }

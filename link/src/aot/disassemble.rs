@@ -60,7 +60,7 @@ impl GeneralSection {
         let insts = cs.disasm_all(buf, start as u64).expect("disassemble");
 
         for instr in insts.as_ref() {
-            let addr = instr.address();
+            let addr = instr.address() as u64 - start as u64;
             let abs_addr = instr.address() as usize; // + start;
 
             // relocation heap

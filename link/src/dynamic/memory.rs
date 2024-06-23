@@ -84,6 +84,15 @@ impl BlockFactoryInner {
         self.mprotect(libc::PROT_READ).unwrap();
     }
 
+    pub fn alloc_block_align(&mut self, size: usize, align: usize) -> Option<BlockInner> {
+        assert!(size > 0);
+        let layout = Layout::from_size_align(size, align).unwrap();
+        match self.heap.allocate_first_fit(layout) {
+            Ok(p) => Some(BlockInner { layout, size, p }),
+            Err(_e) => None,
+        }
+    }
+
     pub fn alloc_block(&mut self, size: usize) -> Option<BlockInner> {
         assert!(size > 0);
         let aligned_size = page_align(size, self.page_size);

@@ -2,7 +2,7 @@ use crate::aot::{
     BlockSection, BuildGotPltSection, BuildGotSection, BuildPltGotSection, BuildPltSection,
     GotPltAssign, GotSectionKind, ResolvePointer, SymbolBind, SymbolSource,
 };
-use crate::dynamic::{BlockFactoryInner, SharedLibraryRepo};
+use crate::dynamic::{BlockFactoryInner, LinkError, SharedLibraryRepo};
 use crate::format;
 use crate::{Data, ReadBlock};
 use object::SymbolKind;
@@ -11,6 +11,7 @@ use std::error::Error;
 use std::path::Path;
 
 pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Error>> {
+    let mut version = LoaderVersion::default();
     let mut ro = BlockFactoryInner::create(10)?;
     ro.force_rw();
     let mut rx = BlockFactoryInner::create(10)?;
@@ -18,40 +19,39 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
     let mut rw = BlockFactoryInner::create(10)?;
     rw.force_rw();
 
-    let mut libraries = SharedLibraryRepo::default();
+    //let mut libraries = SharedLibraryRepo::default();
     for path in block.target.libs.iter() {
         let p = Path::new(&path);
         println!("p: {}", p.to_str().unwrap());
         let ext = p.extension().unwrap().to_str().unwrap();
         println!("ext: {}", ext);
-        libraries.add_library(p.to_str().unwrap(), &Path::new(&path))?;
+        version
+            .libraries
+            .add_library(p.to_str().unwrap(), &Path::new(&path))?;
     }
 
     // RW
+    let align = 0x10;
     let bss_size = block.target.bss.size();
     if bss_size > 0 {
-        let _bss_align = 0x10;
-        let bss_block = rw.alloc_block(bss_size).unwrap();
+        let bss_block = rw.alloc_block_align(bss_size, align).unwrap();
         data.addr_set(".bss", bss_block.as_ptr() as u64);
     }
 
     let rw_size = block.target.rw.size();
-    let _rw_align = 0x10;
-    let mut rw_block = rw.alloc_block(rw_size).unwrap();
+    let mut rw_block = rw.alloc_block_align(rw_size, align).unwrap();
     data.addr_set(".data", rw_block.as_ptr() as u64);
     rw_block.copy(block.target.rw.bytes());
 
     // RO
     let ro_size = block.target.ro.size();
-    let _ro_align = 0x10;
-    let mut ro_block = ro.alloc_block(ro_size).unwrap();
+    let mut ro_block = ro.alloc_block_align(ro_size, align).unwrap();
     data.addr_set(".rodata", ro_block.as_ptr() as u64);
     ro_block.copy(block.target.ro.bytes());
 
     // RX
     let rx_size = block.target.rx.size();
-    let _rx_align = 0x10;
-    let mut rx_block = rx.alloc_block(rx_size).unwrap();
+    let mut rx_block = rx.alloc_block_align(rx_size, align).unwrap();
     data.addr_set(".text", rx_block.as_ptr() as u64);
 
     /*
@@ -109,7 +109,7 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
     let mut lookups = HashMap::new();
     for r in iter {
         if let Some(s) = block.target.lookup_dynamic(&r.name) {
-            if let Some(ptr) = libraries.search_dynamic(&r.name) {
+            if let Some(ptr) = version.libraries.search_dynamic(&r.name) {
                 unsafe {
                     let p = ptr.as_ptr() as *const usize;
                     let v = *p as *const usize;
@@ -168,7 +168,7 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
         if let Some(s) = block.target.lookup_static(&r.name) {
             if r.is_plt() {
                 log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
-                let p = s.pointer.resolve(data).unwrap();
+                let _p = s.pointer.resolve(data).unwrap();
                 data.pointers.insert(s.name.clone(), s.pointer.clone());
                 continue;
             }
@@ -183,7 +183,7 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
                 SymbolBind::Global => format::CodeSymbolDefinition::Defined,
                 SymbolBind::Weak => format::CodeSymbolDefinition::Defined,
             };
-            let p = s.pointer.resolve(data).unwrap();
+            let _p = s.pointer.resolve(data).unwrap();
             data.pointers.insert(s.name.clone(), s.pointer.clone());
 
             let assign = match s.kind {
@@ -295,8 +295,8 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
     if got_size == 0 {
         got_size = std::mem::size_of::<u64>();
     }
-    let _got_align = BuildGotSection::align(data);
-    let mut got_block = rw.alloc_block(got_size).unwrap();
+    let got_align = BuildGotSection::align(data);
+    let mut got_block = rw.alloc_block_align(got_size, got_align).unwrap();
     data.addr_set(".got", got_block.as_ptr() as u64);
     let mut buf = BuildGotSection::contents(data);
     let unapplied = data.dynamics.relocations(GotSectionKind::GOT);
@@ -324,20 +324,20 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
     got_block.copy(buf.as_slice());
 
     let gotplt_size = BuildGotPltSection::size(data);
-    let _gotplt_align = BuildGotPltSection::align(data);
-    let mut gotplt_block = rw.alloc_block(gotplt_size).unwrap();
+    let gotplt_align = BuildGotPltSection::align(data);
+    let gotplt_block = rw.alloc_block_align(gotplt_size, gotplt_align).unwrap();
     data.addr_set(".got.plt", gotplt_block.as_ptr() as u64);
 
     // RX
     let plt_size = BuildPltSection::size(data);
-    let _plt_align = BuildPltSection::align(data);
-    let mut plt_block = rx.alloc_block(plt_size).unwrap();
+    let plt_align = BuildPltSection::align(data);
+    let plt_block = rx.alloc_block_align(plt_size, plt_align).unwrap();
     data.addr_set(".plt", plt_block.as_ptr() as u64);
 
     let pltgot_size = BuildPltGotSection::size(data);
     if pltgot_size > 0 {
         let pltgot_align = BuildPltGotSection::align(data);
-        let mut pltgot_block = rx.alloc_block(pltgot_size).unwrap();
+        let mut pltgot_block = rx.alloc_block_align(pltgot_size, pltgot_align).unwrap();
         data.addr_set(".plt.got", pltgot_block.as_ptr() as u64);
         let buf = BuildPltGotSection::contents(data, 0);
         pltgot_block.copy(buf.as_slice());
@@ -377,4 +377,53 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
     }
 
     Ok(())
+}
+
+#[derive(Default)]
+pub struct LoaderVersion {
+    libraries: SharedLibraryRepo,
+}
+
+impl LoaderVersion {
+    pub fn debug(&self) {
+        log::debug!("Debug:");
+        //for (k, v) in &self.linked {
+        //log::debug!("link: {:?}", (&k, &v));
+        //}
+        crate::dynamic::eprint_process_maps();
+    }
+
+    pub fn lookup(&self, data: &Data, symbol: &str) -> Option<u64> {
+        match data.pointers.get(symbol) {
+            Some(ptr) => {
+                if let Some(p) = ptr.resolve(data) {
+                    Some(p)
+                } else {
+                    None
+                }
+            }
+            None => {
+                if let Some(ptr) = self.libraries.search_dynamic(symbol) {
+                    let p = ptr.as_ptr() as *const usize;
+                    Some(p as u64)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    pub fn invoke<P, T>(&self, data: &Data, name: &str, args: P) -> Result<T, Box<dyn Error>> {
+        // call the main function
+
+        // make sure we dereference the pointer!
+        let p = self.lookup(data, name).ok_or(LinkError::SymbolNotFound)?;
+        unsafe {
+            type MyFunc<P, T> = unsafe extern "cdecl" fn(P) -> T;
+            log::debug!("invoking {} @ {:#08x}", name, p as usize);
+            let f: MyFunc<P, T> = std::mem::transmute(p);
+            let ret = f(args);
+            Ok(ret)
+        }
+    }
 }

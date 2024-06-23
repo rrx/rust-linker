@@ -10,7 +10,7 @@ pub(crate) mod table;
 pub(crate) mod version;
 
 pub use blocks::*;
-pub use disassemble::*;
+//pub use disassemble::*;
 pub use dynamic_linker::*;
 pub use libraries::*;
 pub use memory::*;
@@ -26,7 +26,7 @@ use std::fmt;
 pub enum LinkError {
     NotFound,
     MissingSymbol,
-    SymbolNotFound,
+    SymbolNotFound(String),
 }
 impl std::error::Error for LinkError {}
 impl fmt::Display for LinkError {

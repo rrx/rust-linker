@@ -49,7 +49,9 @@ impl Library {
         // call the main function
 
         // make sure we dereference the pointer!
-        let ptr = self.lookup(name).ok_or(LinkError::SymbolNotFound)?;
+        let ptr = self
+            .lookup(name)
+            .ok_or(LinkError::SymbolNotFound(name.to_string()))?;
         unsafe {
             type MyFunc<P, T> = unsafe extern "cdecl" fn(P) -> T;
             log::debug!("invoking {} @ {:#08x}", name, ptr.as_ptr() as usize);

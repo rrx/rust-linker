@@ -57,11 +57,11 @@ impl GeneralSection {
             .detail(true)
             .build()
             .unwrap();
-        let insts = cs.disasm_all(buf, 0).expect("disassemble");
+        let insts = cs.disasm_all(buf, start as u64).expect("disassemble");
 
         for instr in insts.as_ref() {
             let addr = instr.address();
-            let abs_addr = instr.address() as usize + start;
+            let abs_addr = instr.address() as usize; // + start;
 
             // relocation heap
             while r_heap.len() > 0 {
@@ -96,12 +96,23 @@ impl GeneralSection {
                 }
             }
 
+            let cfg = pretty_hex::HexConfig {
+                title: false,
+                ascii: false,
+                width: 16,
+                group: 2,
+                chunk: 16,
+                ..pretty_hex::HexConfig::default()
+            };
+            let s = pretty_hex::config_hex(&instr.bytes().to_vec(), cfg);
+
             eprintln!(
-                "  {:#06x} {:#06x} {}\t\t{}",
-                instr.address() as usize + start,
+                "  {:#06x} {:#06x} {}\t\t{}\t{}",
+                instr.address() as usize - start,
                 instr.address(),
                 instr.mnemonic().expect("no mnmemonic found"),
-                instr.op_str().expect("no op_str found")
+                instr.op_str().expect("no op_str found"),
+                s
             );
         }
     }

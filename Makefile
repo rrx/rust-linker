@@ -15,6 +15,12 @@ empty_dynamic:
 		/usr/lib/x86_64-linux-gnu/crt1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
+empty_dynamic_debug:
+	exec rust-gdb --args ./target/debug/link --dynamic -v \
+		build/clang-glibc/empty_main.o \
+		/usr/lib/x86_64-linux-gnu/crt1.o \
+		/usr/lib/x86_64-linux-gnu/libc.so.6
+
 empty:
 	cargo run --bin link -- -v --link \
 		-o tmp/empty.exe \
@@ -33,6 +39,13 @@ empty_ref:
 
 gcc_dynamic:
 	cargo run --bin link -- --dynamic -v \
+		build/clang-glibc/print_main.o \
+		build/clang-glibc/asdf1.o \
+		/usr/lib/x86_64-linux-gnu/crt1.o \
+		/usr/lib/x86_64-linux-gnu/libc.so.6
+
+gcc_dynamic_debug:
+	exec rust-gdb --args ./target/debug/link --dynamic -v \
 		build/clang-glibc/print_main.o \
 		build/clang-glibc/asdf1.o \
 		/usr/lib/x86_64-linux-gnu/crt1.o \
@@ -88,7 +101,7 @@ musl:
 		/usr/lib/x86_64-linux-musl/crtn.o
 	exec tmp/musl.exe
 
-examples: gcc empty musl dup empty_dynamic gcc_dynamic
+examples: gcc empty musl dup empty_dynamic #gcc_dynamic
 
 dump:
 	readelf -aW tmp/out.exe

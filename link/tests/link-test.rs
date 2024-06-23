@@ -24,6 +24,22 @@ fn linker_shared() {
 }
 
 //#[test]
+fn loader_shared() {
+    let mut config = AOTConfig::new();
+    config.verbose = true;
+    let mut exe = ReadBlock::new("exe");
+    exe.add(Path::new("../build/testlibs/libz.so"), &config)
+        .unwrap();
+    exe.add(&temp_path("link_shared.o"), &config).unwrap();
+    let mut data = Data::new();
+    let version = link::loader::load_block(&mut data, &mut exe).unwrap();
+    version.debug();
+    let ret: *const () = version.invoke(&data, "call_z", ()).unwrap();
+    log::debug!("ret: {:#08x}", ret as usize);
+    assert!(ret.is_null());
+}
+
+//#[test]
 // segfaults
 fn linker_main() {
     let mut b = DynamicLink::new();
@@ -73,6 +89,23 @@ fn linker_livelink() {
     let ret: i64 = collection.invoke("asdf", (2,)).unwrap();
     log::debug!("ret: {}", ret);
     assert_eq!(3, ret);
+}
+
+#[test]
+fn loader_livelink() {
+    let mut config = AOTConfig::new();
+    config.verbose = true;
+    let mut exe = ReadBlock::new("exe");
+    exe.add(&temp_path("/lib/x86_64-linux-gnu/libc.so.6"), &config)
+        .unwrap();
+    exe.add(&temp_path("globals.o"), &config).unwrap();
+    exe.add(&temp_path("live.so"), &config).unwrap();
+    let mut data = Data::new();
+    let version = link::loader::load_block(&mut data, &mut exe).unwrap();
+    version.debug();
+    let ret: i64 = version.invoke(&data, "simple_function", ()).unwrap();
+    log::debug!("ret: {:#08x}", ret);
+    assert_eq!(ret, 1);
 }
 
 #[test]
@@ -126,6 +159,20 @@ fn test_live_static() {
 }
 
 #[test]
+fn loader_live_static() {
+    let mut config = AOTConfig::new();
+    config.verbose = true;
+    let mut exe = ReadBlock::new("exe");
+    exe.add(&temp_path("live.o"), &config).unwrap();
+    let mut data = Data::new();
+    let version = link::loader::load_block(&mut data, &mut exe).unwrap();
+    version.debug();
+    let ret: i64 = version.invoke(&data, "call_live", (3,)).unwrap();
+    log::debug!("ret: {:#08x}", ret as usize);
+    assert_eq!(0x11, ret);
+}
+
+#[test]
 fn test_empty_main() {
     let mut b = DynamicLink::new();
     b.add(&temp_path("empty_main.o")).unwrap();
@@ -142,6 +189,22 @@ fn test_empty_main() {
 
     //let init_ptr = version.lookup("_init").unwrap().as_ptr();
     //log::debug!("init_ptr: {:#08x}", init_ptr as usize);
+}
+
+#[test]
+fn loader_empty_main() {
+    let mut config = AOTConfig::new();
+    config.verbose = true;
+    let mut exe = ReadBlock::new("exe");
+    exe.add(&temp_path("empty_main.o"), &config).unwrap();
+    let mut data = Data::new();
+    let version = link::loader::load_block(&mut data, &mut exe).unwrap();
+    version.debug();
+    let ret: i64 = version.invoke(&data, "main", (3,)).unwrap();
+    log::debug!("ret: {:#08x}", ret as usize);
+    assert_eq!(0, ret);
+    let main_ptr = version.lookup(&data, "main").unwrap();
+    log::debug!("ptr: {:#08x}", main_ptr as usize);
 }
 
 #[test]
@@ -177,6 +240,25 @@ fn test_libuv() {
         //log::debug!("ret: {:#08x}", ret);
         //assert_eq!(0x0, ret);
     }
+}
+
+//#[test]
+fn loader_libuv() {
+    let mut config = AOTConfig::new();
+    config.verbose = true;
+    let mut exe = ReadBlock::new("exe");
+    exe.add(Path::new("/lib/x86_64-linux-gnu/libc.so.6"), &config)
+        .unwrap();
+    exe.add(Path::new("/usr/lib/x86_64-linux-gnu/libuv.so"), &config)
+        .unwrap();
+    exe.add(&temp_path("uvtest.o"), &config).unwrap();
+
+    let mut data = Data::new();
+    let version = link::loader::load_block(&mut data, &mut exe).unwrap();
+    version.debug();
+    let ret: i64 = version.invoke(&data, "uvtest", ()).unwrap();
+    log::debug!("ret: {:#08x}", ret as usize);
+    assert_eq!(0, ret);
 }
 
 #[test]

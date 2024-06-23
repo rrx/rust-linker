@@ -24,6 +24,13 @@ empty:
 	readelf -aW tmp/empty.exe
 	exec tmp/empty.exe
 
+empty_ref:
+	${CLANG} \
+		-o build/clang-glibc/empty \
+		build/clang-glibc/empty_main.o
+	readelf -sW build/clang-glibc/empty
+	exec build/clang-glibc/empty
+
 gcc_dynamic:
 	cargo run --bin link -- --dynamic -v \
 		build/clang-glibc/print_main.o \

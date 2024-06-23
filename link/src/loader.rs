@@ -1,6 +1,6 @@
 use crate::aot::{
     BlockSection, BuildGotPltSection, BuildGotSection, BuildPltGotSection, BuildPltSection,
-    GotPltAssign, ResolvePointer, SymbolBind, SymbolSource,
+    GotPltAssign, GotSectionKind, ResolvePointer, SymbolBind, SymbolSource,
 };
 use crate::dynamic::{BlockFactoryInner, SharedLibraryRepo};
 use crate::format;
@@ -106,6 +106,7 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
         }
     }
 
+    let mut lookups = HashMap::new();
     for r in iter {
         if let Some(s) = block.target.lookup_dynamic(&r.name) {
             if let Some(ptr) = libraries.search_dynamic(&r.name) {
@@ -120,6 +121,7 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
                     );
                     let pointer = ResolvePointer::Got(got.len());
                     data.pointers.insert(r.name.clone(), pointer);
+                    lookups.insert(r.name.clone(), ResolvePointer::Resolved(p as u64));
                     //got.push(p);
                     //data.pointer_set(r.name.clone(), p as u64);
                     //data.pointers.insert(r.name.clone(), p as u64);
@@ -287,14 +289,39 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
     // ALLOCATE TABLES
 
     // RW
-    let got_size = BuildGotSection::size(data);
-    if got_size > 0 {
-        let _got_align = BuildGotSection::align(data);
-        let mut got_block = rw.alloc_block(got_size).unwrap();
-        data.addr_set(".got", got_block.as_ptr() as u64);
-        let buf = BuildGotSection::contents(data);
-        got_block.copy(buf.as_slice());
+
+    // GOT
+    let mut got_size = BuildGotSection::size(data);
+    if got_size == 0 {
+        got_size = std::mem::size_of::<u64>();
     }
+    let _got_align = BuildGotSection::align(data);
+    let mut got_block = rw.alloc_block(got_size).unwrap();
+    data.addr_set(".got", got_block.as_ptr() as u64);
+    let mut buf = BuildGotSection::contents(data);
+    let unapplied = data.dynamics.relocations(GotSectionKind::GOT);
+    for (i, symbol) in unapplied.iter().enumerate() {
+        let p = symbol.pointer.resolve(data).unwrap();
+        eprintln!("U1({}): {:?}, {:#0x}", i, symbol, p);
+
+        let pp = if let Some(p) = lookups.get(&symbol.name) {
+            p.clone()
+        } else if let Some(s) = block.target.lookup(&symbol.name) {
+            s.pointer.clone()
+        } else {
+            unreachable!();
+        };
+
+        //let s = block.target.lookup(&symbol.name).unwrap();
+        let p = pp.resolve(data).unwrap();
+        eprintln!("U2({}): {:?}, {:#0x}", i, pp, p);
+        //if let Some(pp) = lookups.get(&s.name) {
+        //let p = pp.resolve(data).unwrap();
+        let b = (p as u64).to_le_bytes();
+        buf[i * b.len()..(i + 1) * b.len()].copy_from_slice(&b);
+        //}
+    }
+    got_block.copy(buf.as_slice());
 
     let gotplt_size = BuildGotPltSection::size(data);
     let _gotplt_align = BuildGotPltSection::align(data);
@@ -342,6 +369,11 @@ pub fn load_block(data: &mut Data, block: &ReadBlock) -> Result<(), Box<dyn Erro
             rx_block.as_ptr() as usize,
             rx_block.size(),
         );
+        if got_size > 0 {
+            eprintln!("GOT Disassemble, Size:{}", got_block.size());
+            let buf = std::slice::from_raw_parts(got_block.as_ptr(), got_block.size());
+            format::print_bytes(buf, got_block.as_ptr() as usize);
+        }
     }
 
     Ok(())

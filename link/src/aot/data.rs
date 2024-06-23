@@ -569,7 +569,7 @@ impl ResolvePointer {
     }
 
     pub fn resolve(&self, data: &Data) -> Option<u64> {
-        match self {
+        let out = match self {
             Self::Resolved(x) => Some(*x),
             Self::Section(section_name, offset) => {
                 if let Some(base) = data
@@ -621,6 +621,12 @@ impl ResolvePointer {
                     None
                 }
             }
+        };
+        if let Some(p) = out {
+            log::debug!("resolve({:?}) -> {:#0x}", self, p);
+        } else {
+            log::debug!("resolve({:?})", self);
         }
+        out
     }
 }

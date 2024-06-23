@@ -205,6 +205,15 @@ impl Dynamics {
             track.symbol.pointer.clone()
         } else {
             let symbol = self.save_relocation(symbol.clone(), assign, r);
+            self.symbols.push(symbol.name.clone());
+            self.symbol_hash.insert(
+                symbol.name.clone(),
+                TrackSymbolIndex {
+                    string_id: None,
+                    symbol_index: None,
+                    symbol: symbol.clone(),
+                },
+            );
             symbol.pointer
         }
     }

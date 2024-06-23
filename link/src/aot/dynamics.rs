@@ -142,7 +142,74 @@ impl Dynamics {
             .count()
     }
 
+    fn save_relocation(
+        &mut self,
+        symbol: ReadSymbol,
+        assign: GotPltAssign,
+        r: &CodeRelocation,
+    ) -> ReadSymbol {
+        log::debug!(target: "symbols", "r: {:?}, {}", assign, r);
+        let mut symbol = symbol.clone();
+
+        match assign {
+            GotPltAssign::Got => {
+                let pointer = ResolvePointer::Got(self.got_index);
+                symbol.pointer = pointer.clone();
+
+                self.r_got.push(symbol.clone());
+
+                self.got_index += 1;
+                symbol
+            }
+
+            GotPltAssign::GotWithPltGot => {
+                let pointer = ResolvePointer::PltGot(self.pltgot_index);
+                symbol.pointer = pointer.clone();
+                self.pltgot.push(symbol.clone());
+                self.pltgot_hash
+                    .insert(symbol.name.to_string(), symbol.clone());
+                self.pltgot_index += 1;
+
+                symbol.pointer = ResolvePointer::Got(self.got_index);
+                self.r_got.push(symbol.clone());
+
+                self.got_index += 1;
+                symbol
+            }
+
+            GotPltAssign::GotPltWithPlt => {
+                let pointer = ResolvePointer::Plt(self.plt_index);
+                symbol.pointer = pointer.clone();
+                self.plt.push(symbol.clone());
+                self.plt_hash
+                    .insert(symbol.name.to_string(), symbol.clone());
+                self.plt_index += 1;
+
+                self.r_gotplt.push(symbol.clone());
+                self.gotplt_index += 1;
+                symbol
+            }
+            _ => unreachable!(),
+        }
+    }
+
     pub fn relocation_add(
+        &mut self,
+        symbol: &ReadSymbol,
+        assign: GotPltAssign,
+        r: &CodeRelocation,
+    ) -> ResolvePointer {
+        let name = &symbol.name;
+
+        if let Some(track) = self.symbol_hash.get(name) {
+            track.symbol.pointer.clone()
+        } else {
+            let symbol = self.save_relocation(symbol.clone(), assign, r);
+            symbol.pointer
+        }
+    }
+
+    pub fn relocation_add_write(
         &mut self,
         symbol: &ReadSymbol,
         assign: GotPltAssign,
@@ -154,50 +221,9 @@ impl Dynamics {
         if let Some(track) = self.symbol_hash.get(name) {
             track.symbol.pointer.clone()
         } else {
-            log::debug!(target: "symbols", "r: {:?}, {}", assign, r);
-            let mut symbol = symbol.clone();
-
-            match assign {
-                GotPltAssign::Got => {
-                    let pointer = ResolvePointer::Got(self.got_index);
-                    symbol.pointer = pointer.clone();
-
-                    self.r_got.push(symbol.clone());
-
-                    self.got_index += 1;
-                    self.symbol_add(symbol, w);
-                    pointer
-                }
-
-                GotPltAssign::GotWithPltGot => {
-                    let pointer = ResolvePointer::PltGot(self.pltgot_index);
-                    symbol.pointer = pointer.clone();
-                    self.pltgot.push(symbol.clone());
-                    self.pltgot_hash.insert(name.to_string(), symbol.clone());
-                    self.pltgot_index += 1;
-
-                    symbol.pointer = ResolvePointer::Got(self.got_index);
-                    self.r_got.push(symbol.clone());
-
-                    self.got_index += 1;
-                    self.symbol_add(symbol, w);
-                    pointer
-                }
-
-                GotPltAssign::GotPltWithPlt => {
-                    let pointer = ResolvePointer::Plt(self.plt_index);
-                    symbol.pointer = pointer.clone();
-                    self.plt.push(symbol.clone());
-                    self.plt_hash.insert(name.to_string(), symbol.clone());
-                    self.plt_index += 1;
-
-                    self.r_gotplt.push(symbol.clone());
-                    self.gotplt_index += 1;
-                    self.symbol_add(symbol, w);
-                    pointer
-                }
-                _ => unreachable!(),
-            }
+            let symbol = self.save_relocation(symbol.clone(), assign, r);
+            self.symbol_add(symbol.clone(), w);
+            symbol.pointer
         }
     }
 

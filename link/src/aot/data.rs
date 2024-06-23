@@ -428,7 +428,7 @@ impl Data {
                     _ => GotPltAssign::None,
                 };
 
-                let pointer = self.dynamics.relocation_add(&s, assign, r, w);
+                let pointer = self.dynamics.relocation_add_write(&s, assign, r, w);
                 log::info!("reloc0 {}, {:?}, {:?}, {:?}", &r, assign, s.bind, pointer);
                 continue;
             }
@@ -477,12 +477,12 @@ impl Data {
 
                 if s.source == SymbolSource::Dynamic {
                     log::info!("reloc2 {}", &r);
-                    self.dynamics.relocation_add(&s, assign, r, w);
+                    self.dynamics.relocation_add_write(&s, assign, r, w);
                 } else if def != CodeSymbolDefinition::Local {
                     log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                     if assign == GotPltAssign::None {
                     } else {
-                        self.dynamics.relocation_add(&s, assign, r, w);
+                        self.dynamics.relocation_add_write(&s, assign, r, w);
                     }
                 } else {
                     log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);

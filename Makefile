@@ -10,8 +10,9 @@ test: functions examples
 	cargo test -- --nocapture
 
 empty_dynamic:
-	cargo run --bin dynamic -- \
+	cargo run --bin link -- --dynamic -v \
 		build/clang-glibc/empty_main.o \
+		/usr/lib/x86_64-linux-gnu/crt1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
 empty:
@@ -26,6 +27,7 @@ empty:
 gcc_dynamic:
 	cargo run --bin link -- --dynamic -v \
 		build/clang-glibc/print_main.o \
+		build/clang-glibc/asdf1.o \
 		/usr/lib/x86_64-linux-gnu/crt1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 

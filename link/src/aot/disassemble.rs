@@ -35,7 +35,7 @@ impl GeneralSection {
         for (name, p) in data.pointers.iter() {
             let addr = p.resolve(data).unwrap() as usize;
             if addr >= start && addr <= (start + size) {
-                eprintln!("b: {}, {:#0x}", name, addr);
+                //eprintln!("b: {}, {:#0x}", name, addr);
                 symbols.push((name, addr));
             }
         }

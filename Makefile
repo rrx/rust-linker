@@ -81,7 +81,7 @@ musl:
 		/usr/lib/x86_64-linux-musl/crtn.o
 	exec tmp/musl.exe
 
-examples: gcc empty musl dup
+examples: gcc empty musl dup empty_dynamic gcc_dynamic
 
 dump:
 	readelf -aW tmp/out.exe

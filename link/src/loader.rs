@@ -212,31 +212,10 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
     let got_align = BuildGotSection::align(data);
     let mut got_block = version.rw.alloc_block_align(got_size, got_align).unwrap();
     data.addr_set(".got", got_block.as_ptr() as u64);
-    let mut buf = BuildGotSection::contents(data);
-    let unapplied = data.dynamics.relocations(GotSectionKind::GOT);
-    for (i, symbol) in unapplied.iter().enumerate() {
-        let p = symbol.pointer.resolve(data).unwrap();
-        eprintln!("U1({}): {:?}, {:#0x}", i, symbol, p);
-
-        let pp = if let Some(p) = data.pointers.get(&symbol.name) {
-            p.clone()
-        } else if let Some(s) = block.target.lookup(&symbol.name) {
-            s.pointer.clone()
-        } else {
-            unreachable!();
-        };
-
-        //let s = block.target.lookup(&symbol.name).unwrap();
-        let p = pp.resolve(data).unwrap();
-        eprintln!("U2({}): {:?}, {:#0x}", i, pp, p);
-        //if let Some(pp) = lookups.get(&s.name) {
-        //let p = pp.resolve(data).unwrap();
-        let b = (p as u64).to_le_bytes();
-        buf[i * b.len()..(i + 1) * b.len()].copy_from_slice(&b);
-        //}
-    }
+    let buf = BuildGotSection::contents_dynamic(data);
     got_block.copy(buf.as_slice());
 
+    // GOTPLT
     let gotplt_size = BuildGotPltSection::size(data);
     let gotplt_align = BuildGotPltSection::align(data);
     let gotplt_block = version
@@ -244,10 +223,9 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         .alloc_block_align(gotplt_size, gotplt_align)
         .unwrap();
     data.addr_set(".got.plt", gotplt_block.as_ptr() as u64);
-    //let buf = BuildGotPltSection::contents(data);
-    //gotplt_block.copy(buf.as_slice());
 
     // RX
+
     // PLT
     let plt_size = BuildPltSection::size(data);
     let plt_align = BuildPltSection::align(data);
@@ -255,29 +233,10 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
     data.addr_set(".plt", plt_block.as_ptr() as u64);
 
     let v = BuildPltSection::contents_dynamic(data, plt_block.as_ptr() as usize);
-    /*
-    let mut v = vec![0u8; 16];
-    for (i, symbol) in data.dynamics.plt_objects().iter().enumerate() {
-        // offset is from the next instruction - 5 bytes after the current instruction
-        let rip = plt_block.as_ptr() as isize + (i as isize + 1) * 16 + 5;
-        let p = data
-            .pointers
-            .get(&symbol.name)
-            .unwrap()
-            .resolve(data)
-            .unwrap();
-        println!("PLT Symbol: {:?}", symbol);
-        println!("PLT Symbol: {:#0x}, {:#0x}", p, rip);
-        // E9 cd - JMP rel32
-        let mut buf = [0u8; 16];
-        buf[0] = 0xe9;
-        let b = ((p as isize - rip as isize) as u32).to_le_bytes();
-        buf[1..b.len() + 1].copy_from_slice(&b);
-        v.extend(buf);
-    }
-    */
     plt_block.copy(v.as_slice());
 
+    // PLTGOT
+    /*
     let pltgot_size = BuildPltGotSection::size(data);
     if pltgot_size > 0 {
         let pltgot_align = BuildPltGotSection::align(data);
@@ -289,14 +248,6 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         let buf = BuildPltGotSection::contents(data, 0);
         pltgot_block.copy(buf.as_slice());
     }
-
-    // write data that depends on sections being known
-    /*
-    let buf = BuildGotPltSection::contents(data);
-    gotplt_block.copy(buf.as_slice());
-
-    let buf = BuildPltSection::contents(data, 0);
-    plt_block.copy(buf.as_slice());
     */
 
     apply_relocations(&block.target.rx, data);

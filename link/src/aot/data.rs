@@ -86,6 +86,34 @@ impl BuildGotSection {
         0x08
     }
 
+    pub fn contents_dynamic(data: &Data) -> Vec<u8> {
+        let mut buf = Self::contents(data);
+        let kind = GotSectionKind::GOT;
+        let unapplied = data.dynamics.relocations(kind);
+        for (i, symbol) in unapplied.iter().enumerate() {
+            let p = symbol.pointer.resolve(data).unwrap();
+            eprintln!("U1({}): {:?}, {:#0x}", i, symbol, p);
+
+            let pp = if let Some(p) = data.pointers.get(&symbol.name) {
+                p.clone()
+            } else if let Some(s) = data.symbols.get(&symbol.name) {
+                s.pointer.clone()
+            } else {
+                unreachable!();
+            };
+
+            //let s = block.target.lookup(&symbol.name).unwrap();
+            let p = pp.resolve(data).unwrap();
+            eprintln!("U2({}): {:?}, {:#0x}", i, pp, p);
+            //if let Some(pp) = lookups.get(&s.name) {
+            //let p = pp.resolve(data).unwrap();
+            let b = (p as u64).to_le_bytes();
+            buf[i * b.len()..(i + 1) * b.len()].copy_from_slice(&b);
+            //}
+        }
+        buf
+    }
+
     pub fn contents(data: &Data) -> Vec<u8> {
         let kind = GotSectionKind::GOT;
         let unapplied = data.dynamics.relocations(kind);

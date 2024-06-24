@@ -288,7 +288,6 @@ pub struct Data {
     pub ph: Vec<ProgramHeaderEntry>,
 
     pub addr: HashMap<AddressKey, u64>,
-    //pub pointers: HashMap<String, ResolvePointer>,
     pub symbols: HashMap<String, ReadSymbol>,
     pub section_index: HashMap<String, SectionIndex>,
     pub(crate) segments: SegmentTracker,
@@ -318,7 +317,6 @@ impl Data {
             hash: TrackSection::default(),
             symtab: TrackSection::default(),
             section_dynamic: TrackSection::default(),
-            //pointers: HashMap::new(),
             symbols: HashMap::new(),
             debug: HashSet::new(),
 
@@ -336,20 +334,6 @@ impl Data {
         self.interp = interp;
         self
     }
-
-    /*
-    pub fn pointer_set(&mut self, name: String, p: u64) {
-        self.pointers.insert(name, ResolvePointer::Resolved(p));
-    }
-
-    pub fn pointer_get(&self, name: &str) -> u64 {
-        self.pointers
-            .get(name)
-            .expect(&format!("Pointer not found: {}", name))
-            .resolve(self)
-            .expect(&format!("Pointer unresolved: {}", name))
-    }
-    */
 
     pub fn addr_get_by_name(&self, name: &str) -> Option<u64> {
         self.addr

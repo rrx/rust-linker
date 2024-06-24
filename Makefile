@@ -70,6 +70,16 @@ gcc:
 	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt tmp/gcc.exe
 	exec tmp/gcc.exe
 
+gcc2:
+	cargo run --bin link -- -v --link \
+		-o tmp/gcc2.exe \
+		build/clang-glibc/print_main2.o \
+		/usr/lib/x86_64-linux-gnu/libc.so.6 \
+		/usr/lib/x86_64-linux-gnu/crt1.o 
+	readelf -srW tmp/gcc2.exe
+	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt tmp/gcc2.exe
+	exec tmp/gcc2.exe
+
 dup:
 	cargo run --bin link -- -v --link \
 		-o tmp/dup.exe \

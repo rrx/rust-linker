@@ -1,6 +1,7 @@
 use crate::aot::{
     apply_relocations, BlockSection, BuildGotPltSection, BuildGotSection, BuildPltGotSection,
-    BuildPltSection, GotPltAssign, GotSectionKind, ResolvePointer, SymbolBind, SymbolSource,
+    BuildPltSection, GotPltAssign, GotSectionKind, ReadSymbol, ResolvePointer, SymbolBind,
+    SymbolSource,
 };
 use crate::dynamic::{BlockFactoryInner, LinkError, SharedLibraryRepo};
 use crate::format;
@@ -52,6 +53,9 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
     let rx_size = block.target.rx.size();
     let mut rx_block = version.rx.alloc_block_align(rx_size, align).unwrap();
     data.addr_set(".text", rx_block.as_ptr() as u64);
+    let symbol =
+        ReadSymbol::from_pointer(".text".into(), ResolvePointer::Section(".text".into(), 0));
+    data.symbols.insert(".text".to_string(), symbol);
     block.target.rx.offsets.address = rx_block.as_ptr() as u64;
 
     for (name, symbol) in block.target.exports.iter() {
@@ -89,8 +93,9 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         .chain(block.target.rw.relocations.iter())
         .chain(block.target.bss.relocations.iter());
 
-    let mut got = HashSet::new();
-    let mut gotplt = HashSet::new();
+    //let mut got = HashSet::new();
+    //let mut gotplt = HashSet::new();
+    /*
     for r in iter.clone() {
         match r.effect() {
             format::PatchEffect::AddToGot => {
@@ -102,6 +107,7 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
             _ => (),
         }
     }
+    */
 
     let mut lookups = HashMap::new();
     for r in iter {
@@ -116,7 +122,7 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
                         v as usize,
                         &r.name
                     );
-                    let pointer = ResolvePointer::Got(got.len());
+                    let pointer = ResolvePointer::Resolved(p as u64); //got.len());
                     data.pointers.insert(r.name.clone(), pointer);
                     lookups.insert(r.name.clone(), ResolvePointer::Resolved(p as u64));
                     //got.push(p);
@@ -138,13 +144,13 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
                         } else {
                             GotPltAssign::Got
                         }
-                    } else if got.contains(&r.name) {
+                    } else if r.effect() == format::PatchEffect::AddToGot {
                         if r.is_plt() {
                             GotPltAssign::GotWithPltGot
                         } else {
                             GotPltAssign::Got
                         }
-                    } else if gotplt.contains(&r.name) {
+                    } else if r.effect() == format::PatchEffect::AddToPlt {
                         GotPltAssign::GotPltWithPlt
                     } else {
                         GotPltAssign::None
@@ -177,10 +183,59 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
                 data.pointers.insert(s.name.clone(), s.pointer.clone());
                 continue;
             }
-        } else {
-            unreachable!("Unable to find symbol for relocation: {}", &r.name);
+
+            let def = match s.bind {
+                SymbolBind::Local => format::CodeSymbolDefinition::Local,
+                SymbolBind::Global => format::CodeSymbolDefinition::Defined,
+                SymbolBind::Weak => format::CodeSymbolDefinition::Defined,
+            };
+
+            let assign = match s.kind {
+                SymbolKind::Text => {
+                    if s.is_static() {
+                        if r.is_plt() {
+                            GotPltAssign::GotPltWithPlt
+                        } else {
+                            GotPltAssign::Got
+                        }
+                    } else if r.effect() == format::PatchEffect::AddToGot {
+                        if r.is_plt() {
+                            GotPltAssign::GotWithPltGot
+                        } else {
+                            GotPltAssign::Got
+                        }
+                    } else if r.effect() == format::PatchEffect::AddToPlt {
+                        GotPltAssign::GotPltWithPlt
+                    } else {
+                        GotPltAssign::None
+                    }
+                }
+                SymbolKind::Data => GotPltAssign::Got,
+                _ => GotPltAssign::None,
+            };
+
+            if def != format::CodeSymbolDefinition::Local {
+                log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
+                if assign == GotPltAssign::None {
+                } else {
+                    data.dynamics.relocation_add(&s, assign, r);
+                }
+            } else {
+                log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
+            }
+            continue;
         }
 
+        if let Some(s) = data.symbols.get(&r.name) {
+            log::info!("reloc5 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
+            continue;
+        }
+
+        //else {
+        unreachable!("Unable to find symbol for relocation: {}", &r.name);
+        //}
+
+        /*
         if let Some(s) = block.target.lookup(&r.name) {
             // we don't know the section yet, we just know which kind
             let def = match s.bind {
@@ -216,6 +271,7 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
             };
 
             if s.source == SymbolSource::Dynamic {
+                assert!(false);
                 log::info!("reloc2 {}", &r);
                 data.dynamics.relocation_add(&s, assign, r);
             } else if def != format::CodeSymbolDefinition::Local {
@@ -230,6 +286,7 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         } else {
             unreachable!("Unable to find symbol for relocation: {}", &r.name)
         }
+        */
     }
 
     // ALLOCATE TABLES

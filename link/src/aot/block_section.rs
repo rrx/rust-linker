@@ -40,10 +40,14 @@ fn resolve_r(data: &Data, r: &CodeRelocation) -> Option<ResolvePointer> {
 
     // otherwise, just look up the symbol
     if let Some(resolve_addr) = data.pointers.get(&r.name) {
-        Some(resolve_addr.clone())
-    } else {
-        None
+        return Some(resolve_addr.clone());
     }
+
+    if let Some(s) = data.symbols.get(&r.name) {
+        return Some(s.pointer.clone());
+    }
+
+    None
 }
 
 impl BlockSection for GeneralSection {

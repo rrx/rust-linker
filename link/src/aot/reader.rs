@@ -123,6 +123,7 @@ pub struct ReadSymbol {
     pub(crate) kind: SymbolKind,
     pub(crate) bind: SymbolBind,
     pub(crate) pointer: ResolvePointer,
+    pub(crate) call_pointer: ResolvePointer,
     pub(crate) size: u64,
 }
 
@@ -136,7 +137,8 @@ impl ReadSymbol {
             source: SymbolSource::Static,
             kind: SymbolKind::Unknown,
             bind: SymbolBind::Local,
-            pointer,
+            pointer: pointer.clone(),
+            call_pointer: pointer,
             size: 0,
         }
     }
@@ -315,7 +317,8 @@ impl ReadBlock {
         }
         for symbol in b.dynamic_symbols() {
             let mut s = read_symbol(&b, 0, &symbol)?;
-            s.pointer = ResolvePointer::Resolved(0);
+            s.pointer = ResolvePointer::Unknown;
+            s.call_pointer = ResolvePointer::Unknown;
             s.source = SymbolSource::Dynamic;
             s.size = 0;
             //eprintln!("s: {:#08x}, {:?}", 0, &s);
@@ -621,7 +624,8 @@ pub fn read_symbol<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
         section: section_kind,
         kind: symbol.kind(),
         bind,
-        pointer,
+        pointer: pointer.clone(),
+        call_pointer: pointer.clone(),
         size,
         source: SymbolSource::Static,
         //lookup: SymbolLookupTable::None,

@@ -33,14 +33,14 @@ pub struct GeneralSection {
     pub(crate) offsets: SectionOffset,
 }
 
-fn resolve_r(data: &Data, r: &CodeRelocation) -> Option<u64> {
+fn resolve_r(data: &Data, r: &CodeRelocation) -> Option<ResolvePointer> {
     if let Some(resolve_addr) = data.dynamics.lookup(r) {
-        return resolve_addr.resolve(data);
+        return Some(resolve_addr);
     }
 
     // otherwise, just look up the symbol
     if let Some(resolve_addr) = data.pointers.get(&r.name) {
-        resolve_addr.resolve(data)
+        Some(resolve_addr.clone())
     } else {
         None
     }
@@ -103,7 +103,7 @@ impl ElfBlock for GeneralSection {
 
     fn write(&self, data: &Data, w: &mut Writer) {
         w.write_start_section(&self.offsets);
-        self.apply_relocations(data);
+        apply_relocations(self, data);
 
         w.write(self.bytes.as_slice());
     }
@@ -155,28 +155,32 @@ impl GeneralSection {
         }
         Ok(())
     }
+}
 
-    pub fn apply_relocations(&self, data: &Data) {
-        let patch_base = self.bytes.as_ptr();
-        for r in self.relocations.iter() {
-            if let Some(addr) = resolve_r(data, r) {
-                log::info!(
-                    target: "relocations",
-                    "R-{:?}: {}, vbase: {:#0x}, addr: {:#0x}",
-                    self.offsets.alloc, &r.name, self.offsets.address, addr as usize,
-                );
-                r.patch(
-                    patch_base as *mut u8,
-                    self.offsets.address as *mut u8,
-                    addr as *const u8,
-                );
-            } else {
-                unreachable!("Unable to locate symbol: {}, {}", &r.name, &r);
-            }
+pub fn apply_relocations(section: &GeneralSection, data: &Data) {
+    let patch_base = section.bytes.as_ptr();
+    for r in section.relocations.iter() {
+        if let Some(addr) = resolve_r(data, r) {
+            let resolved = addr.resolve(data).unwrap();
+            log::info!(
+                target: "relocations",
+                "R-{:?}: {}, vbase: {:#0x}, addr: {:#0x}",
+                section.offsets.alloc, &r.name, section.offsets.address, resolved as usize,
+            );
+            r.patch(
+                patch_base as *mut u8,
+                section.offsets.address as *mut u8,
+                resolved as *const u8,
+            );
+            let symbol = data.symbols.get(&r.name).unwrap();
+            log::info!(target: "relocations", "{:?}, {:?}, {:?}", addr, symbol.pointer, symbol.call_pointer);
+            log::info!(target: "relocations", "{:?}", symbol);
+        } else {
+            unreachable!("Unable to locate symbol: {}, {}", &r.name, &r);
         }
-
-        //if data.debug_enabled(&DebugFlag::Disassemble) {
-        self.disassemble(data);
-        //}
     }
+
+    //if data.debug_enabled(&DebugFlag::Disassemble) {
+    section.disassemble(data);
+    //}
 }

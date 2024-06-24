@@ -106,7 +106,7 @@ impl CodeRelocation {
         addr: *const u8,
     ) {
         match self.r.kind {
-            RelocationKind::Elf(R_X86_64_GOTPCREL) => {
+            RelocationKind::Elf(R_X86_64_GOTPCREL /* 41 */) => {
                 unsafe {
                     let patch = patch_base.offset(self.offset as isize);
                     let v = v_base.offset(self.offset as isize);
@@ -134,7 +134,8 @@ impl CodeRelocation {
                 }
             }
 
-            RelocationKind::Elf(R_X86_64_REX_GOTP) => {
+            RelocationKind::Elf(R_X86_64_REX_GOTP /* 42 */) => {
+                // R_X86_64_REX_GOTPCRELX
                 // got entry + addend - reloc_offset(patch)
                 // we are computing the offset from the current instruction pointer
                 unsafe {

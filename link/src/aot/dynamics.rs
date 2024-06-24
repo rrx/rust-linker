@@ -168,11 +168,12 @@ impl Dynamics {
                 self.pltgot.push(symbol.clone());
                 self.pltgot_hash
                     .insert(symbol.name.to_string(), symbol.clone());
-                self.pltgot_index += 1;
 
                 symbol.pointer = ResolvePointer::Got(self.got_index);
+                symbol.call_pointer = ResolvePointer::PltGot(self.pltgot_index);
                 self.r_got.push(symbol.clone());
 
+                self.pltgot_index += 1;
                 self.got_index += 1;
                 symbol
             }
@@ -180,6 +181,7 @@ impl Dynamics {
             GotPltAssign::GotPltWithPlt => {
                 let pointer = ResolvePointer::Plt(self.plt_index);
                 symbol.pointer = pointer.clone();
+                symbol.call_pointer = pointer.clone();
                 self.plt.push(symbol.clone());
                 self.plt_hash
                     .insert(symbol.name.to_string(), symbol.clone());
@@ -198,11 +200,11 @@ impl Dynamics {
         symbol: &ReadSymbol,
         assign: GotPltAssign,
         r: &CodeRelocation,
-    ) -> ResolvePointer {
+    ) -> ReadSymbol {
         let name = &symbol.name;
 
         if let Some(track) = self.symbol_hash.get(name) {
-            track.symbol.pointer.clone()
+            track.symbol.clone()
         } else {
             let symbol = self.save_relocation(symbol.clone(), assign, r);
             self.symbols.push(symbol.name.clone());
@@ -214,7 +216,7 @@ impl Dynamics {
                     symbol: symbol.clone(),
                 },
             );
-            symbol.pointer
+            symbol
         }
     }
 
@@ -224,15 +226,15 @@ impl Dynamics {
         assign: GotPltAssign,
         r: &CodeRelocation,
         w: &mut Writer,
-    ) -> ResolvePointer {
+    ) -> ReadSymbol {
         let name = &symbol.name;
 
         if let Some(track) = self.symbol_hash.get(name) {
-            track.symbol.pointer.clone()
+            track.symbol.clone()
         } else {
             let symbol = self.save_relocation(symbol.clone(), assign, r);
             self.symbol_add(symbol.clone(), w);
-            symbol.pointer
+            symbol
         }
     }
 

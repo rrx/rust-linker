@@ -1,6 +1,6 @@
 use crate::aot::{
-    BlockSection, BuildGotPltSection, BuildGotSection, BuildPltGotSection, BuildPltSection,
-    GotPltAssign, GotSectionKind, ResolvePointer, SymbolBind, SymbolSource,
+    apply_relocations, BlockSection, BuildGotPltSection, BuildGotSection, BuildPltGotSection,
+    BuildPltSection, GotPltAssign, GotSectionKind, ResolvePointer, SymbolBind, SymbolSource,
 };
 use crate::dynamic::{BlockFactoryInner, LinkError, SharedLibraryRepo};
 use crate::format;
@@ -13,7 +13,6 @@ use std::path::Path;
 pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersion, Box<dyn Error>> {
     let mut version = LoaderVersion::new();
 
-    //let mut libraries = SharedLibraryRepo::default();
     for path in block.target.libs.iter() {
         let p = Path::new(&path);
         println!("p: {}", p.to_str().unwrap());
@@ -55,13 +54,10 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
     data.addr_set(".text", rx_block.as_ptr() as u64);
     block.target.rx.offsets.address = rx_block.as_ptr() as u64;
 
-    //let mut pointers = HashMap::new();
     for (name, symbol) in block.target.exports.iter() {
         eprintln!("ES: {:?}", (name, &symbol));
         let _p = symbol.pointer.resolve(data).unwrap();
         data.pointers.insert(name.clone(), symbol.pointer.clone());
-        //data.pointer_set(name.clone(), p);
-        //pointers.insert(name.clone(), p as u64);
     }
 
     /*
@@ -158,15 +154,23 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
                 _ => GotPltAssign::None,
             };
 
-            let pointer = data.dynamics.relocation_add(&s, assign, r);
-            log::info!("reloc0 {}, {:?}, {:?}, {:?}", &r, assign, s.bind, pointer);
-            data.pointers.insert(s.name.clone(), pointer.clone());
+            let symbol = data.dynamics.relocation_add(&s, assign, r);
+            log::info!(
+                "reloc0 {}, {:?}, {:?}, {:?}",
+                &r,
+                assign,
+                s.bind,
+                symbol.pointer
+            );
+            data.pointers.insert(s.name.clone(), symbol.pointer.clone());
+            data.symbols.insert(s.name.clone(), symbol);
             //pointer.resolve(data).unwrap();
             continue;
         }
 
         // static plt relatives
         if let Some(s) = block.target.lookup_static(&r.name) {
+            data.symbols.insert(s.name.clone(), s.clone());
             if r.is_plt() {
                 log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
                 let _p = s.pointer.resolve(data).unwrap();
@@ -227,65 +231,6 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
             unreachable!("Unable to find symbol for relocation: {}", &r.name)
         }
     }
-
-    /*
-        for r in iter {
-            //data.dynamics.relocation_add();
-            if let Some(_p) = data.pointers.get(&r.name) {
-                // already found
-            } else if let Some(symbol) = block.target.lookup(&r.name) {
-                eprintln!("LU: {:?}", (&r.name, &symbol));
-                match symbol.source {
-                    SymbolSource::Dynamic => {
-                        if let Some(ptr) = libraries.search_dynamic(&r.name) {
-                            unsafe {
-                                let p = ptr.as_ptr() as *const usize;
-                                let v = *p as *const usize;
-                                log::debug!(
-                                    "Searching Shared {:#08x}:{:#08x}:{}",
-                                    p as usize,
-                                    v as usize,
-                                    &r.name
-                                );
-                                data.pointers.insert(r.name.clone(), ResolvePointer::Got(got.len()));
-                                //got.push(p);
-                                //data.pointer_set(r.name.clone(), p as u64);
-                                pointers.insert(r.name.clone(), p as u64);
-                            }
-                        } else {
-                            unimplemented!("dynamic not found: {:?}", symbol);
-                        }
-                    }
-                    _ => {
-                        let p = symbol.pointer.resolve(data).unwrap();
-                        data.pointer_set(r.name.clone(), p);
-                    }
-                }
-
-            } else {
-                unimplemented!();
-            }
-            /*
-            } else if let Some(ptr) = libraries.search_dynamic(&r.name) {
-                // data pointers should already have a got in the shared library
-                unsafe {
-                    let p = ptr.as_ptr() as *const usize;
-                    let v = *p as *const usize;
-                    log::debug!(
-                        "Searching Shared {:#08x}:{:#08x}:{}",
-                        p as usize,
-                        v as usize,
-                        &r.name
-                    );
-                    data.pointers.insert(r.name.clone(), ResolvePointer::Got(got.len()));
-                    got.push(p);
-                    //data.pointer_set(r.name.clone(), p as u64);
-                    pointers.insert(r.name.clone(), p as u64);
-                }
-            }
-            */
-        }
-    */
 
     // ALLOCATE TABLES
 
@@ -355,7 +300,6 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         buf[1..b.len() + 1].copy_from_slice(&b);
         v.extend(buf);
     }
-    //let buf = BuildPltSection::contents(data, plt_block.as_ptr() as usize);
     plt_block.copy(v.as_slice());
 
     let pltgot_size = BuildPltGotSection::size(data);
@@ -379,11 +323,9 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
     plt_block.copy(buf.as_slice());
     */
 
-    // set base addresses
-
-    block.target.rx.apply_relocations(data);
-    block.target.ro.apply_relocations(data);
-    block.target.rw.apply_relocations(data);
+    apply_relocations(&block.target.rx, data);
+    apply_relocations(&block.target.ro, data);
+    apply_relocations(&block.target.rw, data);
 
     rx_block.copy(block.target.rx.bytes());
 

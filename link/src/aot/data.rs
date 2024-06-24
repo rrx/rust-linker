@@ -39,27 +39,6 @@ pub struct TrackSection {
     pub section_index: Option<SectionIndex>,
 }
 
-pub struct Data {
-    pub interp: String,
-    pub(crate) libs: Vec<Library>,
-    pub dynamics: Dynamics,
-    pub statics: Statics,
-    debug: HashSet<DebugFlag>,
-    pub ph: Vec<ProgramHeaderEntry>,
-
-    pub addr: HashMap<AddressKey, u64>,
-    pub pointers: HashMap<String, ResolvePointer>,
-    pub section_index: HashMap<String, SectionIndex>,
-    pub(crate) segments: SegmentTracker,
-    pub(crate) dynstr: TrackSection,
-    pub(crate) dynsym: TrackSection,
-    pub(crate) reladyn: TrackSection,
-    pub(crate) relaplt: TrackSection,
-    pub(crate) hash: TrackSection,
-    pub(crate) symtab: TrackSection,
-    pub(crate) section_dynamic: TrackSection,
-}
-
 pub struct BuildGotPltSection {}
 impl BuildGotPltSection {
     pub fn size(data: &Data) -> usize {
@@ -247,6 +226,28 @@ impl BuildPltSection {
     }
 }
 
+pub struct Data {
+    pub interp: String,
+    pub(crate) libs: Vec<Library>,
+    pub dynamics: Dynamics,
+    pub statics: Statics,
+    debug: HashSet<DebugFlag>,
+    pub ph: Vec<ProgramHeaderEntry>,
+
+    pub addr: HashMap<AddressKey, u64>,
+    pub pointers: HashMap<String, ResolvePointer>,
+    pub symbols: HashMap<String, ReadSymbol>,
+    pub section_index: HashMap<String, SectionIndex>,
+    pub(crate) segments: SegmentTracker,
+    pub(crate) dynstr: TrackSection,
+    pub(crate) dynsym: TrackSection,
+    pub(crate) reladyn: TrackSection,
+    pub(crate) relaplt: TrackSection,
+    pub(crate) hash: TrackSection,
+    pub(crate) symtab: TrackSection,
+    pub(crate) section_dynamic: TrackSection,
+}
+
 impl Data {
     pub fn new() -> Self {
         Self {
@@ -265,7 +266,7 @@ impl Data {
             symtab: TrackSection::default(),
             section_dynamic: TrackSection::default(),
             pointers: HashMap::new(),
-
+            symbols: HashMap::new(),
             debug: HashSet::new(),
 
             // Tables
@@ -404,15 +405,20 @@ impl Data {
 
         for r in iter {
             if let Some(s) = target.lookup_dynamic(&r.name) {
+                // if it's dynamic
                 let assign = match s.kind {
                     SymbolKind::Text => {
+                        /*
                         if s.is_static() {
+                            assert!(false);
                             if r.is_plt() {
                                 GotPltAssign::GotPltWithPlt
                             } else {
                                 GotPltAssign::Got
                             }
-                        } else if got.contains(&r.name) {
+                        } else
+                        */
+                        if got.contains(&r.name) {
                             if r.is_plt() {
                                 GotPltAssign::GotWithPltGot
                             } else {
@@ -428,13 +434,21 @@ impl Data {
                     _ => GotPltAssign::None,
                 };
 
-                let pointer = self.dynamics.relocation_add_write(&s, assign, r, w);
-                log::info!("reloc0 {}, {:?}, {:?}, {:?}", &r, assign, s.bind, pointer);
+                let symbol = self.dynamics.relocation_add_write(&s, assign, r, w);
+                self.symbols.insert(symbol.name.clone(), symbol.clone());
+                log::info!(
+                    "reloc0 {}, {:?}, {:?}, {:?}",
+                    &r,
+                    assign,
+                    s.bind,
+                    symbol.pointer
+                );
                 continue;
             }
 
             // static plt relatives
             if let Some(s) = target.lookup_static(&r.name) {
+                self.symbols.insert(s.name.clone(), s.clone());
                 if r.is_plt() {
                     log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
                     continue;
@@ -541,6 +555,7 @@ impl Data {
 
 #[derive(Debug, Clone)]
 pub enum ResolvePointer {
+    Unknown,
     Resolved(u64),
     Section(String, u64),
     Got(usize),
@@ -621,6 +636,7 @@ impl ResolvePointer {
                     None
                 }
             }
+            Self::Unknown => None,
         };
         if let Some(p) = out {
             log::debug!("resolve({:?}) -> {:#0x}", self, p);

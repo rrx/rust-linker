@@ -54,7 +54,9 @@ gcc_ref:
 		-o build/clang-glibc/print_main \
 		build/clang-glibc/print_main.o \
 		build/clang-glibc/asdf1.o
-	readelf -sW build/clang-glibc/print_main
+	readelf -srW build/clang-glibc/print_main
+	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt build/clang-glibc/print_main 
+
 	exec build/clang-glibc/print_main
 
 gcc:
@@ -64,7 +66,8 @@ gcc:
 		build/clang-glibc/asdf1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o 
-	readelf -sW tmp/gcc.exe
+	readelf -srW tmp/gcc.exe
+	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt tmp/gcc.exe
 	exec tmp/gcc.exe
 
 dup:

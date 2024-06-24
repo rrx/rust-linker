@@ -11,7 +11,14 @@ int g3 = 0;
 // link from another object file
 long asdf(long);
 
+int call_fprintf() {
+  int x = &fprintf;
+  fprintf(stdout, "%p\n", x);
+  return 0;
+}
+
 int main(int argc, const char **argv) {
+  /*return call_fprintf();*/
   long y = asdf(1);
   printf("y %d\n", y);
   puts("XXX1");
@@ -21,6 +28,8 @@ int main(int argc, const char **argv) {
   g = &fprintf;
   g2 = &fprintf;
   g3 = &fprintf;
+  printf("%p\n", g);
+  fprintf(stdout, "%p\n", g);
   fprintf(stdout, "%p\n", g);
   fprintf(stderr, "%p\n", g2);
   fprintf(stderr, "%p\n", g3);

@@ -19,7 +19,7 @@ use object::SymbolKind;
 use std::error::Error;
 use std::path::Path;
 
-pub fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Box<dyn Error>> {
+fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Box<dyn Error>> {
     let data = &mut version.data;
     for path in target.libs.iter() {
         let p = Path::new(&path);

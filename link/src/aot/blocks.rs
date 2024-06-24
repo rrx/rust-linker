@@ -105,7 +105,14 @@ impl ElfBlock for FileHeader {
     }
 
     fn write(&self, data: &Data, w: &mut Writer) {
-        let start = data.pointer_get("_start");
+        //let start = data.pointer_get("_start");
+        let start = data
+            .symbols
+            .get("_start")
+            .unwrap()
+            .pointer
+            .resolve(data)
+            .unwrap();
         let e_entry = start;
 
         w.write_file_header(&object::write::elf::FileHeader {
@@ -346,10 +353,13 @@ impl ElfBlock for DynamicSection {
             w.reserved_len()
         );
         data.section_dynamic.addr = Some(self.offsets.address);
-        data.pointers.insert(
-            ".dynamic".to_string(),
-            ResolvePointer::Resolved(self.offsets.address),
-        );
+        let pointer = ResolvePointer::Resolved(self.offsets.address);
+        let symbol = ReadSymbol::from_pointer(".dynamic".to_string(), pointer);
+        data.symbols.insert(symbol.name.clone(), symbol);
+        //data.pointers.insert(
+        //".dynamic".to_string(),
+        //ResolvePointer::Resolved(self.offsets.address),
+        //);
         data.addr_set(".dynamic", self.offsets.address);
     }
 

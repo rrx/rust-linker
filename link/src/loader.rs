@@ -70,7 +70,8 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
     for (name, symbol) in target.exports.iter() {
         eprintln!("ES: {:?}", (name, &symbol));
         let _p = symbol.pointer.resolve(data).unwrap();
-        data.pointers.insert(name.clone(), symbol.pointer.clone());
+        //data.pointers.insert(name.clone(), symbol.pointer.clone());
+        data.symbols.insert(name.clone(), symbol.clone());
     }
 
     /*
@@ -117,6 +118,7 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
 
     for r in iter {
         if let Some(s) = dynamic_lookups.get(&r.name) {
+            /*
             let assign = match s.kind {
                 SymbolKind::Text => {
                     if s.is_static() {
@@ -141,11 +143,12 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
                 SymbolKind::Data => GotPltAssign::Got,
                 _ => GotPltAssign::None,
             };
+            */
 
             //let mut symbol = data.dynamics.relocation_add(&s, assign, r);
-            log::info!("reloc0 {}, {:?}, {:?}, {:?}", &r, assign, s.bind, s.pointer);
+            log::info!("reloc0 {}, {:?}, {:?}", &r, s.bind, s.pointer);
             //symbol.pointer = pointer;
-            data.pointers.insert(s.name.clone(), s.pointer.clone());
+            //data.pointers.insert(s.name.clone(), s.pointer.clone());
             data.symbols.insert(s.name.clone(), s.clone());
             continue;
         }
@@ -156,7 +159,7 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
             if r.is_plt() {
                 log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
                 let _p = s.pointer.resolve(data).unwrap();
-                data.pointers.insert(s.name.clone(), s.pointer.clone());
+                //data.pointers.insert(s.name.clone(), s.pointer.clone());
                 continue;
             }
 
@@ -339,18 +342,18 @@ impl LoaderVersion {
         crate::dynamic::eprint_process_maps();
     }
 
-    pub fn lookup(&self, symbol: &str) -> Option<u64> {
-        if let Some(ptr) = self.data.pointers.get(symbol) {
-            log::debug!("found in pointer: {}", symbol);
-            return Some(ptr.resolve(&self.data).unwrap());
+    pub fn lookup(&self, name: &str) -> Option<u64> {
+        if let Some(symbol) = self.data.symbols.get(name) {
+            log::debug!("found in pointer: {}", name);
+            return Some(symbol.pointer.resolve(&self.data).unwrap());
         }
 
-        if let Some(ptr) = self.libraries.search_dynamic(symbol) {
-            log::debug!("found in shared: {}", symbol);
+        if let Some(ptr) = self.libraries.search_dynamic(name) {
+            log::debug!("found in shared: {}", name);
             let p = ptr.as_ptr() as *const usize;
             return Some(p as u64);
         }
-        log::debug!("not found: {}", symbol);
+        log::debug!("not found: {}", name);
         None
     }
 

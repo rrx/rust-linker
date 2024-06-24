@@ -32,8 +32,8 @@ impl GeneralSection {
 
     pub fn disassemble_code_start(&self, data: &Data, buf: &[u8], start: usize, size: usize) {
         let mut symbols = vec![];
-        for (name, p) in data.pointers.iter() {
-            let addr = p.resolve(data).unwrap() as usize;
+        for (name, s) in data.symbols.iter() {
+            let addr = s.pointer.resolve(data).unwrap() as usize;
             if addr >= start && addr <= (start + size) {
                 //eprintln!("b: {}, {:#0x}", name, addr);
                 symbols.push((name, addr));
@@ -72,7 +72,7 @@ impl GeneralSection {
                     let p0 = if let Some(addr) = data.dynamics.lookup(&r) {
                         addr
                     } else {
-                        data.pointers.get(&r.name).unwrap().clone()
+                        data.symbols.get(&r.name).unwrap().pointer.clone()
                     };
                     let p = p0.resolve(data).unwrap();
                     eprintln!(

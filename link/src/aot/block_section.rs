@@ -39,8 +39,8 @@ fn resolve_r(data: &Data, r: &CodeRelocation) -> Option<ResolvePointer> {
     }
 
     // otherwise, just look up the symbol
-    if let Some(resolve_addr) = data.pointers.get(&r.name) {
-        return Some(resolve_addr.clone());
+    if let Some(symbol) = data.symbols.get(&r.name) {
+        return Some(symbol.pointer.clone());
     }
 
     if let Some(s) = data.symbols.get(&r.name) {
@@ -108,7 +108,6 @@ impl ElfBlock for GeneralSection {
     fn write(&self, data: &Data, w: &mut Writer) {
         w.write_start_section(&self.offsets);
         apply_relocations(self, data);
-
         w.write(self.bytes.as_slice());
     }
 

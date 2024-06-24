@@ -95,8 +95,8 @@ impl BuildGotSection {
             let p = symbol.pointer.resolve(data).unwrap();
             eprintln!("U1({}): {:?}, {:#0x}", i, symbol, p);
 
-            let pp = if let Some(p) = data.pointers.get(&symbol.name) {
-                p.clone()
+            let pp = if let Some(p) = data.symbols.get(&symbol.name) {
+                p.pointer.clone()
             } else if let Some(s) = data.symbols.get(&symbol.name) {
                 s.pointer.clone()
             } else {
@@ -191,9 +191,10 @@ impl BuildPltSection {
             // offset is from the next instruction - 5 bytes after the current instruction
             let rip = plt_base_ptr as isize + (i as isize + 1) * 16 + 5;
             let p = data
-                .pointers
+                .symbols
                 .get(&symbol.name)
                 .unwrap()
+                .pointer
                 .resolve(data)
                 .unwrap();
             println!("PLT Symbol: {:?}", symbol);
@@ -287,7 +288,7 @@ pub struct Data {
     pub ph: Vec<ProgramHeaderEntry>,
 
     pub addr: HashMap<AddressKey, u64>,
-    pub pointers: HashMap<String, ResolvePointer>,
+    //pub pointers: HashMap<String, ResolvePointer>,
     pub symbols: HashMap<String, ReadSymbol>,
     pub section_index: HashMap<String, SectionIndex>,
     pub(crate) segments: SegmentTracker,
@@ -317,7 +318,7 @@ impl Data {
             hash: TrackSection::default(),
             symtab: TrackSection::default(),
             section_dynamic: TrackSection::default(),
-            pointers: HashMap::new(),
+            //pointers: HashMap::new(),
             symbols: HashMap::new(),
             debug: HashSet::new(),
 
@@ -336,6 +337,7 @@ impl Data {
         self
     }
 
+    /*
     pub fn pointer_set(&mut self, name: String, p: u64) {
         self.pointers.insert(name, ResolvePointer::Resolved(p));
     }
@@ -347,6 +349,7 @@ impl Data {
             .resolve(self)
             .expect(&format!("Pointer unresolved: {}", name))
     }
+    */
 
     pub fn addr_get_by_name(&self, name: &str) -> Option<u64> {
         self.addr
@@ -384,8 +387,7 @@ impl Data {
     pub fn write_exports(data: &mut Data, exports: &SymbolMap, w: &mut Writer) {
         println!("ADD EXPORTS");
         for (name, symbol) in exports.iter() {
-            data.pointers
-                .insert(name.to_string(), symbol.pointer.clone());
+            data.symbols.insert(name.to_string(), symbol.clone());
             let section_index = symbol.section.section_index(data);
             data.statics.symbol_add(symbol, section_index, w);
         }
@@ -536,7 +538,9 @@ impl Data {
 
     pub(crate) fn update_data(&mut self, target: &Target) {
         for (name, _, pointer) in self.dynamics.symbols() {
-            self.pointers.insert(name, pointer);
+            //self.pointers.insert(name, pointer);
+            self.symbols
+                .insert(name.clone(), ReadSymbol::from_pointer(name, pointer));
         }
 
         for (name, symbol) in target.locals.iter() {
@@ -546,8 +550,8 @@ impl Data {
                 | ReadSectionKind::ROData
                 | ReadSectionKind::RW
                 | ReadSectionKind::Bss => {
-                    self.pointers
-                        .insert(name.to_string(), symbol.pointer.clone());
+                    self.symbols
+                        .insert(name.to_string(), symbol.clone());
                 }
                 _ => (),
             }
@@ -557,7 +561,8 @@ impl Data {
         let locals = vec!["_DYNAMIC"];
         for symbol_name in locals {
             let s = target.lookup_static(symbol_name).unwrap();
-            self.pointers.insert(s.name, s.pointer);
+            //self.pointers.insert(s.name, s.pointer);
+            self.symbols.insert(s.name.clone(), s);
         }
     }
 

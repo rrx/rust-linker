@@ -60,7 +60,6 @@ impl From<Relocation> for LinkRelocation {
 #[derive(Clone, Debug)]
 pub struct CodeRelocation {
     pub(crate) name: String,
-    //pub(crate) name_id: Option<StringId>,
     pub(crate) offset: u64,
     pub(crate) r: LinkRelocation,
 }

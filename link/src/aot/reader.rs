@@ -390,6 +390,7 @@ impl ReadBlock {
         }
     }
 
+    /*
     pub fn resolve(&mut self) {
         for r in self.target.rx.relocations.iter() {
             eprintln!("E: {:?}", (&self.name, &r));
@@ -398,6 +399,7 @@ impl ReadBlock {
             }
         }
     }
+    */
 
     pub fn add_block(&mut self, block: ReadBlock) {
         let mut renames = HashMap::new();

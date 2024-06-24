@@ -32,7 +32,7 @@ fn loader_shared() {
         .unwrap();
     exe.add(&temp_path("link_shared.o"), &config).unwrap();
     let mut data = Data::new();
-    let version = link::loader::load_block(&mut data, &mut exe).unwrap();
+    let version = link::loader::load_block(&mut data, &mut exe.target).unwrap();
     version.debug();
     let ret: *const () = version.invoke(&data, "call_z", ()).unwrap();
     log::debug!("ret: {:#08x}", ret as usize);
@@ -101,7 +101,7 @@ fn loader_livelink() {
     exe.add(&temp_path("globals.o"), &config).unwrap();
     exe.add(&temp_path("live.so"), &config).unwrap();
     let mut data = Data::new();
-    let version = link::loader::load_block(&mut data, &mut exe).unwrap();
+    let version = link::loader::load_block(&mut data, &mut exe.target).unwrap();
     version.debug();
     let ret: i64 = version.invoke(&data, "simple_function", ()).unwrap();
     log::debug!("ret: {:#08x}", ret);
@@ -165,7 +165,7 @@ fn loader_live_static() {
     let mut exe = ReadBlock::new("exe");
     exe.add(&temp_path("live.o"), &config).unwrap();
     let mut data = Data::new();
-    let version = link::loader::load_block(&mut data, &mut exe).unwrap();
+    let version = link::loader::load_block(&mut data, &mut exe.target).unwrap();
     version.debug();
     let ret: i64 = version.invoke(&data, "call_live", (3,)).unwrap();
     log::debug!("ret: {:#08x}", ret as usize);
@@ -198,7 +198,7 @@ fn loader_empty_main() {
     let mut exe = ReadBlock::new("exe");
     exe.add(&temp_path("empty_main.o"), &config).unwrap();
     let mut data = Data::new();
-    let version = link::loader::load_block(&mut data, &mut exe).unwrap();
+    let version = link::loader::load_block(&mut data, &mut exe.target).unwrap();
     version.debug();
     let ret: i64 = version.invoke(&data, "main", (3,)).unwrap();
     log::debug!("ret: {:#08x}", ret as usize);
@@ -254,7 +254,7 @@ fn loader_libuv() {
     exe.add(&temp_path("uvtest.o"), &config).unwrap();
 
     let mut data = Data::new();
-    let version = link::loader::load_block(&mut data, &mut exe).unwrap();
+    let version = link::loader::load_block(&mut data, &mut exe.target).unwrap();
     version.debug();
     let ret: i64 = version.invoke(&data, "uvtest", ()).unwrap();
     log::debug!("ret: {:#08x}", ret as usize);

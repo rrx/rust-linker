@@ -1,6 +1,16 @@
 use crate::aot::{
-    apply_relocations, BlockSection, BuildGotPltSection, BuildGotSection, BuildPltGotSection,
-    BuildPltSection, GotPltAssign, GotSectionKind, ReadSymbol, ResolvePointer, SymbolBind,
+    apply_relocations,
+    BlockSection,
+    BuildGotPltSection,
+    BuildGotSection,
+    //BuildPltGotSection,
+    BuildPltSection,
+    GotPltAssign,
+    //GotSectionKind,
+    ReadSymbol,
+    ResolvePointer,
+    SymbolBind,
+    Target,
 };
 use crate::dynamic::{BlockFactoryInner, LinkError, SharedLibraryRepo};
 use crate::format;
@@ -9,10 +19,10 @@ use object::SymbolKind;
 use std::error::Error;
 use std::path::Path;
 
-pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersion, Box<dyn Error>> {
+pub fn load_block(data: &mut Data, target: &mut Target) -> Result<LoaderVersion, Box<dyn Error>> {
     let mut version = LoaderVersion::new();
 
-    for path in block.target.libs.iter() {
+    for path in target.libs.iter() {
         let p = Path::new(&path);
         println!("p: {}", p.to_str().unwrap());
         let ext = p.extension().unwrap().to_str().unwrap();
@@ -24,46 +34,46 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
 
     // RW
     let align = 0x10;
-    let bss_size = block.target.bss.size();
+    let bss_size = target.bss.size();
     if bss_size > 0 {
         let bss_block = version.rw.alloc_block_align(bss_size, align).unwrap();
         data.addr_set(".bss", bss_block.as_ptr() as u64);
     }
 
-    let rw_size = block.target.rw.size();
+    let rw_size = target.rw.size();
     if rw_size > 0 {
         let mut rw_block = version.rw.alloc_block_align(rw_size, align).unwrap();
         data.addr_set(".data", rw_block.as_ptr() as u64);
-        rw_block.copy(block.target.rw.bytes());
-        block.target.rw.offsets.address = rw_block.as_ptr() as u64;
+        rw_block.copy(target.rw.bytes());
+        target.rw.offsets.address = rw_block.as_ptr() as u64;
     }
 
     // RO
-    let ro_size = block.target.ro.size();
+    let ro_size = target.ro.size();
     if ro_size > 0 {
         let mut ro_block = version.ro.alloc_block_align(ro_size, align).unwrap();
         data.addr_set(".rodata", ro_block.as_ptr() as u64);
-        ro_block.copy(block.target.ro.bytes());
-        block.target.ro.offsets.address = ro_block.as_ptr() as u64;
+        ro_block.copy(target.ro.bytes());
+        target.ro.offsets.address = ro_block.as_ptr() as u64;
     }
 
     // RX
-    let rx_size = block.target.rx.size();
+    let rx_size = target.rx.size();
     let mut rx_block = version.rx.alloc_block_align(rx_size, align).unwrap();
     data.addr_set(".text", rx_block.as_ptr() as u64);
     let symbol =
         ReadSymbol::from_pointer(".text".into(), ResolvePointer::Section(".text".into(), 0));
     data.symbols.insert(".text".to_string(), symbol);
-    block.target.rx.offsets.address = rx_block.as_ptr() as u64;
+    target.rx.offsets.address = rx_block.as_ptr() as u64;
 
-    for (name, symbol) in block.target.exports.iter() {
+    for (name, symbol) in target.exports.iter() {
         eprintln!("ES: {:?}", (name, &symbol));
         let _p = symbol.pointer.resolve(data).unwrap();
         data.pointers.insert(name.clone(), symbol.pointer.clone());
     }
 
     /*
-    for (name, symbol) in block.target.locals.iter() {
+    for (name, symbol) in target.locals.iter() {
         eprintln!("LS: {:?}", (name, &symbol));
         data.pointers.insert(name.clone(), symbol.pointer.clone());
         let p = symbol.pointer.resolve(data).unwrap();
@@ -73,17 +83,16 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
     }
     */
 
-    let iter = block
-        .target
+    let iter = target
         .rx
         .relocations
         .iter()
-        .chain(block.target.ro.relocations.iter())
-        .chain(block.target.rw.relocations.iter())
-        .chain(block.target.bss.relocations.iter());
+        .chain(target.ro.relocations.iter())
+        .chain(target.rw.relocations.iter())
+        .chain(target.bss.relocations.iter());
 
     for r in iter {
-        if let Some(s) = block.target.lookup_dynamic(&r.name) {
+        if let Some(s) = target.lookup_dynamic(&r.name) {
             let pointer = if let Some(ptr) = version.libraries.search_dynamic(&r.name) {
                 unsafe {
                     let p = ptr.as_ptr() as *const usize;
@@ -141,7 +150,7 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         }
 
         // static plt relatives
-        if let Some(s) = block.target.lookup_static(&r.name) {
+        if let Some(s) = target.lookup_static(&r.name) {
             data.symbols.insert(s.name.clone(), s.clone());
             if r.is_plt() {
                 log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
@@ -250,23 +259,20 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
     }
     */
 
-    apply_relocations(&block.target.rx, data);
-    apply_relocations(&block.target.ro, data);
-    apply_relocations(&block.target.rw, data);
+    apply_relocations(&target.rx, data);
+    apply_relocations(&target.ro, data);
+    apply_relocations(&target.rw, data);
 
-    rx_block.copy(block.target.rx.bytes());
+    rx_block.copy(target.rx.bytes());
 
     //for (name, p) in pointers.iter() {
     //eprintln!("P: {:#0x}: {}", p, name);
     //}
     unsafe {
         let buf = std::slice::from_raw_parts(rx_block.as_ptr(), rx_block.size());
-        block.target.rx.disassemble_code_start(
-            data,
-            buf,
-            rx_block.as_ptr() as usize,
-            rx_block.size(),
-        );
+        target
+            .rx
+            .disassemble_code_start(data, buf, rx_block.as_ptr() as usize, rx_block.size());
         if got_size > 0 {
             eprintln!(
                 "GOT Disassemble, Base: {:#0x}, Size:{}",

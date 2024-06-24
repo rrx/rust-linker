@@ -10,6 +10,7 @@ use crate::aot::{
     ReadSymbol,
     ResolvePointer,
     SymbolBind,
+    SymbolSource,
     Target,
 };
 use crate::dynamic::{BlockFactoryInner, LinkError, SharedLibraryRepo};
@@ -188,7 +189,9 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
                 _ => GotPltAssign::None,
             };
 
-            if def != format::CodeSymbolDefinition::Local {
+            if s.source == SymbolSource::Dynamic {
+                unreachable!();
+            } else if def != format::CodeSymbolDefinition::Local {
                 log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                 if assign == GotPltAssign::None {
                 } else {

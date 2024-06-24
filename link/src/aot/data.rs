@@ -459,17 +459,9 @@ impl Data {
                 // if it's dynamic
                 let assign = match s.kind {
                     SymbolKind::Text => {
-                        /*
                         if s.is_static() {
-                            assert!(false);
-                            if r.is_plt() {
-                                GotPltAssign::GotPltWithPlt
-                            } else {
-                                GotPltAssign::Got
-                            }
-                        } else
-                        */
-                        if got.contains(&r.name) {
+                            unreachable!();
+                        } else if got.contains(&r.name) {
                             if r.is_plt() {
                                 GotPltAssign::GotWithPltGot
                             } else {
@@ -504,11 +496,7 @@ impl Data {
                     log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
                     continue;
                 }
-            } else {
-                unreachable!("Unable to find symbol for relocation: {}", &r.name);
-            }
 
-            if let Some(s) = target.lookup(&r.name) {
                 // we don't know the section yet, we just know which kind
                 let def = match s.bind {
                     SymbolBind::Local => CodeSymbolDefinition::Local,
@@ -541,8 +529,7 @@ impl Data {
                 };
 
                 if s.source == SymbolSource::Dynamic {
-                    log::info!("reloc2 {}", &r);
-                    self.dynamics.relocation_add_write(&s, assign, r, w);
+                    unreachable!();
                 } else if def != CodeSymbolDefinition::Local {
                     log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                     if assign == GotPltAssign::None {
@@ -552,9 +539,10 @@ impl Data {
                 } else {
                     log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                 }
-            } else {
-                unreachable!("Unable to find symbol for relocation: {}", &r.name)
+                continue;
             }
+
+            unreachable!("Unable to find symbol for relocation: {}", &r.name)
         }
     }
 

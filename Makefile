@@ -39,30 +39,30 @@ empty_ref:
 
 gcc_dynamic:
 	cargo run --bin link -- --dynamic -v \
-		build/clang-glibc/print_main.o \
+		build/clang-glibc/print_main1.o \
 		build/clang-glibc/asdf1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
 gcc_dynamic_debug:
 	exec rust-gdb --args ./target/debug/link --dynamic -v \
-		build/clang-glibc/print_main.o \
+		build/clang-glibc/print_main1.o \
 		build/clang-glibc/asdf1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
 gcc_ref:
 	${CLANG} \
-		-o build/clang-glibc/print_main \
-		build/clang-glibc/print_main.o \
+		-o build/clang-glibc/print_main1 \
+		build/clang-glibc/print_main1.o \
 		build/clang-glibc/asdf1.o
-	readelf -srW build/clang-glibc/print_main
-	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt build/clang-glibc/print_main 
+	readelf -srW build/clang-glibc/print_main1
+	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt build/clang-glibc/print_main1
 
-	exec build/clang-glibc/print_main
+	exec build/clang-glibc/print_main1
 
 gcc:
 	cargo run --bin link -- -v --link \
 		-o tmp/gcc.exe \
-		build/clang-glibc/print_main.o \
+		build/clang-glibc/print_main1.o \
 		build/clang-glibc/asdf1.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o 
@@ -73,7 +73,7 @@ gcc:
 dup:
 	cargo run --bin link -- -v --link \
 		-o tmp/dup.exe \
-		build/clang-glibc/print_main.o \
+		build/clang-glibc/print_main1.o \
 		build/clang-glibc/asdf1.o \
 		build/clang-glibc/asdf2.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
@@ -169,11 +169,13 @@ functions:
 	$(CLANG) ${CFLAGS} -c testfiles/link_shared.c -o ./build/clang-glibc/link_shared.o
 	$(CLANG) ${CFLAGS} -c testfiles/live.c -o ./build/clang-glibc/live.o
 	$(CLANG) ${CFLAGS} -c testfiles/empty_main.c -o ./build/clang-glibc/empty_main.o
-	$(CLANG) ${CFLAGS} -c testfiles/print_main.c -o ./build/clang-glibc/print_main.o
+	$(CLANG) ${CFLAGS} -c testfiles/print_main1.c -o ./build/clang-glibc/print_main1.o
+	$(CLANG) ${CFLAGS} -c testfiles/print_main2.c -o ./build/clang-glibc/print_main2.o
 	$(CLANG) ${CFLAGS} -c testfiles/sdltest.c -o ./build/clang-glibc/sdltest.o
 
 	$(CLANG) ${CFLAGS_MUSL} -v -c testfiles/empty_main.c -o ./build/clang-musl/empty_main.o
-	$(CLANG) ${CFLAGS_MUSL} -v -c testfiles/print_main.c -o ./build/clang-musl/print_main.o
+	$(CLANG) ${CFLAGS_MUSL} -v -c testfiles/print_main1.c -o ./build/clang-musl/print_main1.o
+	$(CLANG) ${CFLAGS_MUSL} -v -c testfiles/print_main2.c -o ./build/clang-musl/print_main2.o
 
 	gcc -fPIC -c testfiles/sdltest.c -o ./build/gcc-glibc/sdltest.o
 	gcc -fPIC -c testfiles/empty_main.c -o ./build/gcc-glibc/empty_main.o

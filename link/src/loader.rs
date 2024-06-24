@@ -1,13 +1,11 @@
 use crate::aot::{
     apply_relocations, BlockSection, BuildGotPltSection, BuildGotSection, BuildPltGotSection,
     BuildPltSection, GotPltAssign, GotSectionKind, ReadSymbol, ResolvePointer, SymbolBind,
-    SymbolSource,
 };
 use crate::dynamic::{BlockFactoryInner, LinkError, SharedLibraryRepo};
 use crate::format;
 use crate::{Data, ReadBlock};
 use object::SymbolKind;
-use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::path::Path;
 
@@ -93,26 +91,10 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         .chain(block.target.rw.relocations.iter())
         .chain(block.target.bss.relocations.iter());
 
-    //let mut got = HashSet::new();
-    //let mut gotplt = HashSet::new();
-    /*
-    for r in iter.clone() {
-        match r.effect() {
-            format::PatchEffect::AddToGot => {
-                got.insert(r.name.clone());
-            }
-            format::PatchEffect::AddToPlt => {
-                gotplt.insert(r.name.clone());
-            }
-            _ => (),
-        }
-    }
-    */
-
-    let mut lookups = HashMap::new();
+    //let mut lookups = HashMap::new();
     for r in iter {
         if let Some(s) = block.target.lookup_dynamic(&r.name) {
-            if let Some(ptr) = version.libraries.search_dynamic(&r.name) {
+            let pointer = if let Some(ptr) = version.libraries.search_dynamic(&r.name) {
                 unsafe {
                     let p = ptr.as_ptr() as *const usize;
                     let v = *p as *const usize;
@@ -122,23 +104,17 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
                         v as usize,
                         &r.name
                     );
-                    let pointer = ResolvePointer::Resolved(p as u64); //got.len());
-                    data.pointers.insert(r.name.clone(), pointer);
-                    lookups.insert(r.name.clone(), ResolvePointer::Resolved(p as u64));
-                    //got.push(p);
-                    //data.pointer_set(r.name.clone(), p as u64);
-                    //data.pointers.insert(r.name.clone(), p as u64);
+                    let pointer = ResolvePointer::Resolved(p as u64);
+                    pointer
                 }
             } else {
                 unimplemented!("dynamic not found: {:?}", s);
-            }
-
-            //let p = s.pointer.resolve(data).unwrap();
-            //data.pointers.insert(s.name.clone(), s.pointer.clone());
+            };
 
             let assign = match s.kind {
                 SymbolKind::Text => {
                     if s.is_static() {
+                        assert!(false);
                         if r.is_plt() {
                             GotPltAssign::GotPltWithPlt
                         } else {
@@ -160,7 +136,7 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
                 _ => GotPltAssign::None,
             };
 
-            let symbol = data.dynamics.relocation_add(&s, assign, r);
+            let mut symbol = data.dynamics.relocation_add(&s, assign, r);
             log::info!(
                 "reloc0 {}, {:?}, {:?}, {:?}",
                 &r,
@@ -168,9 +144,9 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
                 s.bind,
                 symbol.pointer
             );
+            symbol.pointer = pointer;
             data.pointers.insert(s.name.clone(), symbol.pointer.clone());
             data.symbols.insert(s.name.clone(), symbol);
-            //pointer.resolve(data).unwrap();
             continue;
         }
 
@@ -307,7 +283,7 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         let p = symbol.pointer.resolve(data).unwrap();
         eprintln!("U1({}): {:?}, {:#0x}", i, symbol, p);
 
-        let pp = if let Some(p) = lookups.get(&symbol.name) {
+        let pp = if let Some(p) = data.pointers.get(&symbol.name) {
             p.clone()
         } else if let Some(s) = block.target.lookup(&symbol.name) {
             s.pointer.clone()
@@ -347,7 +323,12 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
     for (i, symbol) in data.dynamics.plt_objects().iter().enumerate() {
         // offset is from the next instruction - 5 bytes after the current instruction
         let rip = plt_block.as_ptr() as isize + (i as isize + 1) * 16 + 5;
-        let p = lookups.get(&symbol.name).unwrap().resolve(data).unwrap();
+        let p = data
+            .pointers
+            .get(&symbol.name)
+            .unwrap()
+            .resolve(data)
+            .unwrap();
         println!("PLT Symbol: {:?}", symbol);
         println!("PLT Symbol: {:#0x}, {:#0x}", p, rip);
         // E9 cd - JMP rel32

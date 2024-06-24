@@ -156,6 +156,29 @@ impl BuildPltSection {
         0x10
     }
 
+    pub fn contents_dynamic(data: &Data, plt_base_ptr: usize) -> Vec<u8> {
+        let mut v = vec![0u8; 16];
+        for (i, symbol) in data.dynamics.plt_objects().iter().enumerate() {
+            // offset is from the next instruction - 5 bytes after the current instruction
+            let rip = plt_base_ptr as isize + (i as isize + 1) * 16 + 5;
+            let p = data
+                .pointers
+                .get(&symbol.name)
+                .unwrap()
+                .resolve(data)
+                .unwrap();
+            println!("PLT Symbol: {:?}", symbol);
+            println!("PLT Symbol: {:#0x}, {:#0x}", p, rip);
+            // E9 cd - JMP rel32
+            let mut buf = [0u8; 16];
+            buf[0] = 0xe9;
+            let b = ((p as isize - rip as isize) as u32).to_le_bytes();
+            buf[1..b.len() + 1].copy_from_slice(&b);
+            v.extend(buf);
+        }
+        v
+    }
+
     pub fn contents(data: &Data, base: usize) -> Vec<u8> {
         let got_addr = data.addr_get_by_name(".got.plt").unwrap() as isize;
         let vbase = base as isize;

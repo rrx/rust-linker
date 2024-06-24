@@ -71,15 +71,6 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         //data.pointer_set(name.clone(), p);
         //pointers.insert(name.clone(), p as u64);
     }
-
-    for (name, symbol) in block.target.dynamic.iter() {
-        eprintln!("DS: {:?}", (name, &symbol));
-        //data.pointers.insert(name.clone(), symbol.pointer.clone());
-        //let p = symbol.pointer.resolve(data).unwrap();
-        //data.pointers.insert(name.clone(), symbol.pointer.clone());
-        //data.pointer_set(name.clone(), p);
-        //pointers.insert(name.clone(), p as u64);
-    }
     */
 
     let iter = block
@@ -91,7 +82,6 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         .chain(block.target.rw.relocations.iter())
         .chain(block.target.bss.relocations.iter());
 
-    //let mut lookups = HashMap::new();
     for r in iter {
         if let Some(s) = block.target.lookup_dynamic(&r.name) {
             let pointer = if let Some(ptr) = version.libraries.search_dynamic(&r.name) {
@@ -207,62 +197,7 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
             continue;
         }
 
-        //else {
         unreachable!("Unable to find symbol for relocation: {}", &r.name);
-        //}
-
-        /*
-        if let Some(s) = block.target.lookup(&r.name) {
-            // we don't know the section yet, we just know which kind
-            let def = match s.bind {
-                SymbolBind::Local => format::CodeSymbolDefinition::Local,
-                SymbolBind::Global => format::CodeSymbolDefinition::Defined,
-                SymbolBind::Weak => format::CodeSymbolDefinition::Defined,
-            };
-            let _p = s.pointer.resolve(data).unwrap();
-            data.pointers.insert(s.name.clone(), s.pointer.clone());
-
-            let assign = match s.kind {
-                SymbolKind::Text => {
-                    if s.is_static() {
-                        if r.is_plt() {
-                            GotPltAssign::GotPltWithPlt
-                        } else {
-                            GotPltAssign::Got
-                        }
-                    } else if got.contains(&r.name) {
-                        if r.is_plt() {
-                            GotPltAssign::GotWithPltGot
-                        } else {
-                            GotPltAssign::Got
-                        }
-                    } else if gotplt.contains(&r.name) {
-                        GotPltAssign::GotPltWithPlt
-                    } else {
-                        GotPltAssign::None
-                    }
-                }
-                SymbolKind::Data => GotPltAssign::Got,
-                _ => GotPltAssign::None,
-            };
-
-            if s.source == SymbolSource::Dynamic {
-                assert!(false);
-                log::info!("reloc2 {}", &r);
-                data.dynamics.relocation_add(&s, assign, r);
-            } else if def != format::CodeSymbolDefinition::Local {
-                log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
-                if assign == GotPltAssign::None {
-                } else {
-                    data.dynamics.relocation_add(&s, assign, r);
-                }
-            } else {
-                log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
-            }
-        } else {
-            unreachable!("Unable to find symbol for relocation: {}", &r.name)
-        }
-        */
     }
 
     // ALLOCATE TABLES
@@ -319,6 +254,8 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
     let mut plt_block = version.rx.alloc_block_align(plt_size, plt_align).unwrap();
     data.addr_set(".plt", plt_block.as_ptr() as u64);
 
+    let v = BuildPltSection::contents_dynamic(data, plt_block.as_ptr() as usize);
+    /*
     let mut v = vec![0u8; 16];
     for (i, symbol) in data.dynamics.plt_objects().iter().enumerate() {
         // offset is from the next instruction - 5 bytes after the current instruction
@@ -338,6 +275,7 @@ pub fn load_block(data: &mut Data, block: &mut ReadBlock) -> Result<LoaderVersio
         buf[1..b.len() + 1].copy_from_slice(&b);
         v.extend(buf);
     }
+    */
     plt_block.copy(v.as_slice());
 
     let pltgot_size = BuildPltGotSection::size(data);

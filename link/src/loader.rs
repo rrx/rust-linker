@@ -17,6 +17,7 @@ use crate::dynamic::{BlockFactoryInner, LinkError, SharedLibraryRepo};
 use crate::format;
 use crate::{Data, ReadBlock};
 use object::SymbolKind;
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
 
@@ -91,25 +92,31 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
         .chain(target.rw.relocations.iter())
         .chain(target.bss.relocations.iter());
 
-    for r in iter {
+    let mut dynamic_lookups = HashMap::new();
+
+    for r in iter.clone() {
+        if let Some(_) = dynamic_lookups.get(&r.name) {
+            continue;
+        }
+
         if let Some(s) = target.lookup_dynamic(&r.name) {
             let pointer = if let Some(ptr) = version.libraries.search_dynamic(&r.name) {
-                unsafe {
-                    let p = ptr.as_ptr() as *const usize;
-                    let v = *p as *const usize;
-                    log::debug!(
-                        "Searching Shared {:#08x}:{:#08x}:{}",
-                        p as usize,
-                        v as usize,
-                        &r.name
-                    );
-                    let pointer = ResolvePointer::Resolved(p as u64);
-                    pointer
-                }
+                let p = ptr.as_ptr() as *const usize;
+                log::debug!("Searching Shared {:#08x}:{}", p as usize, &r.name);
+                ResolvePointer::Resolved(p as u64)
             } else {
                 unimplemented!("dynamic not found: {:?}", s);
             };
+            let mut symbol = s.clone();
+            symbol.pointer = pointer.clone();
+            symbol.call_pointer = pointer;
 
+            dynamic_lookups.insert(&r.name, symbol);
+        }
+    }
+
+    for r in iter {
+        if let Some(s) = dynamic_lookups.get(&r.name) {
             let assign = match s.kind {
                 SymbolKind::Text => {
                     if s.is_static() {
@@ -135,17 +142,11 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
                 _ => GotPltAssign::None,
             };
 
-            let mut symbol = data.dynamics.relocation_add(&s, assign, r);
-            log::info!(
-                "reloc0 {}, {:?}, {:?}, {:?}",
-                &r,
-                assign,
-                s.bind,
-                symbol.pointer
-            );
-            symbol.pointer = pointer;
-            data.pointers.insert(s.name.clone(), symbol.pointer.clone());
-            data.symbols.insert(s.name.clone(), symbol);
+            //let mut symbol = data.dynamics.relocation_add(&s, assign, r);
+            log::info!("reloc0 {}, {:?}, {:?}, {:?}", &r, assign, s.bind, s.pointer);
+            //symbol.pointer = pointer;
+            data.pointers.insert(s.name.clone(), s.pointer.clone());
+            data.symbols.insert(s.name.clone(), s.clone());
             continue;
         }
 

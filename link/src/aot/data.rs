@@ -1,4 +1,5 @@
 use super::*;
+use crate::format;
 use crate::format::*;
 use object::write::elf::{SectionIndex, Writer};
 use object::write::StringId;
@@ -440,19 +441,6 @@ impl Data {
         // if it's being added to got, then only add it to got
         // with entries in the got and gotplt, we then apply relocations
         // to point to the appropriate got and gotplt entries
-        let mut got = HashSet::new();
-        let mut gotplt = HashSet::new();
-        for r in iter.clone() {
-            match r.effect() {
-                PatchEffect::AddToGot => {
-                    got.insert(r.name.clone());
-                }
-                PatchEffect::AddToPlt => {
-                    gotplt.insert(r.name.clone());
-                }
-                _ => (),
-            }
-        }
 
         for r in iter {
             if let Some(s) = target.lookup_dynamic(&r.name) {
@@ -461,13 +449,13 @@ impl Data {
                     SymbolKind::Text => {
                         if s.is_static() {
                             unreachable!();
-                        } else if got.contains(&r.name) {
+                        } else if r.effect() == format::PatchEffect::AddToGot {
                             if r.is_plt() {
                                 GotPltAssign::GotWithPltGot
                             } else {
                                 GotPltAssign::Got
                             }
-                        } else if gotplt.contains(&r.name) {
+                        } else if r.effect() == format::PatchEffect::AddToPlt {
                             GotPltAssign::GotPltWithPlt
                         } else {
                             GotPltAssign::None
@@ -512,13 +500,13 @@ impl Data {
                             } else {
                                 GotPltAssign::Got
                             }
-                        } else if got.contains(&r.name) {
+                        } else if r.effect() == format::PatchEffect::AddToGot {
                             if r.is_plt() {
                                 GotPltAssign::GotWithPltGot
                             } else {
                                 GotPltAssign::Got
                             }
-                        } else if gotplt.contains(&r.name) {
+                        } else if r.effect() == format::PatchEffect::AddToPlt {
                             GotPltAssign::GotPltWithPlt
                         } else {
                             GotPltAssign::None

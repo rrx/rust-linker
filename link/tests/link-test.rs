@@ -31,10 +31,9 @@ fn loader_shared() {
     exe.add(Path::new("../build/testlibs/libz.so"), &config)
         .unwrap();
     exe.add(&temp_path("link_shared.o"), &config).unwrap();
-    let mut data = Data::new();
-    let version = link::loader::load_block(&mut data, &mut exe.target).unwrap();
+    let version = LoaderVersion::load_block(&mut exe).unwrap();
     version.debug();
-    let ret: *const () = version.invoke(&data, "call_z", ()).unwrap();
+    let ret: *const () = version.invoke("call_z", ()).unwrap();
     log::debug!("ret: {:#08x}", ret as usize);
     assert!(ret.is_null());
 }
@@ -100,10 +99,9 @@ fn loader_livelink() {
         .unwrap();
     exe.add(&temp_path("globals.o"), &config).unwrap();
     exe.add(&temp_path("live.so"), &config).unwrap();
-    let mut data = Data::new();
-    let version = link::loader::load_block(&mut data, &mut exe.target).unwrap();
+    let version = LoaderVersion::load_block(&mut exe).unwrap();
     version.debug();
-    let ret: i64 = version.invoke(&data, "simple_function", ()).unwrap();
+    let ret: i64 = version.invoke("simple_function", ()).unwrap();
     log::debug!("ret: {:#08x}", ret);
     assert_eq!(ret, 1);
 }
@@ -164,10 +162,9 @@ fn loader_live_static() {
     config.verbose = true;
     let mut exe = ReadBlock::new("exe");
     exe.add(&temp_path("live.o"), &config).unwrap();
-    let mut data = Data::new();
-    let version = link::loader::load_block(&mut data, &mut exe.target).unwrap();
+    let version = LoaderVersion::load_block(&mut exe).unwrap();
     version.debug();
-    let ret: i64 = version.invoke(&data, "call_live", (3,)).unwrap();
+    let ret: i64 = version.invoke("call_live", (3,)).unwrap();
     log::debug!("ret: {:#08x}", ret as usize);
     assert_eq!(0x11, ret);
 }
@@ -197,13 +194,12 @@ fn loader_empty_main() {
     config.verbose = true;
     let mut exe = ReadBlock::new("exe");
     exe.add(&temp_path("empty_main.o"), &config).unwrap();
-    let mut data = Data::new();
-    let version = link::loader::load_block(&mut data, &mut exe.target).unwrap();
+    let version = LoaderVersion::load_block(&mut exe).unwrap();
     version.debug();
-    let ret: i64 = version.invoke(&data, "main", (3,)).unwrap();
+    let ret: i64 = version.invoke("main", (3,)).unwrap();
     log::debug!("ret: {:#08x}", ret as usize);
     assert_eq!(0, ret);
-    let main_ptr = version.lookup(&data, "main").unwrap();
+    let main_ptr = version.lookup("main").unwrap();
     log::debug!("ptr: {:#08x}", main_ptr as usize);
 }
 
@@ -253,10 +249,9 @@ fn loader_libuv() {
         .unwrap();
     exe.add(&temp_path("uvtest.o"), &config).unwrap();
 
-    let mut data = Data::new();
-    let version = link::loader::load_block(&mut data, &mut exe.target).unwrap();
+    let version = LoaderVersion::load_block(&mut exe).unwrap();
     version.debug();
-    let ret: i64 = version.invoke(&data, "uvtest", ()).unwrap();
+    let ret: i64 = version.invoke("uvtest", ()).unwrap();
     log::debug!("ret: {:#08x}", ret as usize);
     assert_eq!(0, ret);
 }

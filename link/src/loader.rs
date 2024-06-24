@@ -19,9 +19,8 @@ use object::SymbolKind;
 use std::error::Error;
 use std::path::Path;
 
-pub fn load_block(data: &mut Data, target: &mut Target) -> Result<LoaderVersion, Box<dyn Error>> {
-    let mut version = LoaderVersion::new();
-
+pub fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Box<dyn Error>> {
+    let data = &mut version.data;
     for path in target.libs.iter() {
         let p = Path::new(&path);
         println!("p: {}", p.to_str().unwrap());
@@ -303,12 +302,7 @@ pub fn load_block(data: &mut Data, target: &mut Target) -> Result<LoaderVersion,
         */
     }
 
-    // set protection
-    version.ro.force_ro();
-    version.rx.force_rx();
-    version.rw.force_rw();
-
-    Ok(version)
+    Ok(())
 }
 
 pub struct LoaderVersion {
@@ -316,6 +310,7 @@ pub struct LoaderVersion {
     ro: BlockFactoryInner,
     rw: BlockFactoryInner,
     rx: BlockFactoryInner,
+    data: Data,
 }
 
 impl LoaderVersion {
@@ -331,6 +326,7 @@ impl LoaderVersion {
             ro,
             rx,
             rw,
+            data: Data::new(),
         }
     }
 
@@ -339,10 +335,10 @@ impl LoaderVersion {
         crate::dynamic::eprint_process_maps();
     }
 
-    pub fn lookup(&self, data: &Data, symbol: &str) -> Option<u64> {
-        if let Some(ptr) = data.pointers.get(symbol) {
+    pub fn lookup(&self, symbol: &str) -> Option<u64> {
+        if let Some(ptr) = self.data.pointers.get(symbol) {
             log::debug!("found in pointer: {}", symbol);
-            return Some(ptr.resolve(data).unwrap());
+            return Some(ptr.resolve(&self.data).unwrap());
         }
 
         if let Some(ptr) = self.libraries.search_dynamic(symbol) {
@@ -354,9 +350,9 @@ impl LoaderVersion {
         None
     }
 
-    pub fn invoke<P, T>(&self, data: &Data, name: &str, args: P) -> Result<T, Box<dyn Error>> {
+    pub fn invoke<P, T>(&self, name: &str, args: P) -> Result<T, Box<dyn Error>> {
         let p = self
-            .lookup(data, name)
+            .lookup(name)
             .ok_or(LinkError::SymbolNotFound(name.to_string()))?;
         log::debug!("invoking {} @ {:#08x}", name, p as usize);
         unsafe {
@@ -365,5 +361,17 @@ impl LoaderVersion {
             let ret = f(args);
             Ok(ret)
         }
+    }
+
+    pub fn load_block(block: &mut ReadBlock) -> Result<LoaderVersion, Box<dyn Error>> {
+        let mut version = LoaderVersion::new();
+        load_block(&mut version, &mut block.target)?;
+
+        // set protection
+        version.ro.force_ro();
+        version.rx.force_rx();
+        version.rw.force_rw();
+
+        Ok(version)
     }
 }

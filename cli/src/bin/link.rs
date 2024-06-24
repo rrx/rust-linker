@@ -47,19 +47,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         exe.dump();
     }
 
-    let mut data = Data::new();
-    if let Some(interp) = args.interp {
-        data = data.interp(interp);
-    }
-
     if args.dynamic {
-        let version = link::loader::load_block(&mut data, &mut exe.target)?;
+        let version = LoaderVersion::load_block(&mut exe)?;
         version.debug();
-        let r: u32 = version.invoke(&data, "main", ())?;
+        let r: u32 = version.invoke("main", ())?;
         println!("ret: {}", r);
         //let mut link = DynamicLink::new();
         //link.load(&data, &exe)?;
     } else if args.link {
+        let mut data = Data::new();
+        if let Some(interp) = args.interp {
+            data = data.interp(interp);
+        }
+
         let output = args.output.unwrap_or("a.out".to_string());
         Data::write(data, exe.target, Path::new(&output), &config)?;
     }

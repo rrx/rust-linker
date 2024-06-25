@@ -27,14 +27,20 @@ empty:
 		build/clang-glibc/empty_main.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6 \
 		/usr/lib/x86_64-linux-gnu/crt1.o
-	readelf -aW tmp/empty.exe
+	objdump -d --full-contents --section=.text tmp/empty.exe
+	#readelf -aW tmp/empty.exe
+	readelf -tW tmp/empty.exe
+	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt tmp/empty.exe
 	exec tmp/empty.exe
 
 empty_ref:
 	${CLANG} \
 		-o build/clang-glibc/empty \
 		build/clang-glibc/empty_main.o
-	readelf -sW build/clang-glibc/empty
+	#readelf -sW build/clang-glibc/empty
+	objdump -d --full-contents --section=.text build/clang-glibc/empty
+	readelf -tW build/clang-glibc/empty
+	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt build/clang-glibc/empty
 	exec build/clang-glibc/empty
 
 gcc_dynamic:
@@ -79,6 +85,14 @@ gcc2:
 	readelf -srW tmp/gcc2.exe
 	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt tmp/gcc2.exe
 	exec tmp/gcc2.exe
+
+gcc2_ref:
+	${CLANG} \
+		-o build/clang-glibc/print_main2 \
+		build/clang-glibc/print_main2.o 
+	readelf -srW build/clang-glibc/print_main2
+	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt build/clang-glibc/print_main2
+	exec build/clang-glibc/print_main2
 
 dup:
 	cargo run --bin link -- -v --link \
@@ -165,7 +179,7 @@ deps:
 	cargo modules generate graph --package link --lib --orphans | dot -Tpng > link.png && open link.png
 	cargo depgraph --build-deps --workspace-only | dot -Tpng > crates.png && open crates.png
 
-CFLAGS=-fPIC -fno-direct-access-external-data
+CFLAGS=-fPIC -fno-lto -fno-direct-access-external-data
 CFLAGS_MUSL=-I/usr/include/x86_64-linux-musl ${CFLAGS}
 
 functions:

@@ -70,20 +70,8 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
     for (name, symbol) in target.exports.iter() {
         eprintln!("ES: {:?}", (name, &symbol));
         let _p = symbol.pointer.resolve(data).unwrap();
-        //data.pointers.insert(name.clone(), symbol.pointer.clone());
         data.symbols.insert(name.clone(), symbol.clone());
     }
-
-    /*
-    for (name, symbol) in target.locals.iter() {
-        eprintln!("LS: {:?}", (name, &symbol));
-        data.pointers.insert(name.clone(), symbol.pointer.clone());
-        let p = symbol.pointer.resolve(data).unwrap();
-        data.pointers.insert(name.clone(), symbol.pointer.clone());
-        //data.pointer_set(name.clone(), p);
-        //pointers.insert(name.clone(), p as u64);
-    }
-    */
 
     let iter = target
         .rx
@@ -110,7 +98,6 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
             };
             let mut symbol = s.clone();
             symbol.pointer = pointer.clone();
-            symbol.call_pointer = pointer;
 
             dynamic_lookups.insert(&r.name, symbol);
         }
@@ -118,38 +105,9 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
 
     for r in iter {
         if let Some(s) = dynamic_lookups.get(&r.name) {
-            /*
-            let assign = match s.kind {
-                SymbolKind::Text => {
-                    if s.is_static() {
-                        assert!(false);
-                        if r.is_plt() {
-                            GotPltAssign::GotPltWithPlt
-                        } else {
-                            GotPltAssign::Got
-                        }
-                    } else if r.effect() == format::PatchEffect::AddToGot {
-                        if r.is_plt() {
-                            GotPltAssign::GotWithPltGot
-                        } else {
-                            GotPltAssign::Got
-                        }
-                    } else if r.effect() == format::PatchEffect::AddToPlt {
-                        GotPltAssign::GotPltWithPlt
-                    } else {
-                        GotPltAssign::None
-                    }
-                }
-                SymbolKind::Data => GotPltAssign::Got,
-                _ => GotPltAssign::None,
-            };
-            */
-
-            //let mut symbol = data.dynamics.relocation_add(&s, assign, r);
-            log::info!("reloc0 {}, {:?}, {:?}", &r, s.bind, s.pointer);
-            //symbol.pointer = pointer;
-            //data.pointers.insert(s.name.clone(), s.pointer.clone());
-            data.symbols.insert(s.name.clone(), s.clone());
+            let symbol = data.dynamics.save_relocation(s.clone(), r);
+            log::info!("reloc0 {}, {:?}, {:?}", &r, symbol.bind, symbol.pointer);
+            data.symbols.insert(s.name.clone(), symbol);
             continue;
         }
 
@@ -159,7 +117,6 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
             if r.is_plt() {
                 log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
                 let _p = s.pointer.resolve(data).unwrap();
-                //data.pointers.insert(s.name.clone(), s.pointer.clone());
                 continue;
             }
 
@@ -199,7 +156,7 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
                 log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                 if assign == GotPltAssign::None {
                 } else {
-                    data.dynamics.relocation_add(&s, assign, r);
+                    data.dynamics.relocation_add(&s, r);
                 }
             } else {
                 log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
@@ -243,12 +200,15 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
 
     // PLT
     let plt_size = BuildPltSection::size(data);
-    let plt_align = BuildPltSection::align(data);
-    let mut plt_block = version.rx.alloc_block_align(plt_size, plt_align).unwrap();
-    data.addr_set(".plt", plt_block.as_ptr() as u64);
-
-    let v = BuildPltSection::contents_dynamic(data, plt_block.as_ptr() as usize);
-    plt_block.copy(v.as_slice());
+    let mut plt_block = None;
+    if plt_size > 0 {
+        let plt_align = BuildPltSection::align(data);
+        let mut block = version.rx.alloc_block_align(plt_size, plt_align).unwrap();
+        data.addr_set(".plt", block.as_ptr() as u64);
+        let v = BuildPltSection::contents_dynamic(data, block.as_ptr() as usize);
+        block.copy(v.as_slice());
+        plt_block = Some(block);
+    }
 
     // PLTGOT
     /*
@@ -289,24 +249,27 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
             format::print_bytes(buf, got_block.as_ptr() as usize);
         }
         if plt_size > 0 {
+            let block = plt_block.as_ref().unwrap();
             eprintln!(
                 "PLT Disassemble, Base: {:#0x}, Size:{}",
-                plt_block.as_ptr() as usize,
-                plt_block.size()
+                block.as_ptr() as usize,
+                block.size()
             );
-            let buf = std::slice::from_raw_parts(plt_block.as_ptr(), plt_block.size());
-            format::print_bytes(buf, plt_block.as_ptr() as usize);
+            let buf = std::slice::from_raw_parts(block.as_ptr(), block.size());
+            format::print_bytes(buf, block.as_ptr() as usize);
             format::disassemble_buf(buf);
         }
 
-        /*
         if gotplt_size > 0 {
-            eprintln!("GOTPLT Disassemble, Base: {:#0x}, Size:{}", gotplt_block.as_ptr() as usize, gotplt_block.size());
+            eprintln!(
+                "GOTPLT Disassemble, Base: {:#0x}, Size:{}",
+                gotplt_block.as_ptr() as usize,
+                gotplt_block.size()
+            );
             let buf = std::slice::from_raw_parts(gotplt_block.as_ptr(), gotplt_block.size());
             format::print_bytes(buf, gotplt_block.as_ptr() as usize);
             format::disassemble_buf(buf);
         }
-        */
     }
 
     Ok(())

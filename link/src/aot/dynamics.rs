@@ -44,6 +44,11 @@ pub struct Dynamics {
     pltgot: Vec<ReadSymbol>,
     pub pltgot_hash: HashMap<String, ReadSymbol>,
 
+    pub got_lookup: HashMap<String, usize>,
+    pub gotplt_lookup: HashMap<String, usize>,
+    pub plt_lookup: HashMap<String, usize>,
+    pub pltgot_lookup: HashMap<String, usize>,
+
     got_index: usize,
     gotplt_index: usize,
     plt_index: usize,
@@ -66,8 +71,12 @@ impl Dynamics {
             pltgot: vec![],
             pltgot_hash: HashMap::new(),
             got_index: 0,
+            got_lookup: HashMap::new(),
+            gotplt_lookup: HashMap::new(),
+            plt_lookup: HashMap::new(),
+            pltgot_lookup: HashMap::new(),
             gotplt_index: 3,
-            plt_index: 0,
+            plt_index: 1,
             pltgot_index: 0,
         }
     }
@@ -142,71 +151,67 @@ impl Dynamics {
             .count()
     }
 
-    fn save_relocation(
-        &mut self,
-        symbol: ReadSymbol,
-        assign: GotPltAssign,
-        r: &CodeRelocation,
-    ) -> ReadSymbol {
-        log::debug!(target: "symbols", "r: {:?}, {}", assign, r);
-        let mut symbol = symbol.clone();
+    pub fn save_relocation(&mut self, symbol: ReadSymbol, r: &CodeRelocation) -> ReadSymbol {
+        log::debug!(target: "symbols", "r: {}", r);
+        let mut add_got = false;
+        let mut add_gotplt = false;
+        let mut add_plt = false;
 
-        match assign {
-            GotPltAssign::Got => {
-                let pointer = ResolvePointer::Got(self.got_index);
-                symbol.pointer = pointer.clone();
-
-                self.r_got.push(symbol.clone());
-
-                self.got_index += 1;
-                symbol
+        if symbol.is_static() {
+            if r.is_got() {
+                add_got = true;
             }
-
-            GotPltAssign::GotWithPltGot => {
-                let pointer = ResolvePointer::PltGot(self.pltgot_index);
-                symbol.pointer = pointer.clone();
-                self.pltgot.push(symbol.clone());
-                self.pltgot_hash
-                    .insert(symbol.name.to_string(), symbol.clone());
-
-                symbol.pointer = ResolvePointer::Got(self.got_index);
-                symbol.call_pointer = ResolvePointer::PltGot(self.pltgot_index);
-                self.r_got.push(symbol.clone());
-
-                self.pltgot_index += 1;
-                self.got_index += 1;
-                symbol
+        } else {
+            if r.is_got() {
+                add_got = true;
             }
-
-            GotPltAssign::GotPltWithPlt => {
-                let pointer = ResolvePointer::Plt(self.plt_index);
-                symbol.pointer = pointer.clone();
-                symbol.call_pointer = pointer.clone();
-                self.plt.push(symbol.clone());
-                self.plt_hash
-                    .insert(symbol.name.to_string(), symbol.clone());
-                self.plt_index += 1;
-
-                self.r_gotplt.push(symbol.clone());
-                self.gotplt_index += 1;
-                symbol
+            if r.is_plt() {
+                add_got = true;
+                add_plt = true;
             }
-            _ => unreachable!(),
         }
+
+        if add_plt {
+            if !self.plt_lookup.contains_key(&symbol.name) {
+                self.plt.push(symbol.clone());
+                self.pltgot.push(symbol.clone());
+                self.plt_lookup
+                    .insert(symbol.name.to_string(), self.plt_index);
+                self.pltgot_lookup
+                    .insert(symbol.name.to_string(), self.pltgot_index);
+                self.plt_index += 1;
+                self.pltgot_index += 1;
+            }
+        }
+
+        if add_gotplt {
+            if !self.gotplt_lookup.contains_key(&symbol.name) {
+                self.r_gotplt.push(symbol.clone());
+                self.gotplt_lookup
+                    .insert(symbol.name.to_string(), self.gotplt_index);
+                self.gotplt_index += 1;
+            }
+        }
+
+        if add_got {
+            if !self.got_lookup.contains_key(&symbol.name) {
+                self.r_got.push(symbol.clone());
+                self.got_lookup
+                    .insert(symbol.name.to_string(), self.got_index);
+                self.got_index += 1;
+            }
+        }
+
+        symbol
     }
 
-    pub fn relocation_add(
-        &mut self,
-        symbol: &ReadSymbol,
-        assign: GotPltAssign,
-        r: &CodeRelocation,
-    ) -> ReadSymbol {
+    pub fn relocation_add(&mut self, symbol: &ReadSymbol, r: &CodeRelocation) -> ReadSymbol {
         let name = &symbol.name;
+        let symbol = self.save_relocation(symbol.clone(), r);
 
         if let Some(track) = self.symbol_hash.get(name) {
             track.symbol.clone()
         } else {
-            let symbol = self.save_relocation(symbol.clone(), assign, r);
             self.symbols.push(symbol.name.clone());
             self.symbol_hash.insert(
                 symbol.name.clone(),
@@ -223,16 +228,15 @@ impl Dynamics {
     pub fn relocation_add_write(
         &mut self,
         symbol: &ReadSymbol,
-        assign: GotPltAssign,
         r: &CodeRelocation,
         w: &mut Writer,
     ) -> ReadSymbol {
         let name = &symbol.name;
+        let symbol = self.save_relocation(symbol.clone(), r);
 
         if let Some(track) = self.symbol_hash.get(name) {
             track.symbol.clone()
         } else {
-            let symbol = self.save_relocation(symbol.clone(), assign, r);
             self.symbol_add(symbol.clone(), w);
             symbol
         }
@@ -305,15 +309,11 @@ impl Dynamics {
         }
     }
 
-    pub fn symbols(&self) -> Vec<(String, Option<SymbolIndex>, ResolvePointer)> {
+    pub fn symbols(&self) -> Vec<(String, Option<SymbolIndex>, ReadSymbol)> {
         let mut out = vec![];
         for name in self.symbols.iter() {
             let track = self.symbol_hash.get(name).unwrap();
-            out.push((
-                name.to_string(),
-                track.symbol_index,
-                track.symbol.pointer.clone(),
-            ));
+            out.push((name.to_string(), track.symbol_index, track.symbol.clone()));
         }
         out
     }

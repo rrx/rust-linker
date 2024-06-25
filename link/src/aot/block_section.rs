@@ -33,23 +33,6 @@ pub struct GeneralSection {
     pub(crate) offsets: SectionOffset,
 }
 
-fn resolve_r(data: &Data, r: &CodeRelocation) -> Option<ResolvePointer> {
-    if let Some(resolve_addr) = data.dynamics.lookup(r) {
-        return Some(resolve_addr);
-    }
-
-    // otherwise, just look up the symbol
-    if let Some(symbol) = data.symbols.get(&r.name) {
-        return Some(symbol.pointer.clone());
-    }
-
-    if let Some(s) = data.symbols.get(&r.name) {
-        return Some(s.pointer.clone());
-    }
-
-    None
-}
-
 impl BlockSection for GeneralSection {
     fn size(&self) -> usize {
         self.offsets.size as usize
@@ -163,21 +146,15 @@ impl GeneralSection {
 pub fn apply_relocations(section: &GeneralSection, data: &Data) {
     let patch_base = section.bytes.as_ptr();
     for r in section.relocations.iter() {
-        if let Some(addr) = resolve_r(data, r) {
-            let resolved = addr.resolve(data).unwrap();
-            log::info!(
-                target: "relocations",
-                "R-{:?}: {}, vbase: {:#0x}, addr: {:#0x}",
-                section.offsets.alloc, &r.name, section.offsets.address, resolved as usize,
-            );
+        if let Some(symbol) = data.symbols.get(&r.name) {
+            log::info!(target: "relocations", "{}: {:?}", &r.name, (symbol, r.is_plt(), r.is_got()));
+            log::info!(target: "relocations", "{}: {:?}", &r.name, r);
             r.patch(
+                data,
+                &symbol,
                 patch_base as *mut u8,
                 section.offsets.address as *mut u8,
-                resolved as *const u8,
             );
-            let symbol = data.symbols.get(&r.name).unwrap();
-            log::info!(target: "relocations", "{:?}, {:?}, {:?}", addr, symbol.pointer, symbol.call_pointer);
-            log::info!(target: "relocations", "{:?}", symbol);
         } else {
             unreachable!("Unable to locate symbol: {}, {}", &r.name, &r);
         }

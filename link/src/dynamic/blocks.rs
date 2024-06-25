@@ -93,7 +93,7 @@ pub fn patch_code(
             &r.name
         );
 
-        r.patch(patch_base as *mut u8, patch_base as *mut u8, addr);
+        r.patch_dynamic(patch_base as *mut u8, patch_base as *mut u8, addr);
     }
 
     block
@@ -134,7 +134,7 @@ pub fn patch_data(
             &r.name
         );
 
-        r.patch(patch_base as *mut u8, patch_base as *mut u8, addr);
+        r.patch_dynamic(patch_base as *mut u8, patch_base as *mut u8, addr);
     }
     block
 }

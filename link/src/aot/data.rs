@@ -150,7 +150,6 @@ impl BuildPltGotSection {
         let pltgot = data.dynamics.pltgot_objects();
         let mut bytes: Vec<u8> = vec![];
         for (slot_index, symbol) in pltgot.iter().enumerate() {
-            let p = data.dynamics.symbol_lookup(&symbol.name).unwrap();
             let mut slot: [u8; 8] = [0xff, 0x25, 0x00, 0x00, 0x00, 0x00, 0x66, 0x90];
             let slot_size = slot.len();
             assert_eq!(slot_size, Self::entry_size());
@@ -158,14 +157,14 @@ impl BuildPltGotSection {
             //1050:       ff 25 82 2f 00 00       jmp    *0x2f82(%rip)        # 3fd8 <fprintf@GLIBC_2.2.5>
             //1056:       66 90                   xchg   %ax,%ax
 
+            let index = data.dynamics.got_lookup.get(&symbol.name).unwrap();
+            let p = ResolvePointer::Got(*index);
             let gotplt_addr = p.resolve(data).unwrap();
             let offset = (slot_index as isize) * slot_size as isize;
             let rip = vbase + offset + 6;
             let addr = gotplt_addr as isize - rip;
 
-            let offset = slot_index * slot_size;
-            slot.as_mut_slice()[offset + 2..offset + 6]
-                .copy_from_slice(&(addr as i32).to_le_bytes());
+            slot.as_mut_slice()[2..6].copy_from_slice(&(addr as i32).to_le_bytes());
             bytes.extend(slot);
         }
         bytes
@@ -175,10 +174,17 @@ impl BuildPltGotSection {
 pub struct BuildPltSection {}
 
 impl BuildPltSection {
+    pub fn is_needed(data: &Data) -> bool {
+        data.dynamics.plt_objects().len() > 0
+    }
     pub fn size(data: &Data) -> usize {
         let plt_entries_count = data.dynamics.plt_objects().len();
-        // length + 1, to account for the stub.  Each entry is 0x10 in size
-        (1 + plt_entries_count) * 0x10
+        if plt_entries_count == 0 {
+            0
+        } else {
+            // length + 1, to account for the stub.  Each entry is 0x10 in size
+            (1 + plt_entries_count) * 0x10
+        }
     }
 
     pub fn align(_data: &Data) -> usize {
@@ -210,6 +216,11 @@ impl BuildPltSection {
     }
 
     pub fn contents(data: &Data, base: usize) -> Vec<u8> {
+        let plt_entries_count = data.dynamics.plt_objects().len();
+        if plt_entries_count == 0 {
+            return vec![];
+        }
+
         let got_addr = data.addr_get_by_name(".got.plt").unwrap() as isize;
         let vbase = base as isize;
 
@@ -232,8 +243,6 @@ impl BuildPltSection {
         let got2 = got_addr + 0x10 - (vbase + 0x0c);
         let b = (got2 as i32).to_le_bytes();
         stub.as_mut_slice()[8..12].copy_from_slice(&b);
-
-        let plt_entries_count = data.dynamics.plt_objects().len();
 
         for slot_index in 0..plt_entries_count {
             // PLT ENTRY
@@ -371,6 +380,7 @@ impl Data {
     pub fn write_exports(data: &mut Data, exports: &SymbolMap, w: &mut Writer) {
         println!("ADD EXPORTS");
         for (name, symbol) in exports.iter() {
+            println!("EXPORTS: {:?}", symbol);
             data.symbols.insert(name.to_string(), symbol.clone());
             let section_index = symbol.section.section_index(data);
             data.statics.symbol_add(symbol, section_index, w);
@@ -429,43 +439,18 @@ impl Data {
         // to point to the appropriate got and gotplt entries
 
         for r in iter {
-            if let Some(s) = target.lookup_dynamic(&r.name) {
-                // if it's dynamic
-                let assign = match s.kind {
-                    SymbolKind::Text => {
-                        if s.is_static() {
-                            unreachable!();
-                        } else if r.effect() == format::PatchEffect::AddToGot {
-                            if r.is_plt() {
-                                GotPltAssign::GotWithPltGot
-                            } else {
-                                GotPltAssign::Got
-                            }
-                        } else if r.effect() == format::PatchEffect::AddToPlt {
-                            GotPltAssign::GotPltWithPlt
-                        } else {
-                            GotPltAssign::None
-                        }
-                    }
-                    SymbolKind::Data => GotPltAssign::Got,
-                    _ => GotPltAssign::None,
-                };
+            let symbol = target.lookup(&r.name).unwrap();
+            eprintln!("S: {:?}", symbol);
 
-                let symbol = self.dynamics.relocation_add_write(&s, assign, r, w);
+            if let Some(s) = target.lookup_dynamic(&r.name) {
+                let symbol = self.dynamics.relocation_add_write(&symbol, r, w);
                 self.symbols.insert(symbol.name.clone(), symbol.clone());
-                log::info!(
-                    "reloc0 {}, {:?}, {:?}, {:?}",
-                    &r,
-                    assign,
-                    s.bind,
-                    symbol.pointer
-                );
+                log::info!("reloc0 {}, {:?}, {:?}", &r, s.bind, symbol.pointer);
                 continue;
             }
 
             // static plt relatives
             if let Some(s) = target.lookup_static(&r.name) {
-                self.symbols.insert(s.name.clone(), s.clone());
                 if r.is_plt() {
                     log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
                     continue;
@@ -508,7 +493,7 @@ impl Data {
                     log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                     if assign == GotPltAssign::None {
                     } else {
-                        self.dynamics.relocation_add_write(&s, assign, r, w);
+                        self.dynamics.relocation_add_write(&symbol, r, w);
                     }
                 } else {
                     log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
@@ -521,10 +506,9 @@ impl Data {
     }
 
     pub(crate) fn update_data(&mut self, target: &Target) {
-        for (name, _, pointer) in self.dynamics.symbols() {
+        for (name, _, s) in self.dynamics.symbols() {
             //self.pointers.insert(name, pointer);
-            self.symbols
-                .insert(name.clone(), ReadSymbol::from_pointer(name, pointer));
+            self.symbols.insert(name.clone(), s); //ReadSymbol::from_pointer(name, pointer));
         }
 
         for (name, symbol) in target.locals.iter() {
@@ -545,7 +529,6 @@ impl Data {
         let locals = vec!["_DYNAMIC"];
         for symbol_name in locals {
             let s = target.lookup_static(symbol_name).unwrap();
-            //self.pointers.insert(s.name, s.pointer);
             self.symbols.insert(s.name.clone(), s);
         }
     }
@@ -626,7 +609,9 @@ impl ResolvePointer {
                 if let Some(base) = data.addr_get_by_name(".got.plt") {
                     let size = std::mem::size_of::<usize>() as u64;
                     // first 3 entries in the got.plt are already used
-                    Some(base + (*index as u64 + 3) * size)
+                    // but that should already be factored in the index
+                    assert!(*index >= 3);
+                    Some(base + (*index as u64 + 0) * size)
                 } else {
                     None
                 }
@@ -637,7 +622,9 @@ impl ResolvePointer {
                     // each entry in small model is 0x10 in size
                     let size = 0x10;
                     // skip the stub (+1)
-                    Some(base + (*index as u64 + 1) * size)
+                    // stub should already be part of the index
+                    assert!(*index >= 1);
+                    Some(base + (*index as u64 + 0) * size)
                 } else {
                     None
                 }
@@ -654,11 +641,6 @@ impl ResolvePointer {
             }
             Self::Unknown => None,
         };
-        if let Some(p) = out {
-            log::debug!("resolve({:?}) -> {:#0x}", self, p);
-        } else {
-            log::debug!("resolve({:?})", self);
-        }
         out
     }
 }

@@ -439,7 +439,9 @@ impl Data {
         // to point to the appropriate got and gotplt entries
 
         for r in iter {
-            let symbol = target.lookup(&r.name).unwrap();
+            let symbol = target
+                .lookup(&r.name)
+                .expect(&format!("Missing {}", &r.name));
             eprintln!("S: {:?}", symbol);
 
             if let Some(s) = target.lookup_dynamic(&r.name) {

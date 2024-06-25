@@ -3,7 +3,7 @@ use crate::aot::{
     BlockSection,
     BuildGotPltSection,
     BuildGotSection,
-    //BuildPltGotSection,
+    BuildPltGotSection,
     BuildPltSection,
     GotPltAssign,
     //GotSectionKind,
@@ -211,7 +211,6 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
     }
 
     // PLTGOT
-    /*
     let pltgot_size = BuildPltGotSection::size(data);
     if pltgot_size > 0 {
         let pltgot_align = BuildPltGotSection::align(data);
@@ -223,7 +222,6 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
         let buf = BuildPltGotSection::contents(data, 0);
         pltgot_block.copy(buf.as_slice());
     }
-    */
 
     apply_relocations(&target.rx, data);
     apply_relocations(&target.ro, data);

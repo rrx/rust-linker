@@ -86,6 +86,11 @@ gcc2:
 	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt tmp/gcc2.exe
 	exec tmp/gcc2.exe
 
+gcc2_dynamic:
+	cargo run --bin link -- --dynamic -v \
+		build/clang-glibc/print_main2.o \
+		/usr/lib/x86_64-linux-gnu/libc.so.6
+
 gcc2_ref:
 	${CLANG} \
 		-o build/clang-glibc/print_main2 \
@@ -93,6 +98,20 @@ gcc2_ref:
 	readelf -srW build/clang-glibc/print_main2
 	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt build/clang-glibc/print_main2
 	exec build/clang-glibc/print_main2
+
+link_shared:
+	cargo run --bin link -- -v --link \
+		-o tmp/link_shared.exe \
+		build/clang-glibc/link_shared.o \
+		build/clang-glibc/print_main1.o \
+		build/clang-glibc/asdf1.o \
+		build/testlibs/libz.so \
+		/usr/lib/x86_64-linux-gnu/libc.so.6 \
+		/usr/lib/x86_64-linux-gnu/crt1.o 
+	readelf -srW tmp/link_shared.exe
+	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt tmp/link_shared.exe
+	exec tmp/link_shared.exe
+
 
 dup:
 	cargo run --bin link -- -v --link \
@@ -126,7 +145,7 @@ musl:
 		/usr/lib/x86_64-linux-musl/crtn.o
 	exec tmp/musl.exe
 
-examples: gcc empty musl dup empty_dynamic #gcc_dynamic
+examples: gcc empty musl dup link_shared empty_dynamic #gcc_dynamic
 
 dump:
 	readelf -aW tmp/out.exe

@@ -212,20 +212,22 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
 
     // PLTGOT
     let pltgot_size = BuildPltGotSection::size(data);
+    let mut pltgot_block = None;
     if pltgot_size > 0 {
         let pltgot_align = BuildPltGotSection::align(data);
-        let mut pltgot_block = version
+        let mut block = version
             .rx
             .alloc_block_align(pltgot_size, pltgot_align)
             .unwrap();
-        data.addr_set(".plt.got", pltgot_block.as_ptr() as u64);
+        data.addr_set(".plt.got", block.as_ptr() as u64);
         let buf = BuildPltGotSection::contents(data, 0);
-        pltgot_block.copy(buf.as_slice());
+        block.copy(buf.as_slice());
+        pltgot_block = Some(block);
     }
 
-    apply_relocations(&target.rx, data);
-    apply_relocations(&target.ro, data);
-    apply_relocations(&target.rw, data);
+    apply_relocations(&target.rx, data, true);
+    apply_relocations(&target.ro, data, true);
+    apply_relocations(&target.rw, data, true);
 
     rx_block.copy(target.rx.bytes());
 
@@ -250,6 +252,18 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
             let block = plt_block.as_ref().unwrap();
             eprintln!(
                 "PLT Disassemble, Base: {:#0x}, Size:{}",
+                block.as_ptr() as usize,
+                block.size()
+            );
+            let buf = std::slice::from_raw_parts(block.as_ptr(), block.size());
+            format::print_bytes(buf, block.as_ptr() as usize);
+            format::disassemble_buf(buf);
+        }
+
+        if pltgot_size > 0 {
+            let block = pltgot_block.as_ref().unwrap();
+            eprintln!(
+                "PLTGOT Disassemble, Base: {:#0x}, Size:{}",
                 block.as_ptr() as usize,
                 block.size()
             );

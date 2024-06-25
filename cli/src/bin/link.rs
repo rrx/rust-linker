@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if args.dynamic {
         let version = LoaderVersion::load_block(&mut exe)?;
         version.debug();
-        let r: u32 = version.invoke("main", ())?;
+        let r: u32 = version.invoke("main", (0,))?;
         println!("ret: {}", r);
         //let mut link = DynamicLink::new();
         //link.load(&data, &exe)?;

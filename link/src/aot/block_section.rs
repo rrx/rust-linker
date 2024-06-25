@@ -90,7 +90,7 @@ impl ElfBlock for GeneralSection {
 
     fn write(&self, data: &Data, w: &mut Writer) {
         w.write_start_section(&self.offsets);
-        apply_relocations(self, data);
+        apply_relocations(self, data, false);
         w.write(self.bytes.as_slice());
     }
 
@@ -143,7 +143,7 @@ impl GeneralSection {
     }
 }
 
-pub fn apply_relocations(section: &GeneralSection, data: &Data) {
+pub fn apply_relocations(section: &GeneralSection, data: &Data, preload: bool) {
     let patch_base = section.bytes.as_ptr();
     for r in section.relocations.iter() {
         if let Some(symbol) = data.symbols.get(&r.name) {
@@ -154,6 +154,7 @@ pub fn apply_relocations(section: &GeneralSection, data: &Data) {
                 &symbol,
                 patch_base as *mut u8,
                 section.offsets.address as *mut u8,
+                preload,
             );
         } else {
             unreachable!("Unable to locate symbol: {}, {}", &r.name, &r);

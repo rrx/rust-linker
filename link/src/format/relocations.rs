@@ -272,6 +272,7 @@ impl CodeRelocation {
         patch_base: *mut u8,
         // this will be the same for patch_base when live
         v_base: *mut u8, // the virtual base, where the segment will be mapped
+        preload: bool,
     ) {
         let pointer = symbol.pointer.clone();
         log::info!(target: "relocations", "{}: {:?}", &self.name, self);
@@ -297,7 +298,7 @@ impl CodeRelocation {
         };
 
         log::info!(target: "relocations", "{}: {:?}", &self.name, pointer);
-        let addr = pointer.resolve(data).unwrap();
+        let mut addr = pointer.resolve(data).unwrap();
         log::info!(target: "relocations", "{}: {:#0x}", &self.name, addr);
 
         match self.r.kind {
@@ -439,6 +440,10 @@ impl CodeRelocation {
 
                 // complicated pointer arithmetic to update the relocations
                 //
+                if preload {
+                    addr = symbol.pointer.resolve(data).unwrap();
+                }
+
                 unsafe {
                     let patch = patch_base.offset(self.offset as isize);
                     let v = v_base.offset(self.offset as isize);

@@ -91,6 +91,11 @@ gcc2_dynamic:
 		build/clang-glibc/print_main2.o \
 		/usr/lib/x86_64-linux-gnu/libc.so.6
 
+gcc2_dynamic_debug:
+	exec rust-gdb --args ./target/debug/link --dynamic -v \
+		build/clang-glibc/print_main2.o \
+		/usr/lib/x86_64-linux-gnu/libc.so.6
+
 gcc2_ref:
 	${CLANG} \
 		-o build/clang-glibc/print_main2 \
@@ -145,7 +150,7 @@ musl:
 		/usr/lib/x86_64-linux-musl/crtn.o
 	exec tmp/musl.exe
 
-examples: gcc empty musl dup link_shared empty_dynamic #gcc_dynamic
+examples: gcc empty musl dup link_shared empty_dynamic gcc2_dynamic gcc_dynamic
 
 dump:
 	readelf -aW tmp/out.exe

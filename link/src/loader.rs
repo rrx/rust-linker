@@ -167,9 +167,9 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
         if let Some(s) = data.symbols.get(&r.name) {
             log::info!("reloc5 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
             continue;
+        } else {
+            unreachable!("Unable to find symbol for relocation: {}", &r.name);
         }
-
-        unreachable!("Unable to find symbol for relocation: {}", &r.name);
     }
 
     // ALLOCATE TABLES

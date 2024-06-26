@@ -100,7 +100,8 @@ gcc2_ref:
 	${CLANG} \
 		-o build/clang-glibc/print_main2 \
 		build/clang-glibc/print_main2.o 
-	readelf -srW build/clang-glibc/print_main2
+	readelf -aW build/clang-glibc/print_main2
+	objdump -d --full-contents --section=.text --section=.data --section=.rodata build/clang-glibc/print_main2
 	objdump -d --full-contents --section=.plt.got --section=.plt --section=.got --section=.got.plt build/clang-glibc/print_main2
 	exec build/clang-glibc/print_main2
 
@@ -145,6 +146,7 @@ musl:
 		-o tmp/musl.exe \
 		build/clang-musl/empty_main.o \
 		/usr/lib/x86_64-linux-musl/libc.so \
+		build/clang-glibc/print_string.o \
 		/usr/lib/x86_64-linux-musl/crt1.o \
 		/usr/lib/x86_64-linux-musl/crti.o \
 		/usr/lib/x86_64-linux-musl/crtn.o

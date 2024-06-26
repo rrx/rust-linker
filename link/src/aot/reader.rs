@@ -316,12 +316,13 @@ impl ReadBlock {
         for symbol in b.dynamic_symbols() {
             let mut s = read_symbol(&b, 0, &symbol)?;
             count += 1;
-            if s.kind != SymbolKind::Unknown {
-                s.pointer = ResolvePointer::Unknown;
-                s.source = SymbolSource::Dynamic;
-                s.size = 0;
-                self.target.insert_dynamic(s);
-            }
+            //println!("{} read {:?}", count, &s);
+            //if s.kind != SymbolKind::Unknown {
+            s.pointer = ResolvePointer::Unknown;
+            s.source = SymbolSource::Dynamic;
+            s.size = 0;
+            self.target.insert_dynamic(s);
+            //}
         }
         log::debug!("{} symbols read from {}", count, name);
         self.target.libs.insert(name.to_string());

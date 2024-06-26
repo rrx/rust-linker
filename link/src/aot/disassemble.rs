@@ -70,17 +70,13 @@ impl GeneralSection {
                 if next_reloc_addr <= addr {
                     let r = r_heap.pop().unwrap();
                     eprintln!("    {}", r);
-                    let p0 = if let Some(addr) = data.dynamics.lookup(&r) {
-                        addr
-                    } else {
-                        data.symbols.get(&r.name).unwrap().pointer.clone()
-                    };
-                    if let Some(p) = p0.resolve(data) {
-                        eprintln!(
-                            "    Base: {:#0x}, addr: {:#0x}, offset: {:#0x}, p: {:#0x}, p0: {}",
-                            start, addr, r.offset, p, p0
-                        );
-                    }
+                    let symbol = data.symbols.get(&r.name).unwrap();
+                    let p0 = r.pointer(data, symbol);
+                    let p = p0.resolve(data).unwrap();
+                    eprintln!(
+                        "    Base: {:#0x}, addr: {:#0x}, offset: {:#0x}, p: {:#0x}, p0: {}",
+                        start, addr, r.offset, p, p0
+                    );
                 } else {
                     break;
                 }

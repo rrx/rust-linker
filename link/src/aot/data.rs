@@ -439,71 +439,84 @@ impl Data {
         // to point to the appropriate got and gotplt entries
 
         for r in iter {
+            /*
             let symbol = target
                 .lookup(&r.name)
                 .expect(&format!("Missing {}", &r.name));
             eprintln!("S: {:?}", symbol);
+            */
+            log::info!("r {:?}", (&r, target.lookup_dynamic(&r.name)));
 
             if let Some(s) = target.lookup_dynamic(&r.name) {
-                let symbol = self.dynamics.relocation_add_write(&symbol, r, w);
+                let symbol = self.dynamics.relocation_add_write(&s, r, w);
                 self.symbols.insert(symbol.name.clone(), symbol.clone());
                 log::info!("reloc0 {}, {:?}, {:?}", &r, s.bind, symbol.pointer);
+                let symbol = target
+                    .lookup(&r.name)
+                    .expect(&format!("Missing {}", &r.name));
+                eprintln!("S: {:?}", symbol);
+
                 continue;
             }
 
             // static plt relatives
             if let Some(s) = target.lookup_static(&r.name) {
+                let symbol = target
+                    .lookup(&r.name)
+                    .expect(&format!("Missing {}", &r.name));
+                eprintln!("S: {:?}", symbol);
+
                 if r.is_plt() {
                     log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
-                    continue;
-                }
+                    //continue;
+                } else {
+                    // we don't know the section yet, we just know which kind
+                    let def = match s.bind {
+                        SymbolBind::Local => CodeSymbolDefinition::Local,
+                        SymbolBind::Global => CodeSymbolDefinition::Defined,
+                        SymbolBind::Weak => CodeSymbolDefinition::Defined,
+                    };
 
-                // we don't know the section yet, we just know which kind
-                let def = match s.bind {
-                    SymbolBind::Local => CodeSymbolDefinition::Local,
-                    SymbolBind::Global => CodeSymbolDefinition::Defined,
-                    SymbolBind::Weak => CodeSymbolDefinition::Defined,
-                };
-
-                let assign = match s.kind {
-                    SymbolKind::Text => {
-                        if s.is_static() {
-                            if r.is_plt() {
+                    let assign = match s.kind {
+                        SymbolKind::Text => {
+                            if s.is_static() {
+                                if r.is_plt() {
+                                    GotPltAssign::GotPltWithPlt
+                                } else {
+                                    GotPltAssign::Got
+                                }
+                            } else if r.effect() == format::PatchEffect::AddToGot {
+                                if r.is_plt() {
+                                    GotPltAssign::GotWithPltGot
+                                } else {
+                                    GotPltAssign::Got
+                                }
+                            } else if r.effect() == format::PatchEffect::AddToPlt {
                                 GotPltAssign::GotPltWithPlt
                             } else {
-                                GotPltAssign::Got
+                                GotPltAssign::None
                             }
-                        } else if r.effect() == format::PatchEffect::AddToGot {
-                            if r.is_plt() {
-                                GotPltAssign::GotWithPltGot
-                            } else {
-                                GotPltAssign::Got
-                            }
-                        } else if r.effect() == format::PatchEffect::AddToPlt {
-                            GotPltAssign::GotPltWithPlt
-                        } else {
-                            GotPltAssign::None
                         }
-                    }
-                    SymbolKind::Data => GotPltAssign::Got,
-                    _ => GotPltAssign::None,
-                };
+                        SymbolKind::Data => GotPltAssign::Got,
+                        _ => GotPltAssign::None,
+                    };
 
-                if s.source == SymbolSource::Dynamic {
-                    unreachable!();
-                } else if def != CodeSymbolDefinition::Local {
-                    log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
-                    if assign == GotPltAssign::None {
+                    if s.source == SymbolSource::Dynamic {
+                        unreachable!();
+                    } else if def != CodeSymbolDefinition::Local {
+                        log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
+                        if assign == GotPltAssign::None {
+                        } else {
+                            self.dynamics.relocation_add_write(&s, r, w);
+                        }
                     } else {
-                        self.dynamics.relocation_add_write(&symbol, r, w);
+                        log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                     }
-                } else {
-                    log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                 }
-                continue;
+                //continue;
+            } else {
+                unreachable!("Unable to find symbol for relocation: {}", &r.name)
             }
-
-            unreachable!("Unable to find symbol for relocation: {}", &r.name)
         }
     }
 

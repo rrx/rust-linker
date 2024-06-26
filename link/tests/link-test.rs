@@ -153,7 +153,23 @@ fn test_libc() {
 }
 
 #[test]
-fn loader_libc_musl() {
+fn loader_libc() {
+    let mut config = AOTConfig::new();
+    config.verbose = true;
+    let mut exe = ReadBlock::new("exe");
+    exe.add(&temp_path("print_stuff.o"), &config).unwrap();
+    exe.add(&temp_path("print_string.o"), &config).unwrap();
+    exe.add(&temp_path("/lib/x86_64-linux-gnu/libc.so.6"), &config)
+        .unwrap();
+    let version = LoaderVersion::load_block(&mut exe).unwrap();
+    version.debug();
+    test_loader_print_string(&version);
+    test_loader_lib_print(&version);
+    test_loader_print_stuff(&version);
+}
+
+#[test]
+fn loader_musl() {
     let mut config = AOTConfig::new();
     config.verbose = true;
     let mut exe = ReadBlock::new("exe");

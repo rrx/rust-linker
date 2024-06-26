@@ -12,8 +12,6 @@ pub struct Target {
     pub rw: GeneralSection,
     pub rx: GeneralSection,
     pub bss: GeneralSection,
-    //pub got: GeneralSection,
-    //pub gotplt: GeneralSection,
     pub unresolved: HashSet<String>,
     pub unknown: SymbolMap,
 }
@@ -29,8 +27,6 @@ impl Target {
             rw: ReadSectionKind::RW.section(),
             rx: ReadSectionKind::RX.section(),
             bss: ReadSectionKind::Bss.section(),
-            //got: GeneralSection::new(AllocSegment::RW, ".got", 0x10),
-            //gotplt: GeneralSection::new(AllocSegment::RW, ".got.plt", 0x10),
             unresolved: HashSet::new(),
             unknown: SymbolMap::new(),
         }

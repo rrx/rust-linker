@@ -1,5 +1,7 @@
 use crate::aot::{Data, ReadSymbol, ResolvePointer};
-use object::{Relocation, RelocationEncoding, RelocationKind, RelocationTarget};
+use object::{
+    elf::R_X86_64_GOTPCRELX, Relocation, RelocationEncoding, RelocationKind, RelocationTarget,
+};
 use std::fmt;
 
 const R_X86_64_GOTPCREL: u32 = 0x29; //41;
@@ -264,19 +266,11 @@ impl CodeRelocation {
         }
     }
 
-    pub fn patch(
-        &self,
-        data: &Data,
-        symbol: &ReadSymbol,
-        // pointer to the base of the relocation slice
-        patch_base: *mut u8,
-        // this will be the same for patch_base when live
-        v_base: *mut u8, // the virtual base, where the segment will be mapped
-        preload: bool,
-    ) {
+    pub fn pointer(&self, data: &Data, symbol: &ReadSymbol) -> ResolvePointer {
         let pointer = symbol.pointer.clone();
-        log::info!(target: "relocations", "{}: {:?}", &self.name, self);
-        log::info!(target: "relocations", "{}: {:?}", &self.name, symbol.pointer);
+        log::info!(target: "relocations", "{}: relocation: {:?}", &self.name, self);
+        log::info!(target: "relocations", "{}: symbol pointer:  {:?}", &self.name, symbol.pointer);
+        log::info!(target: "relocations", "{}: is_static: {}, got: {}, plt: {}", &self.name, symbol.is_static(), self.is_got(), self.is_plt());
 
         let pointer = if symbol.is_static() {
             if self.is_got() {
@@ -296,13 +290,34 @@ impl CodeRelocation {
                 pointer
             }
         };
+        log::info!(target: "relocations", "{}: pointer:  {:?}", &self.name, pointer);
+        pointer
+    }
 
-        log::info!(target: "relocations", "{}: {:?}", &self.name, pointer);
+    pub fn patch(
+        &self,
+        data: &Data,
+        symbol: &ReadSymbol,
+        // pointer to the base of the relocation slice
+        patch_base: *mut u8,
+        // this will be the same for patch_base when live
+        v_base: *mut u8, // the virtual base, where the segment will be mapped
+        preload: bool,
+    ) {
+        let pointer = self.pointer(data, symbol);
         let mut addr = pointer.resolve(data).unwrap();
-        log::info!(target: "relocations", "{}: {:#0x}", &self.name, addr);
+        log::info!(target: "relocations", "{}: resolved: {:#0x}", &self.name, addr);
 
         match self.r.kind {
-            RelocationKind::Elf(R_X86_64_GOTPCREL /* 41 */) => {
+            RelocationKind::Elf(R_X86_64_GOTPCREL /* 41 */)
+            | RelocationKind::Elf(R_X86_64_REX_GOTP /* 42 */) => {
+                /* Note: R_X86_64_REX_GOTPCRELX relocation has an optimization as defined in the ABI
+                 * converting a relative offset to an immediate one
+                 */
+
+                // R_X86_64_GOTPCRELX
+                // R_X86_64_REX_GOTPCRELX
+                // G + GOT + A - P
                 unsafe {
                     let patch = patch_base.offset(self.offset as isize);
                     let v = v_base.offset(self.offset as isize);
@@ -329,13 +344,23 @@ impl CodeRelocation {
                 }
             }
 
+            /*
             RelocationKind::Elf(R_X86_64_REX_GOTP /* 42 */) => {
                 // R_X86_64_REX_GOTPCRELX
+                // G + GOT + A - P
+                /* Note: This relocation has an optimization as defined in the ABI
+                 * converting a relative offset to an immediate one
+                 */
+
                 // got entry + addend - reloc_offset(patch)
                 // we are computing the offset from the current instruction pointer
 
+                //if preload {
+                    // skip GOT and just point direct
+                    //addr = symbol.pointer.resolve(data).unwrap();
+                //}
+
                 unsafe {
-                    let patch = patch_base.offset(self.offset as isize);
                     let v = v_base.offset(self.offset as isize);
 
                     // this works
@@ -344,6 +369,7 @@ impl CodeRelocation {
                     // this does not work
                     //let value = patch as isize + rel.r.addend as isize - addr as isize;
 
+                    let patch = patch_base.offset(self.offset as isize);
                     let before = std::ptr::read(patch);
                     log::debug!("patch_base: {:#08x}", patch_base as usize);
                     log::debug!("patch: {:#08x}", patch as usize);
@@ -365,7 +391,7 @@ impl CodeRelocation {
                     );
                 }
             }
-
+            */
             RelocationKind::Absolute => {
                 // S + A
                 // S = Address of the symbol
@@ -373,25 +399,36 @@ impl CodeRelocation {
                 //
                 let name = &self.name;
                 unsafe {
+                    log::debug!("addr:  {:#08x}", addr as usize);
+                    log::debug!("patch_base: {:#08x}", patch_base as usize);
+
                     // we need to dereference here, because the pointer is coming from the GOT
-                    let vaddr = std::ptr::read(addr as *const usize) as usize;
-                    let adjusted = vaddr + self.r.addend as usize;
+                    //let vaddr = std::ptr::read(addr as *const usize) as usize;
+                    //log::debug!("vaddr: {:#08x}", vaddr as usize);
+
+                    let adjusted = addr as usize + self.r.addend as usize;
+                    log::debug!("adjusted: {:#0x}", adjusted);
+
                     let patch = patch_base.offset(self.offset as isize);
-                    let _v = v_base.offset(self.offset as isize);
+                    log::debug!("patch: {:#08x}", patch as usize);
+
+                    //let _v = v_base.offset(self.offset as isize);
                     let before = std::ptr::read(patch);
+                    log::debug!("before: {:#08x}", before);
 
                     let patch = match self.r.size {
                         32 => {
                             // patch as 32 bit
                             //let adjusted = addr.offset(self.r.addend as isize) as u64;
                             //*(patch as *mut i32) = adjusted as i32;
-                            unimplemented!("32 bit absolute relocation does not work");
+                            unimplemented!("32 bit absolute relocations not implemented");
                             //patch as u64
                         }
                         64 => {
+                            // R_X86_64_64
                             // patch as 64 bit
                             let patch = patch_base.offset(self.offset as isize) as *mut u64;
-                            //*(patch as *mut u64) = adjusted as u64;
+                            log::debug!("write:  {:#0x} -> {:#0x}", adjusted as u64, patch as u64);
                             std::ptr::write(patch as *mut u64, adjusted as u64);
                             patch as u64
                         }
@@ -400,7 +437,7 @@ impl CodeRelocation {
 
                     log::info!(
                         "rel absolute {}: patch {:#16x}:{:#16x}=>{:#16x} addend:{:#08x} addr:{:#08x}, vaddr:{:#08x}",
-                        name, patch, before, adjusted as usize, self.r.addend, addr as u64, vaddr as usize
+                        name, patch, before, adjusted as usize, self.r.addend, addr as u64, addr as usize
                     );
                 }
             }

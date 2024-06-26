@@ -374,7 +374,7 @@ impl CodeRelocation {
                 let name = &self.name;
                 unsafe {
                     // we need to dereference here, because the pointer is coming from the GOT
-                    let vaddr = *(addr as *const usize) as usize;
+                    let vaddr = std::ptr::read(addr as *const usize) as usize;
                     let adjusted = vaddr + self.r.addend as usize;
                     let patch = patch_base.offset(self.offset as isize);
                     let _v = v_base.offset(self.offset as isize);

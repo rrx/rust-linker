@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 const char *g_str1 = "0xx\n";
 const char *g_str2 = "13334x\n";

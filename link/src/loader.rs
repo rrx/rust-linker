@@ -35,37 +35,59 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
 
     // RW
     let align = 0x10;
-    let bss_size = target.bss.size();
-    if bss_size > 0 {
-        let bss_block = version.rw.alloc_block_align(bss_size, align).unwrap();
-        data.addr_set(".bss", bss_block.as_ptr() as u64);
-    }
+    let bss_block = if target.bss.size() > 0 {
+        let block = version
+            .rw
+            .alloc_block_align(target.bss.size(), align)
+            .unwrap();
+        data.addr_set(".bss", block.as_ptr() as u64);
+        Some(block)
+    } else {
+        None
+    };
 
-    let rw_size = target.rw.size();
-    if rw_size > 0 {
-        let mut rw_block = version.rw.alloc_block_align(rw_size, align).unwrap();
-        data.addr_set(".data", rw_block.as_ptr() as u64);
-        rw_block.copy(target.rw.bytes());
-        target.rw.offsets.address = rw_block.as_ptr() as u64;
-    }
+    let rw_block = if target.rw.size() > 0 {
+        let mut block = version
+            .rw
+            .alloc_block_align(target.rw.size(), align)
+            .unwrap();
+        data.addr_set(".data", block.as_ptr() as u64);
+        block.copy(target.rw.bytes());
+        target.rw.offsets.address = block.as_ptr() as u64;
+        Some(block)
+    } else {
+        None
+    };
 
     // RO
-    let ro_size = target.ro.size();
-    if ro_size > 0 {
-        let mut ro_block = version.ro.alloc_block_align(ro_size, align).unwrap();
-        data.addr_set(".rodata", ro_block.as_ptr() as u64);
-        ro_block.copy(target.ro.bytes());
-        target.ro.offsets.address = ro_block.as_ptr() as u64;
-    }
+    let ro_block = if target.ro.size() > 0 {
+        let mut block = version
+            .ro
+            .alloc_block_align(target.ro.size(), align)
+            .unwrap();
+        data.addr_set(".rodata", block.as_ptr() as u64);
+        block.copy(target.ro.bytes());
+        target.ro.offsets.address = block.as_ptr() as u64;
+        Some(block)
+    } else {
+        None
+    };
 
     // RX
-    let rx_size = target.rx.size();
-    let mut rx_block = version.rx.alloc_block_align(rx_size, align).unwrap();
-    data.addr_set(".text", rx_block.as_ptr() as u64);
-    let symbol =
-        ReadSymbol::from_pointer(".text".into(), ResolvePointer::Section(".text".into(), 0));
-    data.symbols.insert(".text".to_string(), symbol);
-    target.rx.offsets.address = rx_block.as_ptr() as u64;
+    let rx_block = if target.rx.size() > 0 {
+        let block = version
+            .rx
+            .alloc_block_align(target.rx.size(), align)
+            .unwrap();
+        data.addr_set(".text", block.as_ptr() as u64);
+        let symbol =
+            ReadSymbol::from_pointer(".text".into(), ResolvePointer::Section(".text".into(), 0));
+        data.symbols.insert(".text".to_string(), symbol);
+        target.rx.offsets.address = block.as_ptr() as u64;
+        Some(block)
+    } else {
+        None
+    };
 
     for (name, symbol) in target.exports.iter() {
         eprintln!("ES: {:?}", (name, &symbol));
@@ -229,16 +251,20 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
     apply_relocations(&target.ro, data, true);
     apply_relocations(&target.rw, data, true);
 
-    rx_block.copy(target.rx.bytes());
+    if let Some(mut block) = rx_block {
+        block.copy(target.rx.bytes());
+        unsafe {
+            let buf = std::slice::from_raw_parts(block.as_ptr(), block.size());
+            target
+                .rx
+                .disassemble_code_start(data, buf, block.as_ptr() as usize, block.size());
+        }
+    }
 
     //for (name, p) in pointers.iter() {
     //eprintln!("P: {:#0x}: {}", p, name);
     //}
     unsafe {
-        let buf = std::slice::from_raw_parts(rx_block.as_ptr(), rx_block.size());
-        target
-            .rx
-            .disassemble_code_start(data, buf, rx_block.as_ptr() as usize, rx_block.size());
         if got_size > 0 {
             eprintln!(
                 "GOT Disassemble, Base: {:#0x}, Size:{}",
@@ -281,6 +307,24 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
             let buf = std::slice::from_raw_parts(gotplt_block.as_ptr(), gotplt_block.size());
             format::print_bytes(buf, gotplt_block.as_ptr() as usize);
             format::disassemble_buf(buf);
+        }
+
+        if let Some(block) = rw_block {
+            eprintln!(
+                "RW Disassemble, Base: {:#0x}, Size:{}",
+                block.as_ptr() as usize,
+                block.size()
+            );
+            let buf = std::slice::from_raw_parts(block.as_ptr(), block.size());
+            format::print_bytes(buf, block.as_ptr() as usize);
+        }
+
+        if let Some(block) = bss_block {
+            eprintln!(
+                "BSS Disassemble, Base: {:#0x}, Size:{}",
+                block.as_ptr() as usize,
+                block.size()
+            );
         }
     }
 

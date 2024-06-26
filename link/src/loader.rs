@@ -46,13 +46,12 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
         None
     };
 
-    let rw_block = if target.rw.size() > 0 {
-        let mut block = version
+    let mut rw_block = if target.rw.size() > 0 {
+        let block = version
             .rw
             .alloc_block_align(target.rw.size(), align)
             .unwrap();
         data.addr_set(".data", block.as_ptr() as u64);
-        block.copy(target.rw.bytes());
         target.rw.offsets.address = block.as_ptr() as u64;
         Some(block)
     } else {
@@ -60,13 +59,12 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
     };
 
     // RO
-    let ro_block = if target.ro.size() > 0 {
-        let mut block = version
+    let mut ro_block = if target.ro.size() > 0 {
+        let block = version
             .ro
             .alloc_block_align(target.ro.size(), align)
             .unwrap();
         data.addr_set(".rodata", block.as_ptr() as u64);
-        block.copy(target.ro.bytes());
         target.ro.offsets.address = block.as_ptr() as u64;
         Some(block)
     } else {
@@ -74,7 +72,7 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
     };
 
     // RX
-    let rx_block = if target.rx.size() > 0 {
+    let mut rx_block = if target.rx.size() > 0 {
         let block = version
             .rx
             .alloc_block_align(target.rx.size(), align)
@@ -251,10 +249,23 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
     apply_relocations(&target.ro, data, true);
     apply_relocations(&target.rw, data, true);
 
-    if let Some(mut block) = rx_block {
+    // Copy blocks over
+    if let Some(block) = ro_block.as_mut() {
+        block.copy(target.ro.bytes());
+    }
+    if let Some(block) = rw_block.as_mut() {
+        block.copy(target.rw.bytes());
+    }
+
+    if let Some(block) = rx_block.as_mut() {
         block.copy(target.rx.bytes());
         unsafe {
             let buf = std::slice::from_raw_parts(block.as_ptr(), block.size());
+            eprintln!(
+                "RX Disassemble, Base: {:#0x}, Size:{}",
+                block.as_ptr() as usize,
+                block.size()
+            );
             target
                 .rx
                 .disassemble_code_start(data, buf, block.as_ptr() as usize, block.size());
@@ -307,6 +318,16 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
             let buf = std::slice::from_raw_parts(gotplt_block.as_ptr(), gotplt_block.size());
             format::print_bytes(buf, gotplt_block.as_ptr() as usize);
             format::disassemble_buf(buf);
+        }
+
+        if let Some(block) = ro_block {
+            eprintln!(
+                "RO Disassemble, Base: {:#0x}, Size:{}",
+                block.as_ptr() as usize,
+                block.size()
+            );
+            let buf = std::slice::from_raw_parts(block.as_ptr(), block.size());
+            format::print_bytes(buf, block.as_ptr() as usize);
         }
 
         if let Some(block) = rw_block {

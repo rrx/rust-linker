@@ -3,12 +3,12 @@
 
 // .data
 int g = 1;
+char *g4 = "X";
+char *g5 = "X";
 
 // .bss
 int g2 = 0;
 int g3 = 0;
-char *g4 = "X";
-char *g5 = "X";
 
 // link from another object file
 long asdf(long);
@@ -35,7 +35,6 @@ int main(int argc, const char **argv) {
     printf("arg %d: %s\n", i, argv[i]);
   }
 
-  /*
   char buf[80];
   sprintf(buf, "%s\n", g4);
   if (0 != strncmp(buf, "X\n", strlen(buf))) {
@@ -54,7 +53,11 @@ int main(int argc, const char **argv) {
   if (0 != strncmp("X", g5, 1)) {
     abort();
   }
-  */
+
+  char *x = "Y";
+  if (*x != 'Y') {
+    abort();
+  }
 
   return 0;
 }

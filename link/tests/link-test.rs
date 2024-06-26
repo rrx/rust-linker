@@ -140,19 +140,6 @@ fn loader_libuv() {
 }
 
 #[test]
-fn test_libc() {
-    let mut b = DynamicLink::new();
-    b.add_library("libc", &temp_path("/lib/x86_64-linux-gnu/libc.so.6"))
-        .unwrap();
-    b.add(&temp_path("print_stuff.o")).unwrap();
-    b.add(&temp_path("print_string.o")).unwrap();
-    let version = b.link().unwrap();
-    //test_lib_print(version.clone());
-    test_print_stuff(version.clone());
-    //test_print_string(version);
-}
-
-#[test]
 fn loader_libc() {
     let mut config = AOTConfig::new();
     config.verbose = true;
@@ -237,16 +224,9 @@ fn test_loader_print_stuff(version: &LoaderVersion) {
     let ret: i32 = version.invoke("print_stuff2", (c_str_ptr, 7i32)).unwrap();
     log::debug!("ret: {:#08x}", ret);
     assert_eq!(18, ret);
+    let ret: i32 = version.invoke("print_stuff3", (8i32,)).unwrap();
+    log::debug!("ret: {:#08x}", ret);
     let ret: i32 = version.invoke("print_stuff4", (c_str_ptr, 9i32)).unwrap();
-    log::debug!("ret: {:#08x}", ret);
-    return;
-    // TODO: fix print_stuff3, reading string is returning null
-    let ret: i32 = version.invoke("print_stuff3", (8i32,)).unwrap();
-    log::debug!("ret: {:#08x}", ret);
-}
-
-fn test_print_stuff(version: LinkVersion) {
-    let ret: i32 = version.invoke("print_stuff3", (8i32,)).unwrap();
     log::debug!("ret: {:#08x}", ret);
 }
 

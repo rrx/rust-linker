@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int call_fprintf() {
+char *g4 = "X";
+long g = 1;
+
+int main(int argc, const char **argv) {
   int x = &fprintf;
-  fprintf(stdout, "%p\n", x);
+  fprintf(stdout, "%p, %p, %x\n", x, g4, *g4);
   return 0;
 }
-
-int main(int argc, const char **argv) { return call_fprintf(); }

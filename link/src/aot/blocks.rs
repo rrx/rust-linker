@@ -1104,9 +1104,9 @@ impl ElfBlock for PltSection {
 
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         // length + 1, to account for the stub.  Each entry is 0x10 in size
-        let size = BuildPltSection::size(data); //(1 + plt_entries_count) * 0x10;
+        let size = BuildPltSection::size(data);
         self.section.bytes.resize(size, 0);
-        let align = BuildPltSection::align(data); //self.section.offsets.align as usize;
+        let align = BuildPltSection::align(data);
 
         let file_offset = w.reserve_start_section(&self.section.offsets);
         self.section.offsets.size = size as u64;

@@ -62,7 +62,7 @@ impl GeneralSection {
 
         for instr in insts.as_ref() {
             let addr = instr.address() as u64 - start as u64;
-            let abs_addr = instr.address() as usize; // + start;
+            let abs_addr = instr.address() as usize;
 
             // relocation heap
             while r_heap.len() > 0 {

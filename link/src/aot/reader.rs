@@ -316,13 +316,10 @@ impl ReadBlock {
         for symbol in b.dynamic_symbols() {
             let mut s = read_symbol(&b, 0, &symbol)?;
             count += 1;
-            //println!("{} read {:?}", count, &s);
-            //if s.kind != SymbolKind::Unknown {
             s.pointer = ResolvePointer::Unknown;
             s.source = SymbolSource::Dynamic;
             s.size = 0;
             self.target.insert_dynamic(s);
-            //}
         }
         log::debug!("{} symbols read from {}", count, name);
         self.target.libs.insert(name.to_string());
@@ -387,17 +384,6 @@ impl ReadBlock {
         }
     }
 
-    /*
-    pub fn resolve(&mut self) {
-        for r in self.target.rx.relocations.iter() {
-            eprintln!("E: {:?}", (&self.name, &r));
-            if let Some(s) = self.target.lookup_static(&r.name) {
-                eprintln!("S: {:?}", (&self.name, &s));
-            }
-        }
-    }
-    */
-
     pub fn add_block(&mut self, block: ReadBlock) {
         let mut renames = HashMap::new();
 
@@ -414,7 +400,6 @@ impl ReadBlock {
         // exports
         for (_name, s) in block.target.exports.into_iter() {
             let s = self.relocate_symbol(s);
-            //eprintln!("E: {:?}", (&block.name, _name, &s));
             self.target.insert_export(s);
         }
 

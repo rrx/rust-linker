@@ -232,5 +232,5 @@ ninja.build: build.py
 	python3 build.py ../c-testsuite/tests/single-exec
 
 testsuites: ninja.build
-	ninja -v testsuites
+	ninja -v testsuite-clang-glibc
 

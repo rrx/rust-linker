@@ -5,8 +5,9 @@ default: test
 fmt:
 	cargo fmt
 	clang-format -i testfiles/*.c
+	python3 -m black *.py
 
-test: functions examples
+test: functions examples testsuites
 	cargo test -- --nocapture
 
 empty_dynamic:
@@ -208,48 +209,28 @@ deps:
 CFLAGS=-fPIC -fno-lto -fno-direct-access-external-data
 CFLAGS_MUSL=-I/usr/include/x86_64-linux-musl ${CFLAGS}
 
-functions:
+functions: ninja.build
 	mkdir -p build/clang-glibc build/clang-musl build/gcc-glibc build/testlibs
 	cp $(shell python3 scripts/findlib.py libz.so) build/testlibs
-	$(CLANG) ${CFLAGS} -c testfiles/testfunction.c -o ./build/clang-glibc/testfunction.o
-	$(CLANG) ${CFLAGS} -c testfiles/simplefunction.c -o ./build/clang-glibc/simplefunction.o
-	$(CLANG) ${CFLAGS} -c testfiles/asdf1.c -o ./build/clang-glibc/asdf1.o
-	$(CLANG) ${CFLAGS} -c testfiles/asdf2.c -o ./build/clang-glibc/asdf2.o
-	$(CLANG) ${CFLAGS} -c testfiles/segfault.c -o ./build/clang-glibc/segfault.o
-	$(CLANG) ${CFLAGS} -c testfiles/link_shared.c -o ./build/clang-glibc/link_shared.o
-	$(CLANG) ${CFLAGS} -c testfiles/live.c -o ./build/clang-glibc/live.o
-	$(CLANG) ${CFLAGS} -c testfiles/empty_main.c -o ./build/clang-glibc/empty_main.o
-	$(CLANG) ${CFLAGS} -c testfiles/print_main1.c -o ./build/clang-glibc/print_main1.o
-	$(CLANG) ${CFLAGS} -c testfiles/print_main2.c -o ./build/clang-glibc/print_main2.o
-	$(CLANG) ${CFLAGS} -c testfiles/sdltest.c -o ./build/clang-glibc/sdltest.o
-
-	$(CLANG) ${CFLAGS_MUSL} -v -c testfiles/empty_main.c -o ./build/clang-musl/empty_main.o
-	$(CLANG) ${CFLAGS_MUSL} -v -c testfiles/print_main1.c -o ./build/clang-musl/print_main1.o
-	$(CLANG) ${CFLAGS_MUSL} -v -c testfiles/print_main2.c -o ./build/clang-musl/print_main2.o
-
-	gcc -fPIC -c testfiles/sdltest.c -o ./build/gcc-glibc/sdltest.o
-	gcc -fPIC -c testfiles/empty_main.c -o ./build/gcc-glibc/empty_main.o
 	gcc -fPIC testfiles/empty_main.c -o ./build/gcc-glibc/empty_main
-
 	$(CLANG) ${CFLAGS} -g testfiles/empty_main.c -o ./build/clang-glibc/empty_main
 	$(CLANG) ${CFLAGS} -v -fpie testfiles/empty_main.c -o ./build/clang-glibc/empty_main
-
-	$(CLANG) ${CFLAGS} -c testfiles/uvtest.c -o ./build/clang-glibc/uvtest.o
-	$(CLANG) ${CFLAGS} -c testfiles/globals.c -o ./build/clang-glibc/globals.o
-	$(CLANG) ${CFLAGS} -c testfiles/call_extern.c -o ./build/clang-glibc/call_extern.o
-	$(CLANG) ${CFLAGS} -c testfiles/print_stuff.c -o ./build/clang-glibc/print_stuff.o
-	$(CLANG) ${CFLAGS} -c testfiles/print_string.c -o ./build/clang-glibc/print_string.o
 	$(CLANG) ${CFLAGS} -g testfiles/segfault_handle.c -o ./build/clang-glibc/segfault_handle
 	$(CLANG) ${CFLAGS} -g testfiles/segfault_handle2.c -o ./build/clang-glibc/segfault_handle2
-
-	#ar -rv tmp/liblive.a ./tmp/live.o ./tmp/globals.o
-	#$(CLANG) -fPIC -shared ./tmp/liblive.a -o ./tmp/live.so
-	#$(CLANG) -shared -fpic -Wl,--no-undefined testfiles/live.c -o ./build/clang-glibc/live.so
-
 	$(CLANG) ${CFLAGS} -c -nostdlib testfiles/start.c -o ./build/clang-glibc/start.o
 	#$(CLANG) -nostdlib testfiles/globals.c testfiles/start.c -o ./tmp/start
 	$(CLANG) ${CFLAGS} -shared testfiles/live.c -o ./build/clang-glibc/live.so
 	$(CLANG) ${CFLAGS} -nostdlib -shared testfiles/globals.c -o ./build/clang-glibc/globals.so
-
 	$(CLANG) ${CFLAGS} -g testfiles/invoke_print.c -o ./build/clang-glibc/invoke_print
+	ninja -v testfiles
+
+clean:
+	rm -rf build/c-testsuite build/clang-glibc build/clang-musl
+
+
+ninja.build: build.py
+	python3 build.py ../c-testsuite/tests/single-exec
+
+testsuites: ninja.build
+	ninja -v testsuites
 

@@ -24,7 +24,7 @@ fn loader_main() {
     let mut exe = ReadBlock::new("exe");
     exe.add(&temp_path("/lib/x86_64-linux-gnu/libc.so.6"), &config)
         .unwrap();
-    exe.add(&temp_path("print_main.o"), &config).unwrap();
+    exe.add(&temp_path("print_main1.o"), &config).unwrap();
     exe.add(&temp_path("asdf1.o"), &config).unwrap();
     let version = LoaderVersion::load_block(&mut exe).unwrap();
     version.debug();
@@ -45,7 +45,7 @@ fn loader_livelink() {
     exe.add(&temp_path("testfunction.o"), &config).unwrap();
     exe.add(&temp_path("simplefunction.o"), &config).unwrap();
     exe.add(&temp_path("call_extern.o"), &config).unwrap();
-    exe.add(&temp_path("asdf.o"), &config).unwrap();
+    exe.add(&temp_path("asdf1.o"), &config).unwrap();
     let version = LoaderVersion::load_block(&mut exe).unwrap();
     version.debug();
     let ret: i64 = version.invoke("simple_function", ()).unwrap();

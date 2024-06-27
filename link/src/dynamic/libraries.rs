@@ -1,4 +1,5 @@
 use super::*;
+use crate::LinkError;
 use std::error::Error;
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;

@@ -13,9 +13,9 @@ use crate::aot::{
     SymbolSource,
     Target,
 };
-use crate::dynamic::{BlockFactoryInner, LinkError, SharedLibraryRepo};
+use crate::dynamic::{BlockFactoryInner, SharedLibraryRepo};
 use crate::format;
-use crate::{Data, ReadBlock};
+use crate::{Data, LinkError, ReadBlock};
 use object::SymbolKind;
 use std::collections::HashMap;
 use std::error::Error;

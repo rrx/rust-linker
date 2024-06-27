@@ -52,8 +52,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         version.debug();
         let r: u32 = version.invoke("main", (0,))?;
         println!("ret: {}", r);
-        //let mut link = DynamicLink::new();
-        //link.load(&data, &exe)?;
     } else if args.link {
         let mut data = Data::new();
         if let Some(interp) = args.interp {

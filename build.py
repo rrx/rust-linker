@@ -89,18 +89,20 @@ def generate_c_testsuite(base, rule, build_type, fp):
         output_result = os.path.join(output, "%05d.c.results" % i)
         assert os.path.exists(expected_filename)
 
-        i += 1
-
-        if (i - 1) in [143, 189]:
+        # skip broken tests
+        if i in [143, 189]:
+            i += 1
             continue
-        outputs.append(f"{build_type}/{i-1}")
+
+        outputs.append(f"{build_type}/{i}")
         fp.write(f"build {output_filename}: {rule} {filename}\n")
         fp.write(f"build {output_exe}: link {output_filename} | target/release/link\n")
         fp.write(f"build {output_result}: run {output_exe}\n")
         fp.write(
             f"build {filename}-{build_type}-diff: diff {filename}.expected {output_result}\n"
         )
-        fp.write(f"build {build_type}/{i-1}: phony {filename} | {output_result} \n")
+        fp.write(f"build {build_type}/{i}: phony {filename} | {output_result}\n")
+        i += 1
 
     fp.write(f"build testsuite-{build_type}: phony {' '.join(outputs)}\n")
     fp.write(f"default testsuite-{build_type}\n")

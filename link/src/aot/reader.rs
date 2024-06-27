@@ -136,7 +136,7 @@ impl ReadSymbol {
             source: SymbolSource::Static,
             kind: SymbolKind::Unknown,
             bind: SymbolBind::Local,
-            pointer,
+            pointer: pointer.clone(),
             size: 0,
         }
     }
@@ -315,14 +315,11 @@ impl ReadBlock {
         }
         for symbol in b.dynamic_symbols() {
             let mut s = read_symbol(&b, 0, &symbol)?;
-            s.pointer = ResolvePointer::Resolved(0);
+            count += 1;
+            s.pointer = ResolvePointer::Unknown;
             s.source = SymbolSource::Dynamic;
             s.size = 0;
-            //eprintln!("s: {:#08x}, {:?}", 0, &s);
-            count += 1;
-            if s.kind != SymbolKind::Unknown {
-                self.target.insert_dynamic(s);
-            }
+            self.target.insert_dynamic(s);
         }
         log::debug!("{} symbols read from {}", count, name);
         self.target.libs.insert(name.to_string());
@@ -403,7 +400,6 @@ impl ReadBlock {
         // exports
         for (_name, s) in block.target.exports.into_iter() {
             let s = self.relocate_symbol(s);
-            //eprintln!("E: {:?}", (&block.name, name, &s));
             self.target.insert_export(s);
         }
 
@@ -493,6 +489,7 @@ impl ReadBlock {
         match kind {
             ReadSectionKind::Bss => {
                 self.target.bss.from_section(b, section)?;
+                self.target.bss.extend_size(section.size() as usize);
             }
             ReadSectionKind::RX => {
                 self.target.rx.from_section(b, section)?;
@@ -611,10 +608,9 @@ pub fn read_symbol<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
         section: section_kind,
         kind: symbol.kind(),
         bind,
-        pointer,
+        pointer: pointer.clone(),
         size,
         source: SymbolSource::Static,
-        //lookup: SymbolLookupTable::None,
     })
 }
 

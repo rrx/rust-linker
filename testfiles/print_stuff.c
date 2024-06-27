@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 const char *g_str1 = "0xx\n";
 const char *g_str2 = "13334x\n";
@@ -8,14 +9,16 @@ int print_stuff1() { return 1; }
 
 int print_stuff2(char *str, int val) { return g_v + 1 + val; }
 
+// g_str1 is null?
 int print_stuff3(int val) { return g_v + strlen(g_str1); }
 
 int print_stuff4(char *str, int val) {
   fputs("fffff", stdout);
   fflush(stdout);
-  return 0;
+  // g_str1 is null?
   printf("yyyy: %s xxxx\n", g_str1);
   printf("zzzz: %s xxxx\n", g_str2);
+  return 0;
   printf(g_str1);
   printf(g_str2);
   int ret0 = printf(str, val);

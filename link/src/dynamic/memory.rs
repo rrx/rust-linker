@@ -22,7 +22,52 @@ pub struct BlockInner {
     p: NonNull<u8>,
 }
 
+impl BlockInner {
+    pub fn as_ptr(&self) -> *const u8 {
+        self.p.as_ptr() as *const u8
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn copy(&mut self, buf: &[u8]) {
+        // copy data into the area
+        assert!(buf.len() <= self.layout.size());
+        let size = std::cmp::min(buf.len(), self.layout.size());
+        unsafe {
+            std::ptr::copy(buf.as_ptr(), self.p.as_ptr(), size);
+        }
+    }
+}
+
 impl BlockFactoryInner {
+    pub fn create(num_pages: usize) -> Result<BlockFactoryInner, Box<dyn Error>> {
+        // the total amount of space allocated should not be more than 4GB,
+        // because we are limited to 32bit relative addressing
+        // we can address things outside this block, but we need 64 bit addressing
+        let ps = page_size();
+        let size = ps * num_pages;
+        let m = MmapMut::map_anon(size)?;
+        //unsafe {
+        //libc::mprotect(m.as_ptr() as *mut libc::c_void, size_plus_metadata, 7);
+        //}
+        let mut heap = Heap::empty();
+
+        unsafe {
+            let ptr = m.as_ptr();
+            log::debug!("Memory Block Created: {:#08x}+{:x}", ptr as usize, size);
+            heap.init(ptr as *mut u8, ps * num_pages);
+            assert_eq!(heap.bottom(), ptr as *mut u8);
+        }
+
+        Ok(Self {
+            page_size: ps,
+            heap,
+            m,
+        })
+    }
+
     pub fn used(&self) -> usize {
         self.heap.used()
     }
@@ -31,7 +76,24 @@ impl BlockFactoryInner {
         self.mprotect(libc::PROT_READ | libc::PROT_WRITE).unwrap();
     }
 
-    fn alloc_block(&mut self, size: usize) -> Option<BlockInner> {
+    pub fn force_rx(&mut self) {
+        self.mprotect(libc::PROT_READ | libc::PROT_EXEC).unwrap();
+    }
+
+    pub fn force_ro(&mut self) {
+        self.mprotect(libc::PROT_READ).unwrap();
+    }
+
+    pub fn alloc_block_align(&mut self, size: usize, align: usize) -> Option<BlockInner> {
+        assert!(size > 0);
+        let layout = Layout::from_size_align(size, align).unwrap();
+        match self.heap.allocate_first_fit(layout) {
+            Ok(p) => Some(BlockInner { layout, size, p }),
+            Err(_e) => None,
+        }
+    }
+
+    pub fn alloc_block(&mut self, size: usize) -> Option<BlockInner> {
         assert!(size > 0);
         let aligned_size = page_align(size, self.page_size);
         let layout = Layout::from_size_align(aligned_size, 16).unwrap();
@@ -71,29 +133,9 @@ impl BlockFactory {
     }
 
     pub fn create(num_pages: usize) -> Result<BlockFactory, Box<dyn Error>> {
-        // the total amount of space allocated should not be more than 4GB,
-        // because we are limited to 32bit relative addressing
-        // we can address things outside this block, but we need 64 bit addressing
-        let ps = page_size();
-        let size = ps * num_pages;
-        let m = MmapMut::map_anon(size)?;
-        //unsafe {
-        //libc::mprotect(m.as_ptr() as *mut libc::c_void, size_plus_metadata, 7);
-        //}
-        let mut heap = Heap::empty();
-
-        unsafe {
-            let ptr = m.as_ptr();
-            log::debug!("Memory Block Created: {:#08x}+{:x}", ptr as usize, size);
-            heap.init(ptr as *mut u8, ps * num_pages);
-            assert_eq!(heap.bottom(), ptr as *mut u8);
-        }
-
-        Ok(Self(Arc::new(Mutex::new(BlockFactoryInner {
-            page_size: ps,
-            heap,
-            m,
-        }))))
+        Ok(Self(Arc::new(Mutex::new(BlockFactoryInner::create(
+            num_pages,
+        )?))))
     }
 
     pub fn alloc_block(&self, size: usize) -> Option<Block> {
@@ -168,6 +210,9 @@ impl SmartPointer {
     pub fn as_ptr(&self) -> *const u8 {
         self.0.as_ptr() as *const u8
     }
+    //pub fn copy(&mut self, buf: &[u8]) {
+    //self.0.copy(buf);
+    //}
 }
 
 pub struct SmartPointerInner {

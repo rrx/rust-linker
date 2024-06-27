@@ -1,4 +1,5 @@
 use super::*;
+use crate::LinkError;
 use std::error::Error;
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
@@ -49,7 +50,9 @@ impl Library {
         // call the main function
 
         // make sure we dereference the pointer!
-        let ptr = self.lookup(name).ok_or(LinkError::SymbolNotFound)?;
+        let ptr = self
+            .lookup(name)
+            .ok_or(LinkError::SymbolNotFound(name.to_string()))?;
         unsafe {
             type MyFunc<P, T> = unsafe extern "cdecl" fn(P) -> T;
             log::debug!("invoking {} @ {:#08x}", name, ptr.as_ptr() as usize);
@@ -64,12 +67,23 @@ impl Library {
 pub struct SharedLibraryRepo {
     map: im::HashMap<String, SharedLibrary>,
 }
+
 impl SharedLibraryRepo {
     pub fn clear(&mut self) {
         self.map.clear();
     }
+
     pub fn update(&mut self, repo: SharedLibraryRepo) {
         self.map = self.map.clone().union(repo.map.clone());
+    }
+
+    pub fn add_library(&mut self, name: &str, path: &Path) -> Result<(), Box<dyn Error>> {
+        unsafe {
+            let lib = libloading::Library::new(path)?;
+            self.add(name, lib);
+            log::info!("Loaded library: {}", &path.to_string_lossy());
+        }
+        Ok(())
     }
 }
 

@@ -20,10 +20,6 @@ pub trait BlockSection {
     fn relocation_add(&mut self, r: CodeRelocation);
     fn extend_size(&mut self, s: usize);
     fn extend_bytes(&mut self, bytes: &[u8]);
-    //fn reserve_section_index(&mut self, data: &mut Data, w: &mut Writer);
-    //fn reserve(&mut self, data: &mut Data, w: &mut Writer);
-    //fn write(&self, data: &Data, w: &mut Writer);
-    //fn write_section_header(&self, w: &mut Writer);
 }
 
 #[derive(Debug, Clone)]
@@ -32,28 +28,9 @@ pub struct GeneralSection {
     pub(crate) name: &'static str,
     pub(crate) name_id: Option<StringId>,
     pub(crate) section_index: Option<SectionIndex>,
-    //pub(crate) size: usize,
     pub(crate) bytes: Vec<u8>,
     pub(crate) relocations: Vec<CodeRelocation>,
     pub(crate) offsets: SectionOffset,
-}
-
-fn resolve_r(data: &Data, r: &CodeRelocation) -> Option<u64> {
-    //eprintln!("resolve: {}, kind: {:?}", &r.name, r.r.kind());
-
-    // check if it's in the plt or got, and look it up in dynamics
-    //if r.is_plt() || r.is_got() {
-    if let Some(resolve_addr) = data.dynamics.lookup(r) {
-        return resolve_addr.resolve(data);
-    }
-    //}
-
-    // otherwise, just look up the symbol
-    if let Some(resolve_addr) = data.pointers.get(&r.name) {
-        resolve_addr.resolve(data)
-    } else {
-        None
-    }
 }
 
 impl BlockSection for GeneralSection {
@@ -113,8 +90,7 @@ impl ElfBlock for GeneralSection {
 
     fn write(&self, data: &Data, w: &mut Writer) {
         w.write_start_section(&self.offsets);
-        self.apply_relocations(data);
-
+        apply_relocations(self, data, false);
         w.write(self.bytes.as_slice());
     }
 
@@ -132,7 +108,6 @@ impl ElfBlock for GeneralSection {
                 sh_addralign: self.offsets.align,
                 sh_size: self.offsets.size as u64,
             });
-            println!("write size: {}:{}", self.name(), self.offsets.size);
         }
     }
 }
@@ -144,7 +119,6 @@ impl GeneralSection {
             name,
             name_id: None,
             section_index: None,
-            //size: 0,
             bytes: vec![],
             relocations: vec![],
             offsets: SectionOffset::new(name.into(), alloc, align),
@@ -167,31 +141,27 @@ impl GeneralSection {
         }
         Ok(())
     }
+}
 
-    pub fn apply_relocations(&self, data: &Data) {
-        let patch_base = self.bytes.as_ptr();
-        //eprintln!("symbols: {:?}", data.dynamics.symbols());
-        //eprintln!("plt: {:?}", data.dynamics.plt_hash);
-        //eprintln!("pltgot: {:?}", data.dynamics.pltgot_hash);
-        for r in self.relocations.iter() {
-            if let Some(addr) = resolve_r(data, r) {
-                log::info!(
-                    target: "relocations",
-                    "R-{:?}: vbase: {:#0x}, addr: {:#0x}, {}",
-                    self.offsets.alloc, self.offsets.address, addr as usize, &r.name
-                );
-                r.patch(
-                    patch_base as *mut u8,
-                    self.offsets.address as *mut u8,
-                    addr as *const u8,
-                );
-            } else {
-                unreachable!("Unable to locate symbol: {}, {}", &r.name, &r);
-            }
+pub fn apply_relocations(section: &GeneralSection, data: &Data, preload: bool) {
+    let patch_base = section.bytes.as_ptr();
+    for r in section.relocations.iter() {
+        if let Some(symbol) = data.symbols.get(&r.name) {
+            log::info!(target: "relocations", "{}: {:?}", &r.name, (symbol, r.is_plt(), r.is_got()));
+            log::info!(target: "relocations", "{}: {:?}", &r.name, r);
+            r.patch(
+                data,
+                &symbol,
+                patch_base as *mut u8,
+                section.offsets.address as *mut u8,
+                preload,
+            );
+        } else {
+            unreachable!("Unable to locate symbol: {}, {}", &r.name, &r);
         }
-
-        //if data.debug_enabled(&DebugFlag::Disassemble) {
-        self.disassemble(data);
-        //}
     }
+
+    //if data.debug_enabled(&DebugFlag::Disassemble) {
+    section.disassemble(data);
+    //}
 }

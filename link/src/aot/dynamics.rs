@@ -10,7 +10,7 @@ struct TrackStringIndex {
     string_id: StringId,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum GotPltAssign {
     Got,           // object
     GotWithPltGot, // function
@@ -23,7 +23,6 @@ struct TrackSymbolIndex {
     string_id: Option<StringId>,
     symbol_index: Option<SymbolIndex>,
     symbol: ReadSymbol,
-    pointer: ResolvePointer,
 }
 
 pub struct Dynamics {
@@ -44,6 +43,11 @@ pub struct Dynamics {
     pub plt_hash: HashMap<String, ReadSymbol>,
     pltgot: Vec<ReadSymbol>,
     pub pltgot_hash: HashMap<String, ReadSymbol>,
+
+    pub got_lookup: HashMap<String, usize>,
+    pub gotplt_lookup: HashMap<String, usize>,
+    pub plt_lookup: HashMap<String, usize>,
+    pub pltgot_lookup: HashMap<String, usize>,
 
     got_index: usize,
     gotplt_index: usize,
@@ -67,8 +71,12 @@ impl Dynamics {
             pltgot: vec![],
             pltgot_hash: HashMap::new(),
             got_index: 0,
+            got_lookup: HashMap::new(),
+            gotplt_lookup: HashMap::new(),
+            plt_lookup: HashMap::new(),
+            pltgot_lookup: HashMap::new(),
             gotplt_index: 3,
-            plt_index: 0,
+            plt_index: 1,
             pltgot_index: 0,
         }
     }
@@ -83,7 +91,7 @@ impl Dynamics {
     pub fn lookup(&self, r: &CodeRelocation) -> Option<ResolvePointer> {
         if r.is_got() {
             if let Some(track) = self.symbol_hash.get(&r.name) {
-                Some(track.pointer.clone())
+                Some(track.symbol.pointer.clone())
             } else {
                 None
             }
@@ -93,7 +101,7 @@ impl Dynamics {
             } else if let Some(symbol) = self.pltgot_hash.get(&r.name) {
                 Some(symbol.pointer.clone())
             } else if let Some(track) = self.symbol_hash.get(&r.name) {
-                Some(track.pointer.clone())
+                Some(track.symbol.pointer.clone())
             } else {
                 None
             }
@@ -143,57 +151,94 @@ impl Dynamics {
             .count()
     }
 
-    pub fn relocation_add(
+    pub fn save_relocation(&mut self, symbol: ReadSymbol, r: &CodeRelocation) -> ReadSymbol {
+        log::debug!(target: "symbols", "r: {}", r);
+        let mut add_got = false;
+        let mut add_gotplt = false;
+        let mut add_plt = false;
+
+        if symbol.is_static() {
+            if r.is_got() {
+                add_got = true;
+            }
+        } else {
+            if r.is_got() {
+                add_got = true;
+            }
+            if r.is_plt() {
+                add_got = true;
+                add_plt = true;
+            }
+        }
+
+        if add_plt {
+            if !self.plt_lookup.contains_key(&symbol.name) {
+                self.plt.push(symbol.clone());
+                self.pltgot.push(symbol.clone());
+                self.plt_lookup
+                    .insert(symbol.name.to_string(), self.plt_index);
+                self.pltgot_lookup
+                    .insert(symbol.name.to_string(), self.pltgot_index);
+                self.plt_index += 1;
+                self.pltgot_index += 1;
+            }
+        }
+
+        if add_gotplt {
+            if !self.gotplt_lookup.contains_key(&symbol.name) {
+                self.r_gotplt.push(symbol.clone());
+                self.gotplt_lookup
+                    .insert(symbol.name.to_string(), self.gotplt_index);
+                self.gotplt_index += 1;
+            }
+        }
+
+        if add_got {
+            if !self.got_lookup.contains_key(&symbol.name) {
+                self.r_got.push(symbol.clone());
+                self.got_lookup
+                    .insert(symbol.name.to_string(), self.got_index);
+                self.got_index += 1;
+            }
+        }
+
+        symbol
+    }
+
+    pub fn relocation_add(&mut self, symbol: &ReadSymbol, r: &CodeRelocation) -> ReadSymbol {
+        let name = &symbol.name;
+        let symbol = self.save_relocation(symbol.clone(), r);
+
+        if let Some(track) = self.symbol_hash.get(name) {
+            track.symbol.clone()
+        } else {
+            self.symbols.push(symbol.name.clone());
+            self.symbol_hash.insert(
+                symbol.name.clone(),
+                TrackSymbolIndex {
+                    string_id: None,
+                    symbol_index: None,
+                    symbol: symbol.clone(),
+                },
+            );
+            symbol
+        }
+    }
+
+    pub fn relocation_add_write(
         &mut self,
         symbol: &ReadSymbol,
-        assign: GotPltAssign,
         r: &CodeRelocation,
         w: &mut Writer,
-    ) {
+    ) -> ReadSymbol {
         let name = &symbol.name;
+        let symbol = self.save_relocation(symbol.clone(), r);
 
-        if let Some(_track) = self.symbol_hash.get(name) {
-            ()
+        if let Some(track) = self.symbol_hash.get(name) {
+            track.symbol.clone()
         } else {
-            //eprintln!("sym: {:?}", symbol);
-            log::debug!(target: "symbols", "r: {:?}, {}", assign, r);
-            let mut symbol = symbol.clone();
-
-            match assign {
-                GotPltAssign::Got => {
-                    symbol.pointer = ResolvePointer::Got(self.got_index);
-
-                    self.r_got.push(symbol.clone());
-
-                    self.got_index += 1;
-                    self.symbol_add(symbol, w);
-                }
-
-                GotPltAssign::GotWithPltGot => {
-                    symbol.pointer = ResolvePointer::PltGot(self.pltgot_index);
-                    self.pltgot.push(symbol.clone());
-                    self.pltgot_hash.insert(name.to_string(), symbol.clone());
-                    self.pltgot_index += 1;
-
-                    symbol.pointer = ResolvePointer::Got(self.got_index);
-                    self.r_got.push(symbol.clone());
-
-                    self.got_index += 1;
-                    self.symbol_add(symbol, w);
-                }
-
-                GotPltAssign::GotPltWithPlt => {
-                    symbol.pointer = ResolvePointer::Plt(self.plt_index);
-                    self.plt.push(symbol.clone());
-                    self.plt_hash.insert(name.to_string(), symbol.clone());
-                    self.plt_index += 1;
-
-                    self.r_gotplt.push(symbol.clone());
-                    self.gotplt_index += 1;
-                    self.symbol_add(symbol, w);
-                }
-                _ => unreachable!(),
-            };
+            self.symbol_add(symbol.clone(), w);
+            symbol
         }
     }
 
@@ -217,9 +262,7 @@ impl Dynamics {
             //index,
             string_id,
             symbol_index,
-            pointer: symbol.pointer.clone(),
             symbol,
-            //relative,
         };
 
         self.symbol_hash.insert(name.clone(), track);
@@ -229,7 +272,7 @@ impl Dynamics {
     pub fn symbol_lookup(&self, name: &str) -> Option<ResolvePointer> {
         self.symbol_hash
             .get(name)
-            .map(|track| track.pointer.clone())
+            .map(|track| track.symbol.pointer.clone())
     }
 
     pub fn symbol_get(&self, name: &str, data: &Data) -> Option<(SymbolIndex, Sym)> {
@@ -261,17 +304,16 @@ impl Dynamics {
             let track = self.symbol_hash.get(name).unwrap();
             if track.symbol_index.is_some() {
                 let sym = track.symbol.get_dynamic_symbol(data);
-                //let (_symbol_index, sym) = self.symbol_get(name, data).expect(&format!("not found {}", name));
                 w.write_dynamic_symbol(&sym);
             }
         }
     }
 
-    pub fn symbols(&self) -> Vec<(String, Option<SymbolIndex>, ResolvePointer)> {
+    pub fn symbols(&self) -> Vec<(String, Option<SymbolIndex>, ReadSymbol)> {
         let mut out = vec![];
         for name in self.symbols.iter() {
             let track = self.symbol_hash.get(name).unwrap();
-            out.push((name.to_string(), track.symbol_index, track.pointer.clone()));
+            out.push((name.to_string(), track.symbol_index, track.symbol.clone()));
         }
         out
     }

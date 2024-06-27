@@ -10,6 +10,8 @@ struct Args {
     verbose: bool,
     #[arg(long)]
     link: bool,
+    #[arg(long)]
+    dynamic: bool,
     #[arg(short, long)]
     interp: Option<String>,
     #[arg(short, long)]
@@ -32,17 +34,25 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut exe = ReadBlock::new("exe");
     for path in args.inputs.iter() {
-        let block = ReadBlock::from_path(Path::new(&path), &config)?;
+        //let block = ReadBlock::from_path(Path::new(&path), &config)?;
         //block.dump();
-        exe.add_block(block);
+        //exe.add_block(block);
         //block.add(&Path::new(&path), &config)?;
+        exe.add(&Path::new(&path), &config)?;
     }
+
+    //exe.resolve();
 
     if args.verbose {
         exe.dump();
     }
 
-    if args.link {
+    if args.dynamic {
+        let version = LoaderVersion::load_block(&mut exe)?;
+        version.debug();
+        let r: u32 = version.invoke("main", (0,))?;
+        println!("ret: {}", r);
+    } else if args.link {
         let mut data = Data::new();
         if let Some(interp) = args.interp {
             data = data.interp(interp);

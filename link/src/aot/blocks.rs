@@ -105,7 +105,13 @@ impl ElfBlock for FileHeader {
     }
 
     fn write(&self, data: &Data, w: &mut Writer) {
-        let start = data.pointer_get("_start");
+        let start = data
+            .symbols
+            .get("_start")
+            .unwrap()
+            .pointer
+            .resolve(data)
+            .unwrap();
         let e_entry = start;
 
         w.write_file_header(&object::write::elf::FileHeader {
@@ -346,10 +352,9 @@ impl ElfBlock for DynamicSection {
             w.reserved_len()
         );
         data.section_dynamic.addr = Some(self.offsets.address);
-        data.pointers.insert(
-            ".dynamic".to_string(),
-            ResolvePointer::Resolved(self.offsets.address),
-        );
+        let pointer = ResolvePointer::Resolved(self.offsets.address);
+        let symbol = ReadSymbol::from_pointer(".dynamic".to_string(), pointer);
+        data.symbols.insert(symbol.name.clone(), symbol);
         data.addr_set(".dynamic", self.offsets.address);
     }
 
@@ -376,7 +381,6 @@ pub struct RelaDynSection {
     kind: GotSectionKind,
     name_id: Option<StringId>,
     count: usize,
-    //relocation_names: HashMap<String, StringId>,
     offsets: SectionOffset,
     is_rela: bool,
 }
@@ -388,7 +392,6 @@ impl RelaDynSection {
             kind,
             name_id: None,
             count: 0,
-            //relocation_names: HashMap::default(),
             offsets: SectionOffset::new(name, AllocSegment::RO, 0x08),
             is_rela: true,
         }
@@ -604,7 +607,7 @@ impl ElfBlock for SymTabSection {
         let symbols = data.statics.gen_symbols(data);
 
         for (i, x) in symbols.iter().enumerate() {
-            println!("static: {}:{:?}", i, x);
+            log::debug!("static: {}:{:?}", i, x);
         }
 
         assert_eq!(symbols.len(), self.count);
@@ -984,29 +987,13 @@ impl GotSectionKind {
     }
 
     fn write_entries(&self, data: &Data, w: &mut Writer) {
-        let unapplied = data.dynamics.relocations(*self);
-
         match self {
             GotSectionKind::GOT => {
-                // just empty
-                let mut bytes: Vec<u8> = vec![];
-                let len = unapplied.len() + self.start_index();
-                let size = len * std::mem::size_of::<usize>();
-                bytes.resize(size, 0);
+                let bytes = BuildGotSection::contents(data);
                 w.write(bytes.as_slice());
             }
             GotSectionKind::GOTPLT => {
-                // populate with predefined values
-                let mut values: Vec<u64> = vec![data.addr_get(".dynamic"), 0, 0];
-                let len = unapplied.len();
-                let plt_addr = data.addr_get(".plt") + 0x16;
-                for i in 0..len {
-                    values.push(plt_addr + i as u64 * 0x10);
-                }
-                let mut bytes: Vec<u8> = vec![];
-                for v in values {
-                    bytes.extend(v.to_le_bytes().as_slice());
-                }
+                let bytes = BuildGotPltSection::contents(data);
                 w.write(bytes.as_slice());
             }
         }
@@ -1116,14 +1103,11 @@ impl ElfBlock for PltSection {
     }
 
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
-        let plt_entries_count = data.dynamics.plt_objects().len();
-
         // length + 1, to account for the stub.  Each entry is 0x10 in size
-        let size = (1 + plt_entries_count) * 0x10;
+        let size = BuildPltSection::size(data);
         self.section.bytes.resize(size, 0);
-        let align = self.section.offsets.align as usize;
+        let align = BuildPltSection::align(data);
 
-        println!("plt align: {}, size: {}", align, size);
         let file_offset = w.reserve_start_section(&self.section.offsets);
         self.section.offsets.size = size as u64;
         w.reserve(self.section.bytes.len(), align);
@@ -1150,68 +1134,7 @@ impl ElfBlock for PltSection {
 
     fn write(&self, data: &Data, w: &mut Writer) {
         w.write_start_section(&self.section.offsets);
-
-        let got_addr = data.addr_get_by_name(".got.plt").unwrap() as isize;
-        let vbase = self.section.offsets.address as isize;
-
-        let mut stub: Vec<u8> = vec![
-            // 0x401020: push   0x2fe2(%rip)        # 404008 <_GLOBAL_OFFSET_TABLE_+0x8>
-            // got+8 - rip // (0x404000+0x8) - (0x401020 + 0x06)
-            0xff, 0x35, 0xe2, 0x2f, 0x00, 0x00,
-            // 0x401026: jump to GOT[2]
-            // jmp    *0x2fe4(%rip)        # 404010 <_GLOBAL_OFFSET_TABLE_+0x10>
-            0xff, 0x25, 0xe4, 0x2f, 0x00, 0x00,
-            // 40102c:       0f 1f 40 00             nopl   0x0(%rax)
-            0x0f, 0x1f, 0x40, 0x00,
-        ];
-
-        let got1 = got_addr + 0x8 - (vbase + 0x06);
-        let b = (got1 as i32).to_le_bytes();
-        stub.as_mut_slice()[2..6].copy_from_slice(&b);
-
-        let got2 = got_addr + 0x10 - (vbase + 0x0c);
-        let b = (got2 as i32).to_le_bytes();
-        stub.as_mut_slice()[8..12].copy_from_slice(&b);
-
-        let plt_entries_count = data.dynamics.plt_objects().len();
-
-        for slot_index in 0..plt_entries_count {
-            let slot: Vec<u8> = vec![
-                // # 404018 <puts@GLIBC_2.2.5>, .got.plot 4th entry, GOT[3], jump there
-                // # got.plt[3] = 0x401036, initial value,
-                // which points to the second instruction (push) in this plt entry
-                // # the dynamic linker will update GOT[3] with the actual address, so this lookup only happens once
-                // 401030:       ff 25 e2 2f 00 00       jmp    *0x2fe2(%rip)        # 404018 <puts@GLIBC_2.2.5>
-                0xff, 0x25, 0xe2, 0x2f, 0x00, 0x00,
-                // # push plt index onto the stack
-                // # this is a reference to the entry in the relocation table defined by DT_JMPREL (.rela.plt)
-                // # that reloc will have type R_X86_64_JUMP_SLOT
-                // # the reloc will have an offset that points to GOT[3], 0x404018 = BASE + 3*0x08
-                // 401036:       68 00 00 00 00          push   $0x0
-                0x68, 0x00, 0x00, 0x00, 0x00,
-                // # jump to stub, which is (i+2)*0x10 relative to rip
-                // 40103b:       e9 e0 ff ff ff          jmp    401020 <_init+0x20>,
-                0xe9, 0xe0, 0xff, 0xff, 0xff,
-            ];
-            stub.extend(slot);
-
-            let offset = (slot_index + 1) * 0x10;
-            let rip = vbase + offset as isize + 6;
-            let addr = got_addr + (3 + slot_index as isize) * 0x08 - rip;
-            let range = offset as usize + 2..offset as usize + 6;
-            stub.as_mut_slice()[range].copy_from_slice(&(addr as i32).to_le_bytes());
-
-            let range = offset as usize + 7..offset as usize + 11;
-            stub.as_mut_slice()[range].copy_from_slice(&(slot_index as i32).to_le_bytes());
-
-            // next instruction
-            let rip = vbase + offset as isize + 0x10;
-            let addr = self.section.offsets.address as isize - rip;
-            let range = offset as usize + 0x0c..offset as usize + 0x0c + 4;
-            stub.as_mut_slice()[range].copy_from_slice(&(addr as i32).to_le_bytes());
-        }
-
-        // write stub
+        let stub = BuildPltSection::contents(data, self.section.offsets.address as usize);
         w.write(stub.as_slice());
     }
 
@@ -1228,7 +1151,6 @@ impl ElfBlock for PltSection {
             sh_addralign: self.section.offsets.align,
             sh_size: self.section.offsets.size as u64,
         });
-        println!("write size: {}:{}", self.name(), self.section.offsets.size);
     }
 }
 
@@ -1262,7 +1184,6 @@ impl ElfBlock for PltGotSection {
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         let pltgot = data.dynamics.pltgot_objects();
         let size = (pltgot.len()) * self.entry_size;
-        //self.section.size = size;
         let file_offset = w.reserve_start_section(&self.section.offsets);
         self.section.offsets.size = size as u64;
         w.reserve(size, 1);
@@ -1288,30 +1209,8 @@ impl ElfBlock for PltGotSection {
 
     fn write(&self, data: &Data, w: &mut Writer) {
         w.write_start_section(&self.section.offsets);
-
-        let vbase = self.section.offsets.address as isize;
-        let pltgot = data.dynamics.pltgot_objects();
-        eprintln!("Dis");
-        for (slot_index, symbol) in pltgot.iter().enumerate() {
-            let p = data.dynamics.symbol_lookup(&symbol.name).unwrap();
-            let mut slot: [u8; 8] = [0xff, 0x25, 0x00, 0x00, 0x00, 0x00, 0x66, 0x90];
-            let slot_size = slot.len();
-            assert_eq!(slot_size, self.entry_size);
-
-            //1050:       ff 25 82 2f 00 00       jmp    *0x2f82(%rip)        # 3fd8 <fprintf@GLIBC_2.2.5>
-            //1056:       66 90                   xchg   %ax,%ax
-
-            let gotplt_addr = p.resolve(data).unwrap();
-            let offset = (slot_index as isize) * slot_size as isize;
-            let rip = vbase + offset + 6;
-            let addr = gotplt_addr as isize - rip;
-
-            let offset = slot_index * slot_size;
-            slot.as_mut_slice()[offset + 2..offset + 6]
-                .copy_from_slice(&(addr as i32).to_le_bytes());
-            self.section.disassemble_code(data, slot.as_slice());
-            w.write(&slot);
-        }
+        let bytes = BuildPltGotSection::contents(data, self.section.offsets.address as usize);
+        w.write(&bytes);
     }
 
     fn write_section_header(&self, _data: &Data, w: &mut Writer) {
@@ -1323,11 +1222,10 @@ impl ElfBlock for PltGotSection {
             sh_offset: self.section.offsets.file_offset,
             sh_info: 0,
             sh_link: 0,
-            sh_entsize: 0x08, // entity size for .plt.got is 0x08
+            sh_entsize: BuildPltGotSection::entry_size() as u64,
             sh_addralign: self.section.offsets.align,
             sh_size: self.section.offsets.size as u64,
         });
-        println!("write size: {}:{}", self.name(), self.section.offsets.size);
     }
 }
 

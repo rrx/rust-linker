@@ -1,4 +1,5 @@
 use super::*;
+use crate::format;
 use crate::format::*;
 use object::write::elf::{SectionIndex, Writer};
 use object::write::StringId;
@@ -39,6 +40,254 @@ pub struct TrackSection {
     pub section_index: Option<SectionIndex>,
 }
 
+pub struct BuildGotPltSection {}
+impl BuildGotPltSection {
+    pub fn size(data: &Data) -> usize {
+        let kind = GotSectionKind::GOTPLT;
+        let unapplied = data.dynamics.relocations(kind);
+        let len = unapplied.len() + kind.start_index();
+        let size = len * std::mem::size_of::<usize>();
+        size
+    }
+
+    pub fn align(_data: &Data) -> usize {
+        0x08
+    }
+
+    pub fn contents(data: &Data) -> Vec<u8> {
+        let kind = GotSectionKind::GOTPLT;
+        let unapplied = data.dynamics.relocations(kind);
+
+        // populate with predefined values
+        let mut values: Vec<u64> = vec![data.addr_get(".dynamic"), 0, 0];
+        let len = unapplied.len();
+        let plt_addr = data.addr_get(".plt") + 0x16;
+        for i in 0..len {
+            values.push(plt_addr + i as u64 * 0x10);
+        }
+        let mut bytes: Vec<u8> = vec![];
+        for v in values {
+            bytes.extend(v.to_le_bytes().as_slice());
+        }
+        bytes
+    }
+}
+
+pub struct BuildGotSection {}
+impl BuildGotSection {
+    pub fn size(data: &Data) -> usize {
+        let kind = GotSectionKind::GOT;
+        let unapplied = data.dynamics.relocations(kind);
+        let len = unapplied.len() + kind.start_index();
+        let size = len * std::mem::size_of::<usize>();
+        size
+    }
+
+    pub fn align(_data: &Data) -> usize {
+        0x08
+    }
+
+    pub fn contents_dynamic(data: &Data) -> Vec<u8> {
+        let mut buf = Self::contents(data);
+        let kind = GotSectionKind::GOT;
+        let unapplied = data.dynamics.relocations(kind);
+        for (i, symbol) in unapplied.iter().enumerate() {
+            let p = symbol.pointer.resolve(data).unwrap();
+            eprintln!("U1({}): {:?}, {:#0x}", i, symbol, p);
+
+            let pp = if let Some(p) = data.symbols.get(&symbol.name) {
+                p.pointer.clone()
+            } else if let Some(s) = data.symbols.get(&symbol.name) {
+                s.pointer.clone()
+            } else {
+                unreachable!();
+            };
+
+            //let s = block.target.lookup(&symbol.name).unwrap();
+            let p = pp.resolve(data).unwrap();
+            eprintln!("U2({}): {:?}, {:#0x}", i, pp, p);
+            //if let Some(pp) = lookups.get(&s.name) {
+            //let p = pp.resolve(data).unwrap();
+            let b = (p as u64).to_le_bytes();
+            buf[i * b.len()..(i + 1) * b.len()].copy_from_slice(&b);
+            //}
+        }
+        buf
+    }
+
+    pub fn contents(data: &Data) -> Vec<u8> {
+        let kind = GotSectionKind::GOT;
+        let unapplied = data.dynamics.relocations(kind);
+
+        // just empty
+        let mut bytes: Vec<u8> = vec![];
+        let len = unapplied.len() + kind.start_index();
+        let size = len * std::mem::size_of::<usize>();
+        bytes.resize(size, 0);
+        bytes
+    }
+}
+
+pub struct BuildPltGotSection {}
+
+impl BuildPltGotSection {
+    pub fn entry_size() -> usize {
+        0x08
+    }
+
+    pub fn size(data: &Data) -> usize {
+        let pltgot = data.dynamics.pltgot_objects();
+        let size = (pltgot.len()) * Self::entry_size();
+        size
+    }
+
+    pub fn align(_data: &Data) -> usize {
+        0x08
+    }
+
+    pub fn contents(data: &Data, base: usize) -> Vec<u8> {
+        let vbase = base as isize;
+        let pltgot = data.dynamics.pltgot_objects();
+        let mut bytes: Vec<u8> = vec![];
+        for (slot_index, symbol) in pltgot.iter().enumerate() {
+            let mut slot: [u8; 8] = [0xff, 0x25, 0x00, 0x00, 0x00, 0x00, 0x66, 0x90];
+            let slot_size = slot.len();
+            assert_eq!(slot_size, Self::entry_size());
+
+            //1050:       ff 25 82 2f 00 00       jmp    *0x2f82(%rip)        # 3fd8 <fprintf@GLIBC_2.2.5>
+            //1056:       66 90                   xchg   %ax,%ax
+
+            let index = data.dynamics.got_lookup.get(&symbol.name).unwrap();
+            let p = ResolvePointer::Got(*index);
+            let gotplt_addr = p.resolve(data).unwrap();
+            let offset = (slot_index as isize) * slot_size as isize;
+            let rip = vbase + offset + 6;
+            let addr = gotplt_addr as isize - rip;
+
+            slot.as_mut_slice()[2..6].copy_from_slice(&(addr as i32).to_le_bytes());
+            bytes.extend(slot);
+        }
+        bytes
+    }
+}
+
+pub struct BuildPltSection {}
+
+impl BuildPltSection {
+    pub fn is_needed(data: &Data) -> bool {
+        data.dynamics.plt_objects().len() > 0
+    }
+    pub fn size(data: &Data) -> usize {
+        let plt_entries_count = data.dynamics.plt_objects().len();
+        if plt_entries_count == 0 {
+            0
+        } else {
+            // length + 1, to account for the stub.  Each entry is 0x10 in size
+            (1 + plt_entries_count) * 0x10
+        }
+    }
+
+    pub fn align(_data: &Data) -> usize {
+        0x10
+    }
+
+    pub fn contents_dynamic(data: &Data, plt_base_ptr: usize) -> Vec<u8> {
+        let mut v = vec![0u8; 16];
+        for (i, symbol) in data.dynamics.plt_objects().iter().enumerate() {
+            // offset is from the next instruction - 5 bytes after the current instruction
+            let rip = plt_base_ptr as isize + (i as isize + 1) * 16 + 5;
+            let p = data
+                .symbols
+                .get(&symbol.name)
+                .unwrap()
+                .pointer
+                .resolve(data)
+                .unwrap();
+            println!("PLT Symbol: {:?}", symbol);
+            println!("PLT Symbol: {:#0x}, {:#0x}", p, rip);
+            // E9 cd - JMP rel32
+            let mut buf = [0u8; 16];
+            buf[0] = 0xe9;
+            let b = ((p as isize - rip as isize) as u32).to_le_bytes();
+            buf[1..b.len() + 1].copy_from_slice(&b);
+            v.extend(buf);
+        }
+        v
+    }
+
+    pub fn contents(data: &Data, base: usize) -> Vec<u8> {
+        let plt_entries_count = data.dynamics.plt_objects().len();
+        if plt_entries_count == 0 {
+            return vec![];
+        }
+
+        let got_addr = data.addr_get_by_name(".got.plt").unwrap() as isize;
+        let vbase = base as isize;
+
+        // PLT START
+        let mut stub: Vec<u8> = vec![
+            // 0x401020: push   0x2fe2(%rip)        # 404008 <_GLOBAL_OFFSET_TABLE_+0x8>
+            // got+8 - rip // (0x404000+0x8) - (0x401020 + 0x06)
+            0xff, 0x35, 0xe2, 0x2f, 0x00, 0x00,
+            // 0x401026: jump to GOT[2]
+            // jmp    *0x2fe4(%rip)        # 404010 <_GLOBAL_OFFSET_TABLE_+0x10>
+            0xff, 0x25, 0xe4, 0x2f, 0x00, 0x00,
+            // 40102c:       0f 1f 40 00             nopl   0x0(%rax)
+            0x0f, 0x1f, 0x40, 0x00,
+        ];
+
+        let got1 = got_addr + 0x8 - (vbase + 0x06);
+        let b = (got1 as i32).to_le_bytes();
+        stub.as_mut_slice()[2..6].copy_from_slice(&b);
+
+        let got2 = got_addr + 0x10 - (vbase + 0x0c);
+        let b = (got2 as i32).to_le_bytes();
+        stub.as_mut_slice()[8..12].copy_from_slice(&b);
+
+        for slot_index in 0..plt_entries_count {
+            // PLT ENTRY
+            let mut slot: Vec<u8> = vec![
+                // # 404018 <puts@GLIBC_2.2.5>, .got.plot 4th entry, GOT[3], jump there
+                // # got.plt[3] = 0x401036, initial value,
+                // which points to the second instruction (push) in this plt entry
+                // # the dynamic linker will update GOT[3] with the actual address, so this lookup only happens once
+                // 401030:       ff 25 e2 2f 00 00       jmp    *0x2fe2(%rip)        # 404018 <puts@GLIBC_2.2.5>
+                0xff, 0x25, 0xe2, 0x2f, 0x00, 0x00,
+                // # push plt index onto the stack
+                // # this is a reference to the entry in the relocation table defined by DT_JMPREL (.rela.plt)
+                // # that reloc will have type R_X86_64_JUMP_SLOT
+                // # the reloc will have an offset that points to GOT[3], 0x404018 = BASE + 3*0x08
+                // 401036:       68 00 00 00 00          push   $0x0
+                0x68, 0x00, 0x00, 0x00, 0x00,
+                // # jump to stub, which is (i+2)*0x10 relative to rip
+                // 40103b:       e9 e0 ff ff ff          jmp    401020 <_init+0x20>,
+                0xe9, 0xe0, 0xff, 0xff, 0xff,
+            ];
+
+            let offset = (slot_index + 1) * 0x10;
+
+            // pointer to .got.plt entry
+            let rip = vbase + offset as isize + 6;
+            let addr = got_addr + (3 + slot_index as isize) * 0x08 - rip;
+            let range = 2..6;
+            slot.as_mut_slice()[range].copy_from_slice(&(addr as i32).to_le_bytes());
+
+            // slot index
+            let range = 7..11;
+            slot.as_mut_slice()[range].copy_from_slice(&(slot_index as i32).to_le_bytes());
+
+            // next instruction
+            let rip = vbase + offset as isize + 0x10;
+            let addr = vbase as isize - rip; //self.section.offsets.address as isize - rip;
+            let range = 0x0c..0x0c + 4;
+            slot.as_mut_slice()[range].copy_from_slice(&(addr as i32).to_le_bytes());
+
+            stub.extend(slot);
+        }
+        stub
+    }
+}
+
 pub struct Data {
     pub interp: String,
     pub(crate) libs: Vec<Library>,
@@ -48,7 +297,7 @@ pub struct Data {
     pub ph: Vec<ProgramHeaderEntry>,
 
     pub addr: HashMap<AddressKey, u64>,
-    pub pointers: HashMap<String, ResolvePointer>,
+    pub symbols: HashMap<String, ReadSymbol>,
     pub section_index: HashMap<String, SectionIndex>,
     pub(crate) segments: SegmentTracker,
     pub(crate) dynstr: TrackSection,
@@ -58,7 +307,6 @@ pub struct Data {
     pub(crate) hash: TrackSection,
     pub(crate) symtab: TrackSection,
     pub(crate) section_dynamic: TrackSection,
-    //pub target: Target,
 }
 
 impl Data {
@@ -78,14 +326,12 @@ impl Data {
             hash: TrackSection::default(),
             symtab: TrackSection::default(),
             section_dynamic: TrackSection::default(),
-            pointers: HashMap::new(),
-
+            symbols: HashMap::new(),
             debug: HashSet::new(),
 
             // Tables
             dynamics: Dynamics::new(),
             statics: Statics::new(),
-            //target: Target::new(),
         }
     }
 
@@ -96,18 +342,6 @@ impl Data {
     pub fn interp(mut self, interp: String) -> Self {
         self.interp = interp;
         self
-    }
-
-    pub fn pointer_set(&mut self, name: String, p: u64) {
-        self.pointers.insert(name, ResolvePointer::Resolved(p));
-    }
-
-    pub fn pointer_get(&self, name: &str) -> u64 {
-        self.pointers
-            .get(name)
-            .expect(&format!("Pointer not found: {}", name))
-            .resolve(self)
-            .expect(&format!("Pointer unresolved: {}", name))
     }
 
     pub fn addr_get_by_name(&self, name: &str) -> Option<u64> {
@@ -146,8 +380,8 @@ impl Data {
     pub fn write_exports(data: &mut Data, exports: &SymbolMap, w: &mut Writer) {
         println!("ADD EXPORTS");
         for (name, symbol) in exports.iter() {
-            data.pointers
-                .insert(name.to_string(), symbol.pointer.clone());
+            println!("EXPORTS: {:?}", symbol);
+            data.symbols.insert(name.to_string(), symbol.clone());
             let section_index = symbol.section.section_index(data);
             data.statics.symbol_add(symbol, section_index, w);
         }
@@ -203,71 +437,83 @@ impl Data {
         // if it's being added to got, then only add it to got
         // with entries in the got and gotplt, we then apply relocations
         // to point to the appropriate got and gotplt entries
-        let mut got = HashSet::new();
-        let mut gotplt = HashSet::new();
-        for r in iter.clone() {
-            //if r.is_got() {
-            //got.insert(r.name.clone());
-            //} else if r.is_plt() {
-            //gotplt.insert(r.name.clone());
-            //} else {
-            match r.effect() {
-                PatchEffect::AddToGot => {
-                    got.insert(r.name.clone());
-                }
-                PatchEffect::AddToPlt => {
-                    gotplt.insert(r.name.clone());
-                }
-                _ => (),
-            }
-        }
 
         for r in iter {
-            if let Some(s) = target.lookup(&r.name) {
-                // we don't know the section yet, we just know which kind
-                let def = match s.bind {
-                    SymbolBind::Local => CodeSymbolDefinition::Local,
-                    SymbolBind::Global => CodeSymbolDefinition::Defined,
-                    SymbolBind::Weak => CodeSymbolDefinition::Defined,
-                };
+            /*
+            let symbol = target
+                .lookup(&r.name)
+                .expect(&format!("Missing {}", &r.name));
+            eprintln!("S: {:?}", symbol);
+            */
+            log::info!("r {:?}", (&r, target.lookup_dynamic(&r.name)));
 
-                let assign = match s.kind {
-                    SymbolKind::Text => {
-                        if s.is_static() {
-                            if r.is_plt() {
+            if let Some(s) = target.lookup_dynamic(&r.name) {
+                let symbol = self.dynamics.relocation_add_write(&s, r, w);
+                self.symbols.insert(symbol.name.clone(), symbol.clone());
+                log::info!("reloc0 {}, {:?}, {:?}", &r, s.bind, symbol.pointer);
+                let symbol = target
+                    .lookup(&r.name)
+                    .expect(&format!("Missing {}", &r.name));
+                eprintln!("S: {:?}", symbol);
+
+                continue;
+            }
+
+            // static plt relatives
+            if let Some(s) = target.lookup_static(&r.name) {
+                let symbol = target
+                    .lookup(&r.name)
+                    .expect(&format!("Missing {}", &r.name));
+                eprintln!("S: {:?}", symbol);
+
+                if r.is_plt() {
+                    log::info!("reloc1 {}, {:?}, {:?}", &r, s.bind, s.pointer);
+                    //continue;
+                } else {
+                    // we don't know the section yet, we just know which kind
+                    let def = match s.bind {
+                        SymbolBind::Local => CodeSymbolDefinition::Local,
+                        SymbolBind::Global => CodeSymbolDefinition::Defined,
+                        SymbolBind::Weak => CodeSymbolDefinition::Defined,
+                    };
+
+                    let assign = match s.kind {
+                        SymbolKind::Text => {
+                            if s.is_static() {
+                                if r.is_plt() {
+                                    GotPltAssign::GotPltWithPlt
+                                } else {
+                                    GotPltAssign::Got
+                                }
+                            } else if r.effect() == format::PatchEffect::AddToGot {
+                                if r.is_plt() {
+                                    GotPltAssign::GotWithPltGot
+                                } else {
+                                    GotPltAssign::Got
+                                }
+                            } else if r.effect() == format::PatchEffect::AddToPlt {
                                 GotPltAssign::GotPltWithPlt
                             } else {
-                                GotPltAssign::Got
+                                GotPltAssign::None
                             }
-                        } else if got.contains(&r.name) {
-                            if r.is_plt() {
-                                GotPltAssign::GotWithPltGot
-                            } else {
-                                GotPltAssign::Got
-                            }
-                        } else if gotplt.contains(&r.name) {
-                            GotPltAssign::GotPltWithPlt
-                        } else {
-                            GotPltAssign::None
                         }
-                    }
-                    SymbolKind::Data => GotPltAssign::Got,
-                    //_ => unimplemented!("{:?}, {}", s, r)
-                    _ => GotPltAssign::None,
-                };
+                        SymbolKind::Data => GotPltAssign::Got,
+                        _ => GotPltAssign::None,
+                    };
 
-                if s.source == SymbolSource::Dynamic {
-                    log::debug!("reloc {}", &r);
-                    self.dynamics.relocation_add(&s, assign, r, w);
-                } else if def != CodeSymbolDefinition::Local {
-                    log::debug!("reloc2 {}", &r);
-                    if assign == GotPltAssign::None {
+                    if s.source == SymbolSource::Dynamic {
+                        unreachable!();
+                    } else if def != CodeSymbolDefinition::Local {
+                        log::info!("reloc3 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
+                        if assign == GotPltAssign::None {
+                        } else {
+                            self.dynamics.relocation_add_write(&s, r, w);
+                        }
                     } else {
-                        self.dynamics.relocation_add(&s, assign, r, w);
+                        log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                     }
-                } else {
-                    log::debug!("reloc3 {}", &r);
                 }
+                //continue;
             } else {
                 unreachable!("Unable to find symbol for relocation: {}", &r.name)
             }
@@ -275,8 +521,9 @@ impl Data {
     }
 
     pub(crate) fn update_data(&mut self, target: &Target) {
-        for (name, _, pointer) in self.dynamics.symbols() {
-            self.pointers.insert(name, pointer);
+        for (name, _, s) in self.dynamics.symbols() {
+            //self.pointers.insert(name, pointer);
+            self.symbols.insert(name.clone(), s); //ReadSymbol::from_pointer(name, pointer));
         }
 
         for (name, symbol) in target.locals.iter() {
@@ -286,8 +533,8 @@ impl Data {
                 | ReadSectionKind::ROData
                 | ReadSectionKind::RW
                 | ReadSectionKind::Bss => {
-                    self.pointers
-                        .insert(name.to_string(), symbol.pointer.clone());
+                    self.symbols
+                        .insert(name.to_string(), symbol.clone());
                 }
                 _ => (),
             }
@@ -297,7 +544,7 @@ impl Data {
         let locals = vec!["_DYNAMIC"];
         for symbol_name in locals {
             let s = target.lookup_static(symbol_name).unwrap();
-            self.pointers.insert(s.name, s.pointer);
+            self.symbols.insert(s.name.clone(), s);
         }
     }
 
@@ -322,6 +569,7 @@ impl Data {
 
 #[derive(Debug, Clone)]
 pub enum ResolvePointer {
+    Unknown,
     Resolved(u64),
     Section(String, u64),
     Got(usize),
@@ -350,9 +598,7 @@ impl ResolvePointer {
     }
 
     pub fn resolve(&self, data: &Data) -> Option<u64> {
-        //eprintln!("X: {:?}", self);
-        //eprintln!("X: {:?}", &data.addr);
-        match self {
+        let out = match self {
             Self::Resolved(x) => Some(*x),
             Self::Section(section_name, offset) => {
                 if let Some(base) = data
@@ -378,7 +624,9 @@ impl ResolvePointer {
                 if let Some(base) = data.addr_get_by_name(".got.plt") {
                     let size = std::mem::size_of::<usize>() as u64;
                     // first 3 entries in the got.plt are already used
-                    Some(base + (*index as u64 + 3) * size)
+                    // but that should already be factored in the index
+                    assert!(*index >= 3);
+                    Some(base + (*index as u64 + 0) * size)
                 } else {
                     None
                 }
@@ -389,7 +637,9 @@ impl ResolvePointer {
                     // each entry in small model is 0x10 in size
                     let size = 0x10;
                     // skip the stub (+1)
-                    Some(base + (*index as u64 + 1) * size)
+                    // stub should already be part of the index
+                    assert!(*index >= 1);
+                    Some(base + (*index as u64 + 0) * size)
                 } else {
                     None
                 }
@@ -404,6 +654,8 @@ impl ResolvePointer {
                     None
                 }
             }
-        }
+            Self::Unknown => None,
+        };
+        out
     }
 }

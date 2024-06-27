@@ -31,10 +31,7 @@ impl AllocSegment {
     }
 }
 
-pub struct Blocks {
-    //pub blocks: Vec<Box<dyn ElfBlock>>,
-    //pub ph: Vec<ProgramHeaderEntry>,
-}
+pub struct Blocks {}
 
 impl Blocks {
     pub fn build(mut data: Data, mut target: Target, w: &mut Writer, config: &AOTConfig) {
@@ -342,7 +339,7 @@ impl SegmentTracker {
             // new segment
             let segment = Segment::new(alloc, base, file_offset as u64);
 
-            eprintln!(
+            log::debug!(
                 "new seg: {:?}, offset: {:#0x}, last_offset: {:#0x}, last_size: {:#0x}, size: {:#0x}, align: {:#0x}, base: {:#0x}",
                 alloc,
                 file_offset,

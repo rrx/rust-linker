@@ -2,3 +2,6 @@
 dead
 tmp
 build
+build.ninja
+.ninja_log
+*.rs2

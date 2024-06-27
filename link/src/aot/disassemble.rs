@@ -22,22 +22,29 @@ impl GeneralSection {
     }
 
     pub fn disassemble_code(&self, data: &Data, buf: &[u8]) {
+        self.disassemble_code_start(
+            data,
+            buf,
+            self.offsets.address as usize,
+            self.offsets.size as usize,
+        );
+    }
+
+    pub fn disassemble_code_start(&self, data: &Data, buf: &[u8], start: usize, size: usize) {
         let mut symbols = vec![];
-        for (name, p) in data.pointers.iter() {
-            let addr = p.resolve(data).unwrap();
-            if addr >= self.offsets.address
-                && addr <= (self.offsets.address + self.offsets.size as u64)
-            {
-                //eprintln!("b: {}, {:#0x}", name, addr);
-                symbols.push((name, addr));
+        for (name, s) in data.symbols.iter() {
+            if let Some(addr) = s.pointer.resolve(data) {
+                if addr as usize >= start && addr as usize <= (start + size) {
+                    //eprintln!("b: {}, {:#0x}", name, addr);
+                    symbols.push((name, addr as usize));
+                }
             }
         }
 
-        //disassemble_code_with_symbols(self.bytes.as_slice(), &symbols, &self.relocations);
-        let mut heap =
-            BinaryHeap::from_vec_cmp(symbols.clone(), |a: &(&String, u64), b: &(&String, u64)| {
-                b.1.cmp(&a.1)
-            });
+        let mut heap = BinaryHeap::from_vec_cmp(
+            symbols.clone(),
+            |a: &(&String, usize), b: &(&String, usize)| b.1.cmp(&a.1),
+        );
 
         let mut r_heap = BinaryHeap::from_vec_cmp(
             self.relocations.clone(),
@@ -51,32 +58,31 @@ impl GeneralSection {
             .detail(true)
             .build()
             .unwrap();
-        let insts = cs.disasm_all(buf, 0).expect("disassemble");
+        let insts = cs.disasm_all(buf, start as u64).expect("disassemble");
 
         for instr in insts.as_ref() {
-            let addr = instr.address();
-            let abs_addr = instr.address() + self.offsets.address; // as u64;
+            let addr = instr.address() as u64 - start as u64;
+            let abs_addr = instr.address() as usize;
 
+            // relocation heap
             while r_heap.len() > 0 {
                 let next_reloc_addr = r_heap.peek().unwrap().offset;
                 if next_reloc_addr <= addr {
                     let r = r_heap.pop().unwrap();
                     eprintln!("    {}", r);
-                    let p0 = if let Some(addr) = data.dynamics.lookup(&r) {
-                        addr
-                    } else {
-                        data.pointers.get(&r.name).unwrap().clone()
-                    };
+                    let symbol = data.symbols.get(&r.name).unwrap();
+                    let p0 = r.pointer(data, symbol);
                     let p = p0.resolve(data).unwrap();
                     eprintln!(
                         "    Base: {:#0x}, addr: {:#0x}, offset: {:#0x}, p: {:#0x}, p0: {}",
-                        self.offsets.address, addr, r.offset, p, p0
+                        start, addr, r.offset, p, p0
                     );
                 } else {
                     break;
                 }
             }
 
+            // symbol heap
             while heap.len() > 0 {
                 let next_symbol_addr = heap.peek().unwrap().1;
 
@@ -88,12 +94,23 @@ impl GeneralSection {
                 }
             }
 
+            let cfg = pretty_hex::HexConfig {
+                title: false,
+                ascii: false,
+                width: 16,
+                group: 2,
+                chunk: 16,
+                ..pretty_hex::HexConfig::default()
+            };
+            let s = pretty_hex::config_hex(&instr.bytes().to_vec(), cfg);
+
             eprintln!(
-                "  {:#06x} {:#06x} {}\t\t{}",
-                instr.address() + self.offsets.address,
+                "  {:#06x} {:#06x} {}\t\t{}\t{}",
+                instr.address() as usize - start,
                 instr.address(),
                 instr.mnemonic().expect("no mnmemonic found"),
-                instr.op_str().expect("no op_str found")
+                instr.op_str().expect("no op_str found"),
+                s
             );
         }
     }

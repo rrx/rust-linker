@@ -16,13 +16,18 @@ def main():
         fp.write(
             f"""
 rule cc-clang
-    command = clang-13 -fPIC -fno-lto -fno-direct-access-external-data -c $in -o $out
+    command = clang-13 \
+            -fPIC -fno-lto -fno-direct-access-external-data \
+            -c $in -o $out
 
 rule cc-gcc
     command = gcc -fPIC -c $in -o $out
 
 rule cc-clang-musl
-    command = clang-13 -I/usr/include/x86_64-linux-musl -fPIC -fno-lto -fno-direct-access-external-data -c $in -o $out
+    command = clang-13 \
+            -I/usr/include/x86_64-linux-musl \
+            -fPIC -fno-lto -fno-direct-access-external-data \
+            -c $in -o $out
 
 rule cc-gcc-musl
     command = gcc -I/usr/include/x86_64-linux-musl -fPIC -c $in -o $out
@@ -88,6 +93,7 @@ def generate_c_testsuite(base, rule, build_type, fp):
         expected_filename = f"{filename}.expected"
         output_result = os.path.join(output, "%05d.c.results" % i)
         assert os.path.exists(expected_filename)
+        link_exe = "target/release/link"
 
         # skip broken tests
         if i in [143, 189]:
@@ -96,10 +102,10 @@ def generate_c_testsuite(base, rule, build_type, fp):
 
         outputs.append(f"{build_type}/{i}")
         fp.write(f"build {output_filename}: {rule} {filename}\n")
-        fp.write(f"build {output_exe}: link {output_filename} | target/release/link\n")
+        fp.write(f"build {output_exe}: link {output_filename} | {link_exe}\n")
         fp.write(f"build {output_result}: run {output_exe}\n")
         fp.write(
-            f"build {filename}-{build_type}-diff: diff {filename}.expected {output_result}\n"
+            f"""build {filename}-{build_type}-diff: diff {filename}.expected {output_result}\n"""
         )
         fp.write(f"build {build_type}/{i}: phony {filename} | {output_result}\n")
         i += 1

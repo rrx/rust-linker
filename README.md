@@ -34,6 +34,8 @@ Some helpful links for building linkers:
 - https://web.archive.org/web/20140130143820/http://www.robinhoksbergen.com/papers/howto_elf.html
 - http://www.skyfree.org/linux/references/ELF_Format.pdf
 - https://gitlab.com/x86-psABIs/x86-64-ABI
+- https://refspecs.linuxbase.org/elf/x86_64-abi-0.98.pdf
+- https://github.com/c-testsuite/c-testsuite
 
 # Similar Work in Rust
 

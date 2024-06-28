@@ -513,7 +513,6 @@ impl Data {
                         log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                     }
                 }
-                //continue;
             } else {
                 unreachable!("Unable to find symbol for relocation: {}", &r.name)
             }
@@ -546,6 +545,10 @@ impl Data {
             let s = target.lookup_static(symbol_name).unwrap();
             self.symbols.insert(s.name.clone(), s);
         }
+
+        let p = ResolvePointer::Section(".text".to_string(), 0);
+        let s = ReadSymbol::from_pointer(".text".into(), p);
+        self.symbols.insert(".text".to_string(), s);
     }
 
     pub fn write(
@@ -567,7 +570,7 @@ impl Data {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ResolvePointer {
     Unknown,
     Resolved(u64),

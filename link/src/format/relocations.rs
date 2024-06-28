@@ -269,7 +269,8 @@ impl CodeRelocation {
     pub fn pointer(&self, data: &Data, symbol: &ReadSymbol) -> ResolvePointer {
         let pointer = symbol.pointer.clone();
         log::info!(target: "relocations", "{}: relocation: {:?}", &self.name, self);
-        log::info!(target: "relocations", "{}: symbol pointer:  {:?}", &self.name, symbol.pointer);
+        log::info!(target: "relocations", "{}: offset: {:#0x}", &self.name, self.offset);
+        log::info!(target: "relocations", "{}: symbol pointer:  {}, addend: {:#0x}", &self.name, symbol.pointer, self.r.addend);
         log::info!(target: "relocations", "{}: is_static: {}, got: {}, plt: {}", &self.name, symbol.is_static(), self.is_got(), self.is_plt());
 
         let pointer = if symbol.is_static() {
@@ -290,7 +291,7 @@ impl CodeRelocation {
                 pointer
             }
         };
-        log::info!(target: "relocations", "{}: pointer:  {:?}", &self.name, pointer);
+        log::info!(target: "relocations", "{}: pointer:  {}", &self.name, pointer);
         pointer
     }
 
@@ -305,6 +306,7 @@ impl CodeRelocation {
         preload: bool,
     ) {
         let pointer = self.pointer(data, symbol);
+        log::info!(target: "relocations", "{}: pointer: {}", &self.name, pointer);
         let mut addr = pointer.resolve(data).unwrap();
         log::info!(target: "relocations", "{}: resolved: {:#0x}", &self.name, addr);
 

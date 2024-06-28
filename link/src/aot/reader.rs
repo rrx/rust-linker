@@ -122,7 +122,7 @@ pub struct ReadSymbol {
     pub(crate) source: SymbolSource,
     pub(crate) kind: SymbolKind,
     pub(crate) bind: SymbolBind,
-    pub(crate) pointer: ResolvePointer,
+    pub pointer: ResolvePointer,
     pub(crate) size: u64,
 }
 
@@ -469,7 +469,7 @@ impl ReadBlock {
 
             if symbol.section_index() == Some(section.index()) {
                 let s = read_symbol(&b, base, &symbol)?;
-                log::debug!("Read: {:?}", &s);
+                log::debug!("Read: {:?}, p: {}", &s, s.pointer);
 
                 if s.bind == SymbolBind::Local {
                     // can't be local and unknown

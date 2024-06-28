@@ -96,7 +96,7 @@ def generate_c_testsuite(base, rule, build_type, fp):
         link_exe = "target/release/link"
 
         # skip broken tests
-        if i in [143, 189]:
+        if i in [189]:
             i += 1
             continue
 

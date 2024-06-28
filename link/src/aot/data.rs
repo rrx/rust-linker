@@ -91,7 +91,7 @@ impl BuildGotSection {
         let mut buf = Self::contents(data);
         let kind = GotSectionKind::GOT;
         let unapplied = data.dynamics.relocations(kind);
-        for (i, symbol) in unapplied.iter().enumerate() {
+        for (i, (r, symbol)) in unapplied.iter().enumerate() {
             let p = symbol.pointer.resolve(data).unwrap();
             eprintln!("U1({}): {:?}, {:#0x}", i, symbol, p);
 
@@ -447,10 +447,16 @@ impl Data {
             */
             log::info!("r {:?}", (&r, target.lookup_dynamic(&r.name)));
 
-            if let Some(s) = target.lookup_dynamic(&r.name) {
+            if let Some(mut s) = target.lookup_dynamic(&r.name) {
+                if r.r.kind() == object::RelocationKind::Absolute && !s.is_static() {
+                    let p = ResolvePointer::Section(r.section_name.clone(), r.offset);
+                    log::info!("reloc0a {}, {:?}, {}", &r, s.bind, p);
+                    s.pointer = p;
+                }
+
                 let symbol = self.dynamics.relocation_add_write(&s, r, w);
                 self.symbols.insert(symbol.name.clone(), symbol.clone());
-                log::info!("reloc0 {}, {:?}, {:?}", &r, s.bind, symbol.pointer);
+                log::info!("reloc0 {}, {:?}, {}", &r, s.bind, symbol.pointer);
                 let symbol = target
                     .lookup(&r.name)
                     .expect(&format!("Missing {}", &r.name));

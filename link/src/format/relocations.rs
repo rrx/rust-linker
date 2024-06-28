@@ -63,6 +63,7 @@ impl From<Relocation> for LinkRelocation {
 #[derive(Clone, Debug)]
 pub struct CodeRelocation {
     pub(crate) name: String,
+    pub(crate) section_name: String,
     pub(crate) offset: u64,
     pub(crate) r: LinkRelocation,
 }
@@ -287,6 +288,8 @@ impl CodeRelocation {
             } else if self.is_plt() {
                 let index = data.dynamics.pltgot_lookup.get(&symbol.name).unwrap();
                 ResolvePointer::PltGot(*index)
+            } else if self.r.kind == RelocationKind::Absolute {
+                ResolvePointer::Section(self.section_name.clone(), self.offset)
             } else {
                 pointer
             }
@@ -307,7 +310,12 @@ impl CodeRelocation {
     ) {
         let pointer = self.pointer(data, symbol);
         log::info!(target: "relocations", "{}: pointer: {}", &self.name, pointer);
-        let mut addr = pointer.resolve(data).unwrap();
+        //let mut addr = pointer.resolve(data).unwrap();
+        let mut addr = if let Some(p) = pointer.resolve(data) {
+            p
+        } else {
+            0
+        };
         log::info!(target: "relocations", "{}: resolved: {:#0x}", &self.name, addr);
 
         match self.r.kind {

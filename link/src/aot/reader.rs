@@ -537,13 +537,15 @@ pub fn dump_hash(data: &[u8]) {
 
 pub fn code_relocation<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
     b: &elf::ElfFile<'a, A, B>,
+    section: &elf::ElfSection<'a, 'b, A, B>,
     r: LinkRelocation,
     offset: usize,
 ) -> Result<CodeRelocation, Box<dyn Error>> {
     let name = match r.target {
         RelocationTarget::Section(index) => {
             let section = b.section_by_index(index)?;
-            section.name()?.to_string()
+            let section_name = section.name()?.to_string();
+            section_name
         }
         RelocationTarget::Symbol(index) => {
             let symbol = b.symbol_by_index(index)?;
@@ -559,6 +561,7 @@ pub fn code_relocation<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
     };
     Ok(CodeRelocation {
         name,
+        section_name: section.name()?.to_string(),
         //name_id: None,
         offset: offset as u64,
         r,

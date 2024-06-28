@@ -446,13 +446,24 @@ impl ElfBlock for RelaDynSection {
         assert_eq!(self.count, relocations.len());
 
         // we are writing a relocation for the GOT entries
-        for (index, symbol) in relocations.iter().enumerate() {
+        for (index, (r, symbol)) in relocations.iter().enumerate() {
             let mut r_addend = 0;
-            let r_sym;
+            let mut r_sym = 0;
 
             // if relative, look up the pointer in statics
             if symbol.is_static() {
-                r_sym = 0;
+                let static_sym = data
+                    .statics
+                    .symbol_hash
+                    .get(&symbol.name)
+                    .expect(&format!("not found {}", &symbol.name));
+                //r_sym = if let Some(symbol_index) = static_sym.symbol_index {
+                //symbol_index.0
+                //} else {
+                //0
+                //};
+                //r_sym = 0;
+
                 if let Some(p) = data.statics.symbol_get(&symbol.name) {
                     if let Some(addr) = p.resolve(data) {
                         r_addend = addr as i64;
@@ -472,6 +483,8 @@ impl ElfBlock for RelaDynSection {
                 GotSectionKind::GOT => {
                     if symbol.is_static() {
                         elf::R_X86_64_RELATIVE
+                    } else if r.r.kind() == object::RelocationKind::Absolute {
+                        elf::R_X86_64_64
                     } else {
                         elf::R_X86_64_GLOB_DAT
                     }
@@ -481,8 +494,13 @@ impl ElfBlock for RelaDynSection {
 
             let r_offset = match self.kind {
                 GotSectionKind::GOT => {
-                    let got_addr = data.addr_get(".got");
-                    got_addr as usize + index * std::mem::size_of::<usize>()
+                    if r.r.kind() == object::RelocationKind::Absolute {
+                        let addr = data.addr_get(&r.section_name);
+                        addr as usize + r.offset as usize
+                    } else {
+                        let got_addr = data.addr_get(".got");
+                        got_addr as usize + index * std::mem::size_of::<usize>()
+                    }
                 }
                 GotSectionKind::GOTPLT => {
                     let start = 3;

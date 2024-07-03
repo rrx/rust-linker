@@ -1,4 +1,5 @@
 CLANG=clang-13
+export RUST_TRACEBACK=1
 
 default: test
 

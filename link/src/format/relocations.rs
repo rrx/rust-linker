@@ -1,6 +1,6 @@
 use crate::aot::{Data, ReadSymbol, ResolvePointer};
 use object::{
-    elf::R_X86_64_GOTPCRELX, Relocation, RelocationEncoding, RelocationKind, RelocationTarget,
+    Relocation, RelocationEncoding, RelocationKind, RelocationTarget,
 };
 use std::fmt;
 

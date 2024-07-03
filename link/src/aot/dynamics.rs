@@ -153,7 +153,7 @@ impl Dynamics {
 
     pub fn save_relocation(&mut self, symbol: ReadSymbol, r: &CodeRelocation) {
         let mut add_got = false;
-        let mut add_gotplt = false;
+        let add_gotplt = false;
         let mut add_plt = false;
         let mut add_absolute = false;
 
@@ -216,9 +216,7 @@ impl Dynamics {
         let name = &symbol.name;
         self.save_relocation(symbol.clone(), r);
 
-        if let Some(track) = self.symbol_hash.get(name) {
-            //track.symbol.clone()
-        } else {
+        if self.symbol_hash.get(name).is_none() {
             self.symbols.push(symbol.name.clone());
             self.symbol_hash.insert(
                 symbol.name.clone(),

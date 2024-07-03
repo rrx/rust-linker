@@ -294,7 +294,9 @@ impl ReadBlock {
             object::read::elf::ElfFile::parse(buf)?;
         match b.kind() {
             ObjectKind::Relocatable | ObjectKind::Executable => {
-                //dump_header(&b)?;
+                if config.verbose {
+                    dump_header(&b)?;
+                }
                 self.relocatable(name.to_string(), &b, config)?
             }
             ObjectKind::Dynamic => self.dynamic(&b, name, config)?,

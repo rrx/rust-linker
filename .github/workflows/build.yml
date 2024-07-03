@@ -29,6 +29,9 @@ jobs:
         with:
           command: check
 
+      - name: Install packages
+        run: sudo apt-get install -y musl-dev
+
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         continue-on-error: true

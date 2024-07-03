@@ -396,52 +396,8 @@ impl RelaDynSection {
             is_rela: true,
         }
     }
-}
 
-impl ElfBlock for RelaDynSection {
-    fn name(&self) -> String {
-        self.offsets.name.clone()
-    }
-
-    fn alloc(&self) -> AllocSegment {
-        self.offsets.alloc
-    }
-
-    fn reserve_section_index(&mut self, _: &mut Data, w: &mut Writer) {
-        let name = self.kind.rel_section_name();
-        self.name_id = Some(w.add_section_name(name.as_bytes()));
-        self.offsets.section_index = Some(w.reserve_section_index());
-    }
-
-    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
-        let relocations = data.dynamics.relocations.relocations(self.kind);
-
-        self.count = relocations.len();
-        let file_offset = w.reserve_start_section(&self.offsets);
-        w.reserve_relocations(self.count, self.is_rela);
-
-        let after = w.reserved_len();
-        let size = after - file_offset;
-        self.offsets.size = size as u64;
-
-        data.segments.add_offsets(self.alloc(), &mut self.offsets);
-        assert_eq!(
-            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
-            w.reserved_len()
-        );
-        match self.kind {
-            GotSectionKind::GOT => {
-                data.addr_set(".rela.dyn", self.offsets.address);
-                data.reladyn.size = Some(w.rel_size(self.is_rela) * relocations.len());
-            }
-            GotSectionKind::GOTPLT => {
-                data.addr_set(".rela.plt", self.offsets.address);
-                data.relaplt.size = Some(w.rel_size(self.is_rela) * relocations.len());
-            }
-        }
-    }
-
-    fn write(&self, data: &Data, w: &mut Writer) {
+    fn section_write_relocations(&self, data: &Data, w: &mut Writer) {
         let relocations = data.dynamics.relocations.relocations(self.kind);
         w.write_start_section(&self.offsets);
         assert_eq!(self.count, relocations.len());
@@ -528,7 +484,7 @@ impl ElfBlock for RelaDynSection {
         }
     }
 
-    fn write_section_header(&self, data: &Data, w: &mut Writer) {
+    fn section_write_relocation_header(&self, data: &Data, w: &mut Writer) {
         let relocations = data.dynamics.relocations.relocations(self.kind);
 
         let sh_addralign = self.offsets.align;
@@ -559,6 +515,63 @@ impl ElfBlock for RelaDynSection {
             sh_addralign,
             sh_size: sh_entsize * relocations.len() as u64,
         });
+    }
+
+    fn section_relocation_reserve(&mut self, data: &mut Data, w: &mut Writer) {
+        let relocations = data.dynamics.relocations.relocations(self.kind);
+
+        self.count = relocations.len();
+        let file_offset = w.reserve_start_section(&self.offsets);
+        w.reserve_relocations(relocations.len(), self.is_rela);
+
+        let after = w.reserved_len();
+        let size = after - file_offset;
+        self.offsets.size = size as u64;
+
+        data.segments
+            .add_offsets(self.offsets.alloc, &mut self.offsets);
+        assert_eq!(
+            data.segments.current().adjusted_file_offset as usize + self.offsets.size as usize,
+            w.reserved_len()
+        );
+        match self.kind {
+            GotSectionKind::GOT => {
+                data.addr_set(".rela.dyn", self.offsets.address);
+                data.reladyn.size = Some(w.rel_size(self.is_rela) * relocations.len());
+            }
+            GotSectionKind::GOTPLT => {
+                data.addr_set(".rela.plt", self.offsets.address);
+                data.relaplt.size = Some(w.rel_size(self.is_rela) * relocations.len());
+            }
+        }
+    }
+}
+
+impl ElfBlock for RelaDynSection {
+    fn name(&self) -> String {
+        self.offsets.name.clone()
+    }
+
+    fn alloc(&self) -> AllocSegment {
+        self.offsets.alloc
+    }
+
+    fn reserve_section_index(&mut self, _: &mut Data, w: &mut Writer) {
+        let name = self.kind.rel_section_name();
+        self.name_id = Some(w.add_section_name(name.as_bytes()));
+        self.offsets.section_index = Some(w.reserve_section_index());
+    }
+
+    fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
+        self.section_relocation_reserve(data, w);
+    }
+
+    fn write(&self, data: &Data, w: &mut Writer) {
+        self.section_write_relocations(data, w);
+    }
+
+    fn write_section_header(&self, data: &Data, w: &mut Writer) {
+        self.section_write_relocation_header(data, w);
     }
 }
 

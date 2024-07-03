@@ -7,7 +7,9 @@ fmt:
 	clang-format -i testfiles/*.c
 	python3 -m black *.py
 
-test: functions examples testsuites
+test: functions examples unittests testsuites
+
+unittests:
 	cargo test -- --nocapture
 
 empty_dynamic:

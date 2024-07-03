@@ -151,7 +151,7 @@ impl Dynamics {
             .count()
     }
 
-    pub fn save_relocation(&mut self, symbol: ReadSymbol, r: &CodeRelocation) -> ReadSymbol {
+    pub fn save_relocation(&mut self, symbol: ReadSymbol, r: &CodeRelocation) {
         let mut add_got = false;
         let mut add_gotplt = false;
         let mut add_plt = false;
@@ -193,6 +193,7 @@ impl Dynamics {
                 self.r_got.push((r.clone(), symbol.clone()));
                 self.got_lookup
                     .insert(symbol.name.to_string(), self.got_index);
+                log::debug!(target: "symbols", "ADD_GOT: {}, {}", &symbol.name, self.got_index);
                 self.got_index += 1;
             }
         }
@@ -209,16 +210,14 @@ impl Dynamics {
         if add_absolute {
             self.r_got.push((r.clone(), symbol.clone()));
         }
-
-        symbol
     }
 
-    pub fn relocation_add(&mut self, symbol: &ReadSymbol, r: &CodeRelocation) -> ReadSymbol {
+    pub fn relocation_add(&mut self, symbol: &ReadSymbol, r: &CodeRelocation) {
         let name = &symbol.name;
-        let symbol = self.save_relocation(symbol.clone(), r);
+        self.save_relocation(symbol.clone(), r);
 
         if let Some(track) = self.symbol_hash.get(name) {
-            track.symbol.clone()
+            //track.symbol.clone()
         } else {
             self.symbols.push(symbol.name.clone());
             self.symbol_hash.insert(
@@ -229,7 +228,6 @@ impl Dynamics {
                     symbol: symbol.clone(),
                 },
             );
-            symbol
         }
     }
 
@@ -240,13 +238,13 @@ impl Dynamics {
         w: &mut Writer,
     ) -> ReadSymbol {
         let name = &symbol.name;
-        let symbol = self.save_relocation(symbol.clone(), r);
+        self.save_relocation(symbol.clone(), r);
 
         if let Some(track) = self.symbol_hash.get(name) {
             track.symbol.clone()
         } else {
             self.symbol_add(symbol.clone(), w);
-            symbol
+            symbol.clone()
         }
     }
 
@@ -259,6 +257,7 @@ impl Dynamics {
         if symbol.is_static() {
             string_id = None;
             symbol_index = None;
+            log::debug!(target: "symbols", "ADD STATIC");
         } else {
             string_id = Some(self.string_add(&symbol.name, w));
             symbol_index = Some(SymbolIndex(w.reserve_dynamic_symbol_index().0));

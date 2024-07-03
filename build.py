@@ -30,7 +30,9 @@ rule cc-clang-musl
             -c $in -o $out
 
 rule cc-gcc-musl
-    command = gcc -O0 -ggdb3 -I/usr/include/x86_64-linux-musl -fPIC -c $in -o $out
+    command = gcc -O0 -ggdb3 \
+            -I/usr/include/x86_64-linux-musl \
+            -fPIC -c $in -o $out
 
 rule build-link
     command = cargo build --release

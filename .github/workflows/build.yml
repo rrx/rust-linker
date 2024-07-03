@@ -30,7 +30,7 @@ jobs:
           command: check
 
       - name: Install packages
-        run: sudo apt-get install -y musl-dev ninja-build clang-13 libsdl2-dev libsigsegv-dev
+        run: sudo apt-get install -y musl-dev ninja-build clang-13 libsdl2-dev libsigsegv-dev libuv1-dev
 
       - name: Make
         run: make functions examples testsuites

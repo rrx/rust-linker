@@ -390,17 +390,6 @@ impl Data {
 
     pub fn write_strings(data: &mut Data, target: &mut Target, w: &mut Writer) {
         // These need to be declared
-        /*
-        let locals = vec![("_DYNAMIC", ".dynamic")];
-
-        for (symbol_name, section_name) in locals {
-            let symbol_name = symbol_name.to_string();
-            let section_name = section_name.to_string();
-            let pointer = ResolvePointer::Section(section_name, 0);
-            let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
-            target.insert_local(symbol);
-        }
-        */
 
         // write strings first
         for (name, _) in target.exports.iter() {
@@ -424,6 +413,11 @@ impl Data {
                 }
             })
             .collect();
+
+        let pointer = ResolvePointer::Section(".dynamic".to_string(), 0);
+        let symbol = ReadSymbol::from_pointer("_DYNAMIC".to_string(), pointer);
+        data.symbols.insert(symbol.name.clone(), symbol.clone());
+        target.insert_local(symbol)
     }
 
     pub(crate) fn update_data(&mut self, target: &Target) {
@@ -445,13 +439,7 @@ impl Data {
             }
         }
 
-        // Add static symbols to data
-        let locals = vec!["_DYNAMIC"];
-        for symbol_name in locals {
-            let s = target.lookup_static(symbol_name).unwrap();
-            self.symbols.insert(s.name.clone(), s);
-        }
-
+        // reset the pointer to .text
         let p = ResolvePointer::Section(".text".to_string(), 0);
         let s = ReadSymbol::from_pointer(".text".into(), p);
         self.symbols.insert(".text".to_string(), s);

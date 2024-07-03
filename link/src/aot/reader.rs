@@ -208,20 +208,8 @@ pub struct ReadBlock {
 
 impl ReadBlock {
     pub fn new(name: &str) -> Self {
-        let mut target = Target::new();
-        // These need to be declared
-        let locals = vec![("_DYNAMIC", ".dynamic")];
-
-        for (symbol_name, section_name) in locals {
-            let symbol_name = symbol_name.to_string();
-            let section_name = section_name.to_string();
-            let pointer = ResolvePointer::Section(section_name, 0);
-            let symbol = ReadSymbol::from_pointer(symbol_name, pointer);
-            target.insert_local(symbol);
-        }
-
         Self {
-            target,
+            target: Target::new(),
             name: name.to_string(),
             local_index: 0,
         }

@@ -37,7 +37,7 @@ impl Blocks {
     pub fn build(mut data: Data, mut target: Target, w: &mut Writer, config: &AOTConfig) {
         // preparation
         Data::write_strings(&mut data, &mut target, w);
-        data.write_relocations(&target, w);
+        write_relocations(&mut data, &target, w);
         data.update_data(&target);
 
         let is_dynamic = target.is_dynamic();

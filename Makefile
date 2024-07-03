@@ -70,7 +70,7 @@ gcc_ref:
 	exec build/clang-glibc/print_main1
 
 gcc:
-	cargo run --bin link -- -v --link \
+	RUST_TRACEBACK=1 cargo run --bin link -- -v --link \
 		-o tmp/gcc.exe \
 		build/clang-glibc/print_main1.o \
 		build/clang-glibc/asdf1.o \

@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     let args = Args::parse();
 
-    if args.inputs.len() == 0 {
+    if args.inputs.is_empty() {
         panic!("Missing files");
     }
 
@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         //block.dump();
         //exe.add_block(block);
         //block.add(&Path::new(&path), &config)?;
-        exe.add(&Path::new(&path), &config)?;
+        exe.add(Path::new(&path), &config)?;
     }
 
     //exe.resolve();

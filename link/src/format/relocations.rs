@@ -180,7 +180,7 @@ impl CodeRelocation {
                 let name = &self.name;
                 unsafe {
                     // we need to dereference here, because the pointer is coming from the GOT
-                    let vaddr = *(addr as *const usize) as usize;
+                    let vaddr = *(addr as *const usize);
                     let adjusted = vaddr + self.r.addend as usize;
                     let patch = patch_base.offset(self.offset as isize);
                     let _v = v_base.offset(self.offset as isize);
@@ -197,7 +197,7 @@ impl CodeRelocation {
                         64 => {
                             // patch as 64 bit
                             let patch = patch_base.offset(self.offset as isize) as *mut u64;
-                            std::ptr::write(patch as *mut u64, adjusted as u64);
+                            std::ptr::write(patch, adjusted as u64);
                             patch as u64
                         }
                         _ => unimplemented!(),
@@ -205,7 +205,7 @@ impl CodeRelocation {
 
                     log::info!(
                         "rel absolute {}: patch {:#16x}:{:#16x}=>{:#16x} addend:{:#08x} addr:{:#08x}, vaddr:{:#08x}",
-                        name, patch, before, adjusted as usize, self.r.addend, addr as u64, vaddr as usize
+                        name, patch, before, adjusted, self.r.addend, addr as u64, vaddr
                     );
                 }
             }
@@ -252,7 +252,6 @@ impl CodeRelocation {
                     let before = std::ptr::read(patch as *const u32);
 
                     // patch as 32 bit
-                    let patch = patch as *mut u32;
                     std::ptr::write(patch as *mut u32, symbol_address as u32);
 
                     log::info!(
@@ -309,11 +308,7 @@ impl CodeRelocation {
         let pointer = self.pointer(data, symbol);
         log::info!(target: "relocations", "{}: pointer: {}", &self.name, pointer);
         //let mut addr = pointer.resolve(data).unwrap();
-        let mut addr = if let Some(p) = pointer.resolve(data) {
-            p
-        } else {
-            0
-        };
+        let mut addr = pointer.resolve(data).unwrap_or_default();
         log::info!(target: "relocations", "{}: resolved: {:#0x}", &self.name, addr);
 
         match self.r.kind {
@@ -437,15 +432,15 @@ impl CodeRelocation {
                             // patch as 64 bit
                             let patch = patch_base.offset(self.offset as isize) as *mut u64;
                             log::debug!("write:  {:#0x} -> {:#0x}", adjusted as u64, patch as u64);
-                            std::ptr::write(patch as *mut u64, adjusted as u64);
+                            std::ptr::write(patch, adjusted as u64);
                             patch as u64
                         }
                         _ => unimplemented!(),
                     };
 
                     log::info!(
-                        "rel absolute {}: patch {:#16x}:{:#16x}=>{:#16x} addend:{:#08x} addr:{:#08x}, vaddr:{:#08x}",
-                        name, patch, before, adjusted as usize, self.r.addend, addr as u64, addr as usize
+                        "rel absolute {}: patch {:#16x}:{:#16x}=>{:#16x} addend:{:#08x} addr:{:#08x}",
+                        name, patch, before, adjusted, self.r.addend, addr
                     );
                 }
             }
@@ -470,7 +465,7 @@ impl CodeRelocation {
 
                     log::info!(
                         "rel relative {}: patch {:#08x}:{:#08x}=>{:#08x} addend:{:#08x} addr:{:#08x}, vaddr:{:#08x}",
-                        &self.name, patch as usize, before, relative_address as usize, self.r.addend, addr as u64, vaddr as usize
+                        &self.name, patch as usize, before, relative_address as usize, self.r.addend, addr, vaddr as usize
                     );
                 }
             }
@@ -498,11 +493,11 @@ impl CodeRelocation {
 
                     // patch as 32 bit
                     let patch = patch as *mut u32;
-                    std::ptr::write(patch as *mut u32, symbol_address as u32);
+                    std::ptr::write(patch, symbol_address as u32);
 
                     log::info!(
                         "plt relative {}: patch {:#08x}:{:#08x}=>{:#08x} addend:{:#08x} addr:{:#08x}",
-                        &self.name, patch as usize, before, symbol_address as usize, self.r.addend, addr as u64
+                        &self.name, patch as usize, before, symbol_address as usize, self.r.addend, addr
                     );
                 }
             }

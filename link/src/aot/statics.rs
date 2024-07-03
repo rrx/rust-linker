@@ -31,6 +31,12 @@ pub struct Statics {
     pub symbol_hash: HashMap<String, StaticSymbolIndex>,
 }
 
+impl Default for Statics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Statics {
     pub fn new() -> Self {
         Self {
@@ -107,11 +113,9 @@ impl Statics {
     }
 
     pub fn symbol_get(&self, name: &str) -> Option<ResolvePointer> {
-        if let Some(track) = self.symbol_hash.get(name) {
-            Some(track.symbol.pointer.clone())
-        } else {
-            None
-        }
+        self.symbol_hash
+            .get(name)
+            .map(|track| track.symbol.pointer.clone())
     }
 
     pub fn symbols_write(&self, data: &Data, w: &mut Writer) {

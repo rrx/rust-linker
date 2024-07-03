@@ -44,7 +44,7 @@ pub fn disassemble_code(buf: &[u8], pointers: &HashMap<String, u64>) {
         .detail(true)
         .build()
         .unwrap();
-    let insts = cs.disasm_all(&buf, 0).expect("disassemble");
+    let insts = cs.disasm_all(buf, 0).expect("disassemble");
     let mut last_name = None;
     for instr in insts.as_ref() {
         let addr = instr.address();
@@ -60,7 +60,7 @@ pub fn disassemble_code(buf: &[u8], pointers: &HashMap<String, u64>) {
                 Some(v)
             };
 
-            if let Some(_) = display_symbol {
+            if display_symbol.is_some() {
                 println!("fn {}: {:#06x}", v, &addr);
             }
             last_name = Some(v);
@@ -96,14 +96,14 @@ impl<'a> Symbol<'a> {
 
 pub fn disassemble_code_with_symbols(
     buf: &[u8],
-    symbols: &Vec<Symbol>,
-    relocations: &Vec<CodeRelocation>,
+    symbols: &[Symbol],
+    relocations: &[CodeRelocation],
 ) {
-    let mut heap = BinaryHeap::from_vec_cmp(symbols.clone(), |a: &Symbol, b: &Symbol| {
+    let mut heap = BinaryHeap::from_vec_cmp(symbols.to_owned(), |a: &Symbol, b: &Symbol| {
         b.addr.cmp(&a.addr)
     });
     let mut r_heap = BinaryHeap::from_vec_cmp(
-        relocations.clone(),
+        relocations.to_owned(),
         |a: &CodeRelocation, b: &CodeRelocation| b.offset.cmp(&a.offset),
     );
     let cs = capstone::Capstone::new()
@@ -113,12 +113,12 @@ pub fn disassemble_code_with_symbols(
         .detail(true)
         .build()
         .unwrap();
-    let insts = cs.disasm_all(&buf, 0).expect("disassemble");
+    let insts = cs.disasm_all(buf, 0).expect("disassemble");
 
     for instr in insts.as_ref() {
         let addr = instr.address();
 
-        while heap.len() > 0 {
+        while !heap.is_empty() {
             let next_symbol_addr = heap.peek().unwrap().addr;
 
             if next_symbol_addr <= addr {
@@ -134,7 +134,7 @@ pub fn disassemble_code_with_symbols(
             }
         }
 
-        while r_heap.len() > 0 {
+        while !r_heap.is_empty() {
             let next_reloc_addr = r_heap.peek().unwrap().offset;
             if next_reloc_addr <= addr {
                 let r = r_heap.pop().unwrap();

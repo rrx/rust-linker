@@ -453,9 +453,9 @@ impl Data {
                     s.pointer = p;
                 }
 
-                let symbol = self.dynamics.relocation_add_write(&s, r, w);
-                self.symbols.insert(symbol.name.clone(), symbol.clone());
-                log::info!("reloc0 {}, {:?}, {}", &r, s.bind, symbol.pointer);
+                self.dynamics.relocation_add_write(&s, r, w);
+                self.symbols.insert(s.name.clone(), s.clone());
+                log::info!("reloc0 {}, {:?}, {}", &r, s.bind, s.pointer);
                 let symbol = target
                     .lookup(&r.name)
                     .expect(&format!("Missing {}", &r.name));

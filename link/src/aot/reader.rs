@@ -619,8 +619,8 @@ pub fn read_symbol<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
     })
 }
 
-pub fn dump_header<'a>(
-    b: &elf::ElfFile<'a, FileHeader64<object::Endianness>>,
+pub fn dump_header(
+    b: &elf::ElfFile<FileHeader64<object::Endianness>>,
     //b: &elf::ElfFile<'a, A, B>,
 ) -> Result<(), Box<dyn Error>> {
     let endian = b.endian();

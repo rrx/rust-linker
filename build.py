@@ -3,6 +3,9 @@ import sys
 import glob
 
 
+EXCLUDE_C_TESTSUITE_TESTS = []
+
+
 def main():
     base = sys.argv[1]
     build_filename = "build.ninja"
@@ -98,7 +101,7 @@ def generate_c_testsuite(base, rule, build_type, fp):
         link_exe = "target/release/link"
 
         # skip broken tests
-        if i in []:
+        if i in EXCLUDE_C_TESTSUITE_TESTS:
             i += 1
             continue
 

@@ -5,8 +5,9 @@ use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::ptr::NonNull;
+use std::rc::Rc;
 use std::sync::Arc;
-pub type SharedLibrary = Arc<Library>;
+pub type SharedLibrary = Rc<Library>;
 
 pub enum Library {
     Raw(RawLibrary),
@@ -114,7 +115,7 @@ impl SharedLibraryRepo {
 
     pub fn add(&mut self, name: &str, lib: libloading::Library) {
         self.map
-            .insert(name.to_string(), Arc::new(Library::Loading(lib)));
+            .insert(name.to_string(), Rc::new(Library::Loading(lib)));
     }
 
     pub fn add_to_new_namespace(&mut self, name: &str, path: &Path) -> Option<Namespace> {
@@ -133,7 +134,7 @@ impl SharedLibraryRepo {
                     namespace,
                 };
                 self.map
-                    .insert(name.to_string(), Arc::new(Library::Raw(lib)));
+                    .insert(name.to_string(), Rc::new(Library::Raw(lib)));
                 Some(namespace)
             }
         }
@@ -156,7 +157,7 @@ impl SharedLibraryRepo {
                     namespace,
                 };
                 self.map
-                    .insert(name.to_string(), Arc::new(Library::Raw(lib)));
+                    .insert(name.to_string(), Rc::new(Library::Raw(lib)));
                 Some(())
             }
         }

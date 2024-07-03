@@ -234,15 +234,11 @@ impl Dynamics {
         symbol: &ReadSymbol,
         r: &CodeRelocation,
         w: &mut Writer,
-    ) -> ReadSymbol {
+    ) {
         let name = &symbol.name;
         self.save_relocation(symbol.clone(), r);
-
-        if let Some(track) = self.symbol_hash.get(name) {
-            track.symbol.clone()
-        } else {
+        if self.symbol_hash.get(name).is_none() {
             self.symbol_add(symbol.clone(), w);
-            symbol.clone()
         }
     }
 

@@ -30,7 +30,7 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
         println!("ext: {}", ext);
         version
             .libraries
-            .add_library(p.to_str().unwrap(), &Path::new(&path))?;
+            .add_library(p.to_str().unwrap(), Path::new(&path))?;
     }
 
     // RW
@@ -104,7 +104,7 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
     let mut dynamic_lookups = HashMap::new();
 
     for r in iter.clone() {
-        if let Some(_) = dynamic_lookups.get(&r.name) {
+        if dynamic_lookups.contains_key(&r.name) {
             continue;
         }
 
@@ -359,7 +359,11 @@ pub struct LoaderVersion {
     rx: BlockFactoryInner,
     data: Data,
 }
-
+impl Default for LoaderVersion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl LoaderVersion {
     pub fn new() -> Self {
         let mut ro = BlockFactoryInner::create(10).unwrap();

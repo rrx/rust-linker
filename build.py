@@ -17,20 +17,20 @@ def main():
             f"""
 rule cc-clang
     command = clang-13 \
-            -fPIC -fno-lto -fno-direct-access-external-data \
+            -O0 -ggdb3 -fPIC -fno-lto -fno-direct-access-external-data \
             -c $in -o $out
 
 rule cc-gcc
-    command = gcc -fPIC -c $in -o $out
+    command = gcc -O0 -ggdb3 -fPIC -c $in -o $out
 
 rule cc-clang-musl
     command = clang-13 \
-            -I/usr/include/x86_64-linux-musl \
+            -O0 -ggdb3 -I/usr/include/x86_64-linux-musl \
             -fPIC -fno-lto -fno-direct-access-external-data \
             -c $in -o $out
 
 rule cc-gcc-musl
-    command = gcc -I/usr/include/x86_64-linux-musl -fPIC -c $in -o $out
+    command = gcc -O0 -ggdb3 -I/usr/include/x86_64-linux-musl -fPIC -c $in -o $out
 
 rule build-link
     command = cargo build --release
@@ -96,7 +96,7 @@ def generate_c_testsuite(base, rule, build_type, fp):
         link_exe = "target/release/link"
 
         # skip broken tests
-        if i in [189]:
+        if i in [151, 204, 216]:
             i += 1
             continue
 

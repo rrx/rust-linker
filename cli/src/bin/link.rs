@@ -66,6 +66,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         let output = args.output.unwrap_or("a.out".to_string());
+        let path = Path::new(&output);
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
         Data::write(data, exe.target, Path::new(&output), &config)?;
     }
 

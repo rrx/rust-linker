@@ -1,7 +1,5 @@
 use crate::aot::{Data, ReadSymbol, ResolvePointer};
-use object::{
-    Relocation, RelocationEncoding, RelocationKind, RelocationTarget,
-};
+use object::{Relocation, RelocationEncoding, RelocationKind, RelocationTarget};
 use std::fmt;
 
 const R_X86_64_GOTPCREL: u32 = 0x29; //41;

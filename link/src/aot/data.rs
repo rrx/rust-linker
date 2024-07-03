@@ -91,7 +91,7 @@ impl BuildGotSection {
         let mut buf = Self::contents(data);
         let kind = GotSectionKind::GOT;
         let unapplied = data.dynamics.relocations(kind);
-        for (i, (r, symbol)) in unapplied.iter().enumerate() {
+        for (i, (_, symbol)) in unapplied.iter().enumerate() {
             let p = symbol.pointer.resolve(data).unwrap();
             eprintln!("U1({}): {:?}, {:#0x}", i, symbol, p);
 
@@ -178,12 +178,11 @@ impl BuildPltSection {
         data.dynamics.plt_objects().len() > 0
     }
     pub fn size(data: &Data) -> usize {
-        let plt_entries_count = data.dynamics.plt_objects().len();
-        if plt_entries_count == 0 {
-            0
-        } else {
+        if Self::is_needed(data) {
             // length + 1, to account for the stub.  Each entry is 0x10 in size
-            (1 + plt_entries_count) * 0x10
+            (1 + data.dynamics.plt_objects().len()) * 0x10
+        } else {
+            0
         }
     }
 

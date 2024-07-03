@@ -231,7 +231,7 @@ clean:
 
 
 ninja.build: build.py
-	python3 build.py ../c-testsuite/tests/single-exec
+	python3 build.py tests/c-testsuite/tests/single-exec
 
 testsuites: ninja.build
 	ninja -v testsuite-clang-glibc

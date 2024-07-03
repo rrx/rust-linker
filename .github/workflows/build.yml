@@ -32,6 +32,9 @@ jobs:
       - name: Install packages
         run: sudo apt-get install -y musl-dev
 
+      - name: Make
+        run: make functions examples testsuites
+
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         continue-on-error: true

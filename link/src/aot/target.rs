@@ -16,6 +16,12 @@ pub struct Target {
     pub unknown: SymbolMap,
 }
 
+impl Default for Target {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Target {
     pub fn new() -> Self {
         Self {
@@ -33,34 +39,26 @@ impl Target {
     }
 
     pub(crate) fn is_dynamic(&self) -> bool {
-        self.libs.len() > 0
+        !self.libs.is_empty()
     }
 
     pub fn lookup_static(&self, name: &str) -> Option<ReadSymbol> {
         if let Some(symbol) = self.locals.get(name) {
             Some(symbol.clone())
-        } else if let Some(symbol) = self.exports.get(name) {
-            Some(symbol.clone())
         } else {
-            None
+            self.exports.get(name).cloned()
         }
     }
 
     pub fn lookup_dynamic(&self, name: &str) -> Option<ReadSymbol> {
-        if let Some(symbol) = self.dynamic.get(name) {
-            Some(symbol.clone())
-        } else {
-            None
-        }
+        self.dynamic.get(name).cloned()
     }
 
     pub fn lookup(&self, name: &str) -> Option<ReadSymbol> {
         if let Some(symbol) = self.lookup_static(name) {
             Some(symbol.clone())
-        } else if let Some(symbol) = self.lookup_dynamic(name) {
-            Some(symbol.clone())
         } else {
-            None
+            self.lookup_dynamic(name)
         }
     }
 
@@ -116,8 +114,8 @@ impl Target {
                     unreachable!()
                 }
             })
-            .collect();
-        disassemble_code_with_symbols(self.rx.bytes(), &symbols, &self.rx.relocations());
+            .collect::<Vec<_>>();
+        disassemble_code_with_symbols(self.rx.bytes(), &symbols, self.rx.relocations());
 
         eprintln!("RO, size: {:#0x}", self.ro.size());
         for s in ro_symbols.iter() {
@@ -150,14 +148,14 @@ impl Target {
         //eprintln!(" S: {:?}", local);
         //}
 
-        if other_symbols.len() > 0 {
+        if !other_symbols.is_empty() {
             eprintln!("Other");
             for s in other_symbols.iter() {
                 eprintln!(" S: {:?}", s);
             }
         }
 
-        if self.unresolved.len() > 0 {
+        if !self.unresolved.is_empty() {
             eprintln!("Unresolved: {}", self.unresolved.len());
             for s in self.unresolved.iter() {
                 eprintln!(" {}", s);

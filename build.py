@@ -3,6 +3,9 @@ import sys
 import glob
 
 
+EXCLUDE_C_TESTSUITE_TESTS = []
+
+
 def main():
     base = sys.argv[1]
     build_filename = "build.ninja"
@@ -16,16 +19,23 @@ def main():
         fp.write(
             f"""
 rule cc-clang
-    command = clang-13 -fPIC -fno-lto -fno-direct-access-external-data -c $in -o $out
+    command = clang-13 \
+            -O0 -ggdb3 -fPIC -fno-lto -fno-direct-access-external-data \
+            -c $in -o $out
 
 rule cc-gcc
-    command = gcc -fPIC -c $in -o $out
+    command = gcc -O0 -ggdb3 -fPIC -c $in -o $out
 
 rule cc-clang-musl
-    command = clang-13 -I/usr/include/x86_64-linux-musl -fPIC -fno-lto -fno-direct-access-external-data -c $in -o $out
+    command = clang-13 \
+            -O0 -ggdb3 -I/usr/include/x86_64-linux-musl \
+            -fPIC -fno-lto -fno-direct-access-external-data \
+            -c $in -o $out
 
 rule cc-gcc-musl
-    command = gcc -I/usr/include/x86_64-linux-musl -fPIC -c $in -o $out
+    command = gcc -O0 -ggdb3 \
+            -I/usr/include/x86_64-linux-musl \
+            -fPIC -c $in -o $out
 
 rule build-link
     command = cargo build --release
@@ -88,18 +98,19 @@ def generate_c_testsuite(base, rule, build_type, fp):
         expected_filename = f"{filename}.expected"
         output_result = os.path.join(output, "%05d.c.results" % i)
         assert os.path.exists(expected_filename)
+        link_exe = "target/release/link"
 
         # skip broken tests
-        if i in [143, 189]:
+        if i in EXCLUDE_C_TESTSUITE_TESTS:
             i += 1
             continue
 
         outputs.append(f"{build_type}/{i}")
         fp.write(f"build {output_filename}: {rule} {filename}\n")
-        fp.write(f"build {output_exe}: link {output_filename} | target/release/link\n")
+        fp.write(f"build {output_exe}: link {output_filename} | {link_exe}\n")
         fp.write(f"build {output_result}: run {output_exe}\n")
         fp.write(
-            f"build {filename}-{build_type}-diff: diff {filename}.expected {output_result}\n"
+            f"""build {filename}-{build_type}-diff: diff {filename}.expected {output_result}\n"""
         )
         fp.write(f"build {build_type}/{i}: phony {filename} | {output_result}\n")
         i += 1

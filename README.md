@@ -11,6 +11,8 @@ This project is a proof-of-concept linker built in Rust.  The purpose of this pr
 - Only compiles for Linux on x86_64
 - Limited linker options, only the simplest were used for implementation
 - Hot-reloading is very primitive and not yet usable
+- Single code model
+- Code must by position independent (-fPIC)
 
 # Developing
 
@@ -34,6 +36,9 @@ Some helpful links for building linkers:
 - https://web.archive.org/web/20140130143820/http://www.robinhoksbergen.com/papers/howto_elf.html
 - http://www.skyfree.org/linux/references/ELF_Format.pdf
 - https://gitlab.com/x86-psABIs/x86-64-ABI
+- https://refspecs.linuxbase.org/elf/x86_64-abi-0.98.pdf
+- https://github.com/c-testsuite/c-testsuite
+- https://eli.thegreenplace.net/2012/01/03/understanding-the-x64-code-models
 
 # Similar Work in Rust
 

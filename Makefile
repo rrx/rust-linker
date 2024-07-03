@@ -7,7 +7,9 @@ fmt:
 	clang-format -i testfiles/*.c
 	python3 -m black *.py
 
-test: functions examples testsuites
+test: functions examples unittests testsuites
+
+unittests:
 	cargo test -- --nocapture
 
 empty_dynamic:
@@ -229,7 +231,7 @@ clean:
 
 
 ninja.build: build.py
-	python3 build.py ../c-testsuite/tests/single-exec
+	python3 build.py tests/c-testsuite/tests/single-exec
 
 testsuites: ninja.build
 	ninja -v testsuite-clang-glibc

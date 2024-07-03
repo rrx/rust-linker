@@ -122,7 +122,7 @@ pub struct ReadSymbol {
     pub(crate) source: SymbolSource,
     pub(crate) kind: SymbolKind,
     pub(crate) bind: SymbolBind,
-    pub(crate) pointer: ResolvePointer,
+    pub pointer: ResolvePointer,
     pub(crate) size: u64,
 }
 
@@ -294,7 +294,9 @@ impl ReadBlock {
             object::read::elf::ElfFile::parse(buf)?;
         match b.kind() {
             ObjectKind::Relocatable | ObjectKind::Executable => {
-                //dump_header(&b)?;
+                if config.verbose {
+                    dump_header(&b)?;
+                }
                 self.relocatable(name.to_string(), &b, config)?
             }
             ObjectKind::Dynamic => self.dynamic(&b, name, config)?,
@@ -469,7 +471,7 @@ impl ReadBlock {
 
             if symbol.section_index() == Some(section.index()) {
                 let s = read_symbol(&b, base, &symbol)?;
-                log::debug!("Read: {:?}", &s);
+                log::debug!("Read: {:?}, p: {}", &s, s.pointer);
 
                 if s.bind == SymbolBind::Local {
                     // can't be local and unknown
@@ -537,13 +539,15 @@ pub fn dump_hash(data: &[u8]) {
 
 pub fn code_relocation<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
     b: &elf::ElfFile<'a, A, B>,
+    section: &elf::ElfSection<'a, 'b, A, B>,
     r: LinkRelocation,
     offset: usize,
 ) -> Result<CodeRelocation, Box<dyn Error>> {
     let name = match r.target {
         RelocationTarget::Section(index) => {
             let section = b.section_by_index(index)?;
-            section.name()?.to_string()
+            let section_name = section.name()?.to_string();
+            section_name
         }
         RelocationTarget::Symbol(index) => {
             let symbol = b.symbol_by_index(index)?;
@@ -559,6 +563,7 @@ pub fn code_relocation<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
     };
     Ok(CodeRelocation {
         name,
+        section_name: section.name()?.to_string(),
         //name_id: None,
         offset: offset as u64,
         r,
@@ -614,8 +619,8 @@ pub fn read_symbol<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
     })
 }
 
-pub fn dump_header<'a>(
-    b: &elf::ElfFile<'a, FileHeader64<object::Endianness>>,
+pub fn dump_header(
+    b: &elf::ElfFile<FileHeader64<object::Endianness>>,
     //b: &elf::ElfFile<'a, A, B>,
 ) -> Result<(), Box<dyn Error>> {
     let endian = b.endian();

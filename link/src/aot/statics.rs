@@ -1,11 +1,7 @@
 use super::*;
 use object::elf;
 use object::write::elf::Sym;
-use object::write::elf::{
-    SectionIndex,
-    //SymbolIndex,
-    Writer,
-};
+use object::write::elf::{SectionIndex, SymbolIndex, Writer};
 use object::write::StringId;
 
 use std::collections::HashMap;
@@ -16,10 +12,10 @@ struct StaticStringIndex {
 }
 
 #[derive(Debug)]
-struct StaticSymbolIndex {
+pub struct StaticSymbolIndex {
     //index: usize,
-    //string_id: StringId,
-    //symbol_index: Option<SymbolIndex>,
+    string_id: StringId,
+    pub symbol_index: Option<SymbolIndex>,
     section_index: Option<SectionIndex>,
     symbol: ReadSymbol,
 }
@@ -32,7 +28,13 @@ pub struct Statics {
 
     // ordered list
     symbols: Vec<String>,
-    symbol_hash: HashMap<String, StaticSymbolIndex>,
+    pub symbol_hash: HashMap<String, StaticSymbolIndex>,
+}
+
+impl Default for Statics {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Statics {
@@ -93,15 +95,15 @@ impl Statics {
         if let Some(_track) = self.symbol_hash.get(&symbol.name) {
             eprintln!("already added: {:?}: {:?}", symbol, section_index);
         } else {
-            let _string_id = self.string_add(&symbol.name, w);
-            let _symbol_index = Some(w.reserve_symbol_index(section_index));
+            let string_id = self.string_add(&symbol.name, w);
+            let symbol_index = Some(w.reserve_symbol_index(section_index));
             //let index = self.symbols.len();
             self.symbols.push(symbol.name.to_string());
 
             let track = StaticSymbolIndex {
                 //index,
-                //string_id,
-                //symbol_index,
+                string_id,
+                symbol_index,
                 section_index,
                 symbol: symbol.clone(),
             };
@@ -111,11 +113,9 @@ impl Statics {
     }
 
     pub fn symbol_get(&self, name: &str) -> Option<ResolvePointer> {
-        if let Some(track) = self.symbol_hash.get(name) {
-            Some(track.symbol.pointer.clone())
-        } else {
-            None
-        }
+        self.symbol_hash
+            .get(name)
+            .map(|track| track.symbol.pointer.clone())
     }
 
     pub fn symbols_write(&self, data: &Data, w: &mut Writer) {

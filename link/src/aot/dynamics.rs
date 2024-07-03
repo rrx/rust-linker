@@ -35,8 +35,8 @@ pub struct Dynamics {
     symbols: Vec<String>,
     symbol_hash: HashMap<String, TrackSymbolIndex>,
 
-    r_got: Vec<ReadSymbol>,
-    r_gotplt: Vec<ReadSymbol>,
+    r_got: Vec<(CodeRelocation, ReadSymbol)>,
+    r_gotplt: Vec<(CodeRelocation, ReadSymbol)>,
 
     // plt entries
     plt: Vec<ReadSymbol>,
@@ -81,7 +81,7 @@ impl Dynamics {
         }
     }
 
-    pub fn relocations(&self, kind: GotSectionKind) -> Vec<ReadSymbol> {
+    pub fn relocations(&self, kind: GotSectionKind) -> Vec<(CodeRelocation, ReadSymbol)> {
         match kind {
             GotSectionKind::GOT => self.r_got.iter().cloned().collect(),
             GotSectionKind::GOTPLT => self.r_gotplt.iter().cloned().collect(),
@@ -151,11 +151,11 @@ impl Dynamics {
             .count()
     }
 
-    pub fn save_relocation(&mut self, symbol: ReadSymbol, r: &CodeRelocation) -> ReadSymbol {
-        log::debug!(target: "symbols", "r: {}", r);
+    pub fn save_relocation(&mut self, symbol: ReadSymbol, r: &CodeRelocation) {
         let mut add_got = false;
-        let mut add_gotplt = false;
+        let add_gotplt = false;
         let mut add_plt = false;
+        let mut add_absolute = false;
 
         if symbol.is_static() {
             if r.is_got() {
@@ -165,11 +165,15 @@ impl Dynamics {
             if r.is_got() {
                 add_got = true;
             }
+
             if r.is_plt() {
                 add_got = true;
                 add_plt = true;
+            } else if r.r.kind() == object::RelocationKind::Absolute {
+                add_absolute = true;
             }
         }
+        log::debug!(target: "symbols", "r: {}, {}, {}, {}", r, add_got, add_gotplt, add_plt);
 
         if add_plt {
             if !self.plt_lookup.contains_key(&symbol.name) {
@@ -184,34 +188,35 @@ impl Dynamics {
             }
         }
 
+        if add_got {
+            if !self.got_lookup.contains_key(&symbol.name) {
+                self.r_got.push((r.clone(), symbol.clone()));
+                self.got_lookup
+                    .insert(symbol.name.to_string(), self.got_index);
+                log::debug!(target: "symbols", "ADD_GOT: {}, {}", &symbol.name, self.got_index);
+                self.got_index += 1;
+            }
+        }
+
         if add_gotplt {
             if !self.gotplt_lookup.contains_key(&symbol.name) {
-                self.r_gotplt.push(symbol.clone());
+                self.r_gotplt.push((r.clone(), symbol.clone()));
                 self.gotplt_lookup
                     .insert(symbol.name.to_string(), self.gotplt_index);
                 self.gotplt_index += 1;
             }
         }
 
-        if add_got {
-            if !self.got_lookup.contains_key(&symbol.name) {
-                self.r_got.push(symbol.clone());
-                self.got_lookup
-                    .insert(symbol.name.to_string(), self.got_index);
-                self.got_index += 1;
-            }
+        if add_absolute {
+            self.r_got.push((r.clone(), symbol.clone()));
         }
-
-        symbol
     }
 
-    pub fn relocation_add(&mut self, symbol: &ReadSymbol, r: &CodeRelocation) -> ReadSymbol {
+    pub fn relocation_add(&mut self, symbol: &ReadSymbol, r: &CodeRelocation) {
         let name = &symbol.name;
-        let symbol = self.save_relocation(symbol.clone(), r);
+        self.save_relocation(symbol.clone(), r);
 
-        if let Some(track) = self.symbol_hash.get(name) {
-            track.symbol.clone()
-        } else {
+        if self.symbol_hash.get(name).is_none() {
             self.symbols.push(symbol.name.clone());
             self.symbol_hash.insert(
                 symbol.name.clone(),
@@ -221,7 +226,6 @@ impl Dynamics {
                     symbol: symbol.clone(),
                 },
             );
-            symbol
         }
     }
 
@@ -230,15 +234,11 @@ impl Dynamics {
         symbol: &ReadSymbol,
         r: &CodeRelocation,
         w: &mut Writer,
-    ) -> ReadSymbol {
+    ) {
         let name = &symbol.name;
-        let symbol = self.save_relocation(symbol.clone(), r);
-
-        if let Some(track) = self.symbol_hash.get(name) {
-            track.symbol.clone()
-        } else {
+        self.save_relocation(symbol.clone(), r);
+        if self.symbol_hash.get(name).is_none() {
             self.symbol_add(symbol.clone(), w);
-            symbol
         }
     }
 
@@ -251,6 +251,7 @@ impl Dynamics {
         if symbol.is_static() {
             string_id = None;
             symbol_index = None;
+            log::debug!(target: "symbols", "ADD STATIC");
         } else {
             string_id = Some(self.string_add(&symbol.name, w));
             symbol_index = Some(SymbolIndex(w.reserve_dynamic_symbol_index().0));

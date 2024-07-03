@@ -2,6 +2,7 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum LinkError {
+    FileNotFound(String),
     NotFound,
     MissingSymbol,
     SymbolNotFound(String),

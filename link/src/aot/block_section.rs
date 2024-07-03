@@ -136,7 +136,7 @@ impl GeneralSection {
         self.extend_size(data.len());
         self.extend_bytes(&data);
         for (offset, r) in section.relocations() {
-            let r = code_relocation(b, r.into(), base_offset + offset as usize)?;
+            let r = code_relocation(b, section, r.into(), base_offset + offset as usize)?;
             self.relocations.push(r);
         }
         Ok(())

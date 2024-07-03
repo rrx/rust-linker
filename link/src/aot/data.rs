@@ -91,7 +91,7 @@ impl BuildGotSection {
         let mut buf = Self::contents(data);
         let kind = GotSectionKind::GOT;
         let unapplied = data.dynamics.relocations(kind);
-        for (i, symbol) in unapplied.iter().enumerate() {
+        for (i, (_, symbol)) in unapplied.iter().enumerate() {
             let p = symbol.pointer.resolve(data).unwrap();
             eprintln!("U1({}): {:?}, {:#0x}", i, symbol, p);
 
@@ -178,12 +178,11 @@ impl BuildPltSection {
         data.dynamics.plt_objects().len() > 0
     }
     pub fn size(data: &Data) -> usize {
-        let plt_entries_count = data.dynamics.plt_objects().len();
-        if plt_entries_count == 0 {
-            0
-        } else {
+        if Self::is_needed(data) {
             // length + 1, to account for the stub.  Each entry is 0x10 in size
-            (1 + plt_entries_count) * 0x10
+            (1 + data.dynamics.plt_objects().len()) * 0x10
+        } else {
+            0
         }
     }
 
@@ -447,10 +446,16 @@ impl Data {
             */
             log::info!("r {:?}", (&r, target.lookup_dynamic(&r.name)));
 
-            if let Some(s) = target.lookup_dynamic(&r.name) {
-                let symbol = self.dynamics.relocation_add_write(&s, r, w);
-                self.symbols.insert(symbol.name.clone(), symbol.clone());
-                log::info!("reloc0 {}, {:?}, {:?}", &r, s.bind, symbol.pointer);
+            if let Some(mut s) = target.lookup_dynamic(&r.name) {
+                if r.r.kind() == object::RelocationKind::Absolute && !s.is_static() {
+                    let p = ResolvePointer::Section(r.section_name.clone(), r.offset);
+                    log::info!("reloc0a {}, {:?}, {}", &r, s.bind, p);
+                    s.pointer = p;
+                }
+
+                self.dynamics.relocation_add_write(&s, r, w);
+                self.symbols.insert(s.name.clone(), s.clone());
+                log::info!("reloc0 {}, {:?}, {}", &r, s.bind, s.pointer);
                 let symbol = target
                     .lookup(&r.name)
                     .expect(&format!("Missing {}", &r.name));
@@ -513,7 +518,6 @@ impl Data {
                         log::info!("reloc4 {}, bind: {:?}, {:?}", &r, s.bind, s.pointer);
                     }
                 }
-                //continue;
             } else {
                 unreachable!("Unable to find symbol for relocation: {}", &r.name)
             }
@@ -546,6 +550,10 @@ impl Data {
             let s = target.lookup_static(symbol_name).unwrap();
             self.symbols.insert(s.name.clone(), s);
         }
+
+        let p = ResolvePointer::Section(".text".to_string(), 0);
+        let s = ReadSymbol::from_pointer(".text".into(), p);
+        self.symbols.insert(".text".to_string(), s);
     }
 
     pub fn write(
@@ -567,7 +575,7 @@ impl Data {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ResolvePointer {
     Unknown,
     Resolved(u64),

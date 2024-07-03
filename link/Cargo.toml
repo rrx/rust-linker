@@ -25,4 +25,4 @@ test-log = { git = "https://github.com/rrx/test-log.git" }
 
 [lib]
 name = "link"
-crate_type = ["dylib", "rlib", "staticlib"]
+crate-type = ["dylib", "rlib", "staticlib"]

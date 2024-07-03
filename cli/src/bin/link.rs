@@ -34,6 +34,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut exe = ReadBlock::new("exe");
     for path in args.inputs.iter() {
+        if !Path::new(&path).exists() {
+            eprintln!("File does not exist: {}", path);
+            return Err(LinkError::FileNotFound(path.clone()).into());
+        }
+    }
+
+    for path in args.inputs.iter() {
         //let block = ReadBlock::from_path(Path::new(&path), &config)?;
         //block.dump();
         //exe.add_block(block);

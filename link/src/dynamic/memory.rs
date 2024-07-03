@@ -379,7 +379,7 @@ impl Block {
         unsafe { std::slice::from_raw_parts(ptr, size) }
     }
 
-    pub fn as_mut_slice(&self) -> &mut [u8] {
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
         let ptr = self.p.unwrap().as_ptr();
         let size = self.layout.size();
         unsafe { std::slice::from_raw_parts_mut(ptr, size) }
@@ -463,7 +463,7 @@ impl Drop for Block {
 
 fn page_align(n: usize, ps: usize) -> usize {
     // hardwired for now, but we can get this from the target we are running at at runtime
-    return (n + (ps - 1)) & !(ps - 1);
+    (n + (ps - 1)) & !(ps - 1)
 }
 
 fn page_size() -> usize {

@@ -125,7 +125,7 @@ fn load_block(version: &mut LoaderVersion, target: &mut Target) -> Result<(), Bo
 
     for r in iter {
         if let Some(s) = dynamic_lookups.get(&r.name) {
-            data.dynamics.save_relocation(s.clone(), r);
+            data.dynamics.relocations.save_relocation(s.clone(), r);
             log::info!("reloc0 {}, {:?}, {:?}", &r, s.bind, s.pointer);
             data.symbols.insert(s.name.clone(), s.clone());
             continue;

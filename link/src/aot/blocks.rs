@@ -402,6 +402,7 @@ impl ElfBlock for RelaDynSection {
     fn name(&self) -> String {
         self.offsets.name.clone()
     }
+
     fn alloc(&self) -> AllocSegment {
         self.offsets.alloc
     }
@@ -413,7 +414,7 @@ impl ElfBlock for RelaDynSection {
     }
 
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
-        let relocations = data.dynamics.relocations(self.kind);
+        let relocations = data.dynamics.relocations.relocations(self.kind);
 
         self.count = relocations.len();
         let file_offset = w.reserve_start_section(&self.offsets);
@@ -441,7 +442,7 @@ impl ElfBlock for RelaDynSection {
     }
 
     fn write(&self, data: &Data, w: &mut Writer) {
-        let relocations = data.dynamics.relocations(self.kind);
+        let relocations = data.dynamics.relocations.relocations(self.kind);
         w.write_start_section(&self.offsets);
         assert_eq!(self.count, relocations.len());
 
@@ -452,7 +453,7 @@ impl ElfBlock for RelaDynSection {
 
             // if relative, look up the pointer in statics
             if symbol.is_static() {
-                let static_sym = data
+                let _static_sym = data
                     .statics
                     .symbol_hash
                     .get(&symbol.name)
@@ -499,7 +500,12 @@ impl ElfBlock for RelaDynSection {
                         addr as usize + r.offset as usize
                     } else {
                         let got_addr = data.addr_get(".got");
-                        let got_index = data.dynamics.got_lookup.get(&symbol.name).unwrap();
+                        let got_index = data
+                            .dynamics
+                            .relocations
+                            .got_lookup
+                            .get(&symbol.name)
+                            .unwrap();
                         got_addr as usize + got_index * std::mem::size_of::<usize>()
                     }
                 }
@@ -523,7 +529,7 @@ impl ElfBlock for RelaDynSection {
     }
 
     fn write_section_header(&self, data: &Data, w: &mut Writer) {
-        let relocations = data.dynamics.relocations(self.kind);
+        let relocations = data.dynamics.relocations.relocations(self.kind);
 
         let sh_addralign = self.offsets.align;
 
@@ -1047,7 +1053,7 @@ impl ElfBlock for GotSection {
 
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
         // each entry in unapplied will be a GOT entry
-        let unapplied = data.dynamics.relocations(self.kind);
+        let unapplied = data.dynamics.relocations.relocations(self.kind);
         let name = self.kind.section_name();
 
         let len = unapplied.len() + self.kind.start_index();
@@ -1201,8 +1207,7 @@ impl ElfBlock for PltGotSection {
     }
 
     fn reserve(&mut self, data: &mut Data, w: &mut Writer) {
-        let pltgot = data.dynamics.pltgot_objects();
-        let size = (pltgot.len()) * self.entry_size;
+        let size = (data.dynamics.pltgot_objects_len()) * self.entry_size;
         let file_offset = w.reserve_start_section(&self.section.offsets);
         self.section.offsets.size = size as u64;
         w.reserve(size, 1);

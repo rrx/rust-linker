@@ -44,7 +44,7 @@ pub struct BuildGotPltSection {}
 impl BuildGotPltSection {
     pub fn size(data: &Data) -> usize {
         let kind = GotSectionKind::GOTPLT;
-        let unapplied = data.dynamics.relocations(kind);
+        let unapplied = data.dynamics.relocations.relocations(kind);
         let len = unapplied.len() + kind.start_index();
         let size = len * std::mem::size_of::<usize>();
         size
@@ -56,7 +56,7 @@ impl BuildGotPltSection {
 
     pub fn contents(data: &Data) -> Vec<u8> {
         let kind = GotSectionKind::GOTPLT;
-        let unapplied = data.dynamics.relocations(kind);
+        let unapplied = data.dynamics.relocations.relocations(kind);
 
         // populate with predefined values
         let mut values: Vec<u64> = vec![data.addr_get(".dynamic"), 0, 0];
@@ -77,7 +77,7 @@ pub struct BuildGotSection {}
 impl BuildGotSection {
     pub fn size(data: &Data) -> usize {
         let kind = GotSectionKind::GOT;
-        let unapplied = data.dynamics.relocations(kind);
+        let unapplied = data.dynamics.relocations.relocations(kind);
         let len = unapplied.len() + kind.start_index();
         let size = len * std::mem::size_of::<usize>();
         size
@@ -90,7 +90,7 @@ impl BuildGotSection {
     pub fn contents_dynamic(data: &Data) -> Vec<u8> {
         let mut buf = Self::contents(data);
         let kind = GotSectionKind::GOT;
-        let unapplied = data.dynamics.relocations(kind);
+        let unapplied = data.dynamics.relocations.relocations(kind);
         for (i, (_, symbol)) in unapplied.iter().enumerate() {
             let p = symbol.pointer.resolve(data).unwrap();
             eprintln!("U1({}): {:?}, {:#0x}", i, symbol, p);
@@ -117,7 +117,7 @@ impl BuildGotSection {
 
     pub fn contents(data: &Data) -> Vec<u8> {
         let kind = GotSectionKind::GOT;
-        let unapplied = data.dynamics.relocations(kind);
+        let unapplied = data.dynamics.relocations.relocations(kind);
 
         // just empty
         let mut bytes: Vec<u8> = vec![];
@@ -136,9 +136,7 @@ impl BuildPltGotSection {
     }
 
     pub fn size(data: &Data) -> usize {
-        let pltgot = data.dynamics.pltgot_objects();
-        let size = (pltgot.len()) * Self::entry_size();
-        size
+        (data.dynamics.pltgot_objects_len()) * Self::entry_size()
     }
 
     pub fn align(_data: &Data) -> usize {
@@ -147,9 +145,8 @@ impl BuildPltGotSection {
 
     pub fn contents(data: &Data, base: usize) -> Vec<u8> {
         let vbase = base as isize;
-        let pltgot = data.dynamics.pltgot_objects();
         let mut bytes: Vec<u8> = vec![];
-        for (slot_index, symbol) in pltgot.iter().enumerate() {
+        for (slot_index, symbol) in data.dynamics.relocations.pltgot.iter().enumerate() {
             let mut slot: [u8; 8] = [0xff, 0x25, 0x00, 0x00, 0x00, 0x00, 0x66, 0x90];
             let slot_size = slot.len();
             assert_eq!(slot_size, Self::entry_size());
@@ -157,7 +154,12 @@ impl BuildPltGotSection {
             //1050:       ff 25 82 2f 00 00       jmp    *0x2f82(%rip)        # 3fd8 <fprintf@GLIBC_2.2.5>
             //1056:       66 90                   xchg   %ax,%ax
 
-            let index = data.dynamics.got_lookup.get(&symbol.name).unwrap();
+            let index = data
+                .dynamics
+                .relocations
+                .got_lookup
+                .get(&symbol.name)
+                .unwrap();
             let p = ResolvePointer::Got(*index);
             let gotplt_addr = p.resolve(data).unwrap();
             let offset = (slot_index as isize) * slot_size as isize;
@@ -175,12 +177,12 @@ pub struct BuildPltSection {}
 
 impl BuildPltSection {
     pub fn is_needed(data: &Data) -> bool {
-        data.dynamics.plt_objects().len() > 0
+        data.dynamics.plt_objects_len() > 0
     }
     pub fn size(data: &Data) -> usize {
         if Self::is_needed(data) {
             // length + 1, to account for the stub.  Each entry is 0x10 in size
-            (1 + data.dynamics.plt_objects().len()) * 0x10
+            (1 + data.dynamics.plt_objects_len()) * 0x10
         } else {
             0
         }
@@ -192,17 +194,17 @@ impl BuildPltSection {
 
     pub fn contents_dynamic(data: &Data, plt_base_ptr: usize) -> Vec<u8> {
         let mut v = vec![0u8; 16];
-        for (i, symbol) in data.dynamics.plt_objects().iter().enumerate() {
+        for (i, name) in data.dynamics.relocations.plt_lookup.keys().enumerate() {
             // offset is from the next instruction - 5 bytes after the current instruction
             let rip = plt_base_ptr as isize + (i as isize + 1) * 16 + 5;
             let p = data
                 .symbols
-                .get(&symbol.name)
+                .get(name)
                 .unwrap()
                 .pointer
                 .resolve(data)
                 .unwrap();
-            println!("PLT Symbol: {:?}", symbol);
+            println!("PLT Symbol: {:?}", name);
             println!("PLT Symbol: {:#0x}, {:#0x}", p, rip);
             // E9 cd - JMP rel32
             let mut buf = [0u8; 16];
@@ -215,7 +217,7 @@ impl BuildPltSection {
     }
 
     pub fn contents(data: &Data, base: usize) -> Vec<u8> {
-        let plt_entries_count = data.dynamics.plt_objects().len();
+        let plt_entries_count = data.dynamics.plt_objects_len();
         if plt_entries_count == 0 {
             return vec![];
         }

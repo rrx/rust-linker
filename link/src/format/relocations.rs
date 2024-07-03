@@ -273,17 +273,32 @@ impl CodeRelocation {
 
         let pointer = if symbol.is_static() {
             if self.is_got() {
-                let index = data.dynamics.got_lookup.get(&symbol.name).unwrap();
+                let index = data
+                    .dynamics
+                    .relocations
+                    .got_lookup
+                    .get(&symbol.name)
+                    .unwrap();
                 ResolvePointer::Got(*index)
             } else {
                 pointer
             }
         } else {
             if self.is_got() {
-                let index = data.dynamics.got_lookup.get(&symbol.name).unwrap();
+                let index = data
+                    .dynamics
+                    .relocations
+                    .got_lookup
+                    .get(&symbol.name)
+                    .unwrap();
                 ResolvePointer::Got(*index)
             } else if self.is_plt() {
-                let index = data.dynamics.pltgot_lookup.get(&symbol.name).unwrap();
+                let index = data
+                    .dynamics
+                    .relocations
+                    .pltgot_lookup
+                    .get(&symbol.name)
+                    .unwrap();
                 ResolvePointer::PltGot(*index)
             } else if self.r.kind == RelocationKind::Absolute {
                 ResolvePointer::Section(self.section_name.clone(), self.offset)

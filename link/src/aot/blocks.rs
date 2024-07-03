@@ -499,7 +499,8 @@ impl ElfBlock for RelaDynSection {
                         addr as usize + r.offset as usize
                     } else {
                         let got_addr = data.addr_get(".got");
-                        got_addr as usize + index * std::mem::size_of::<usize>()
+                        let got_index = data.dynamics.got_lookup.get(&symbol.name).unwrap();
+                        got_addr as usize + got_index * std::mem::size_of::<usize>()
                     }
                 }
                 GotSectionKind::GOTPLT => {

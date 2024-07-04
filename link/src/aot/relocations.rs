@@ -72,17 +72,13 @@ impl RelaDynSection {
 
             // if relative, look up the pointer in statics
             if symbol.is_static() {
-                let _static_sym = data
-                    .statics
-                    .symbol_hash
-                    .get(&symbol.name)
-                    .expect(&format!("not found {}", &symbol.name));
-                //r_sym = if let Some(symbol_index) = static_sym.symbol_index {
-                //symbol_index.0
-                //} else {
-                //0
-                //};
-                //r_sym = 0;
+                // TODO: Adding symbols to the relative relocations causes musl to segfault
+
+                /*
+                if let Some((symbol_index, sym)) = data.dynamics.symbol_get(&symbol.name, data) {
+                    r_sym = symbol_index.0;
+                }
+                */
 
                 if let Some(p) = data.statics.symbol_get(&symbol.name) {
                     if let Some(addr) = p.resolve(data) {

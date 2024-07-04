@@ -234,4 +234,7 @@ ninja.build: build.py
 
 testsuites: ninja.build
 	ninja -v testsuite-clang-glibc
+	ninja -v testsuite-clang-musl
+	ninja -v testsuite-gcc-glibc
+	ninja -v testsuite-gcc-musl
 

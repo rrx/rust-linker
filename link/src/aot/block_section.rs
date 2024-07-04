@@ -130,16 +130,17 @@ impl GeneralSection {
 
     pub fn from_section<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
         &mut self,
+        kind: ReadSectionKind,
         b: &elf::ElfFile<'a, A, B>,
         section: &elf::ElfSection<'a, 'b, A, B>,
     ) -> Result<(), Box<dyn Error>> {
         let data = section.uncompressed_data()?;
         let base_offset = self.size();
-        log::debug!("name: {}", section.name()?);
+        log::debug!("name: {}, {}", section.name()?, kind.section_name());
         self.extend_size(data.len());
         self.extend_bytes(&data);
         for (offset, r) in section.relocations() {
-            let r = code_relocation(b, section, r.into(), base_offset + offset as usize)?;
+            let r = code_relocation(kind, b, section, r.into(), base_offset + offset as usize)?;
             self.relocations.push(r);
         }
         Ok(())

@@ -5,15 +5,17 @@ use capstone::prelude::*;
 
 impl GeneralSection {
     pub fn disassemble(&self, data: &Data) {
-        eprintln!(
-            "Disassemble: {}, {:#0x}, size: {:#0x}",
-            self.name,
-            self.offsets.address,
-            self.size()
-        );
-        match self.offsets.alloc {
-            AllocSegment::RX => self.disassemble_code(data, &self.bytes),
-            _ => self.disassemble_data(data),
+        if self.size() > 0 {
+            eprintln!(
+                "Disassemble: {}, {:#0x}, size: {:#0x}",
+                self.name,
+                self.offsets.address,
+                self.size()
+            );
+            match self.offsets.alloc {
+                AllocSegment::RX => self.disassemble_code(data, &self.bytes),
+                _ => self.disassemble_data(data),
+            }
         }
     }
 

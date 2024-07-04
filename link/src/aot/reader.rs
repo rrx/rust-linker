@@ -209,8 +209,8 @@ pub struct ReadBlock {
 impl ReadBlock {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_string(),
             target: Target::new(),
+            name: name.to_string(),
             local_index: 0,
         }
     }
@@ -460,7 +460,6 @@ impl ReadBlock {
 
         let mut count = 0;
         for symbol in b.symbols() {
-            count += 1;
             // skip the null symbol
             if symbol.kind() == object::SymbolKind::Null {
                 continue;
@@ -470,8 +469,9 @@ impl ReadBlock {
             }
 
             if symbol.section_index() == Some(section.index()) {
+                count += 1;
                 let s = read_symbol(&b, base, &symbol)?;
-                log::debug!("Read: {:?}, p: {}", &s, s.pointer);
+                log::debug!("Read: {:?}, p: {} from {}", &s, s.pointer, section.name()?);
 
                 if s.bind == SymbolBind::Local {
                     // can't be local and unknown
@@ -490,17 +490,17 @@ impl ReadBlock {
 
         match kind {
             ReadSectionKind::Bss => {
-                self.target.bss.from_section(b, section)?;
+                self.target.bss.from_section(kind, b, section)?;
                 self.target.bss.extend_size(section.size() as usize);
             }
             ReadSectionKind::RX => {
-                self.target.rx.from_section(b, section)?;
+                self.target.rx.from_section(kind, b, section)?;
             }
             ReadSectionKind::ROData => {
-                self.target.ro.from_section(b, section)?;
+                self.target.ro.from_section(kind, b, section)?;
             }
             ReadSectionKind::RW => {
-                self.target.rw.from_section(b, section)?;
+                self.target.rw.from_section(kind, b, section)?;
             }
             _ => unimplemented!(),
         }
@@ -538,11 +538,12 @@ pub fn dump_hash(data: &[u8]) {
 }
 
 pub fn code_relocation<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
+    kind: ReadSectionKind,
     b: &elf::ElfFile<'a, A, B>,
-    section: &elf::ElfSection<'a, 'b, A, B>,
     r: LinkRelocation,
     offset: usize,
 ) -> Result<CodeRelocation, Box<dyn Error>> {
+    let section_name = kind.section_name().to_string();
     let name = match r.target {
         RelocationTarget::Section(index) => {
             let section = b.section_by_index(index)?;
@@ -563,7 +564,7 @@ pub fn code_relocation<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
     };
     Ok(CodeRelocation {
         name,
-        section_name: section.name()?.to_string(),
+        section_name, //: section.name()?.to_string(),
         //name_id: None,
         offset: offset as u64,
         r,

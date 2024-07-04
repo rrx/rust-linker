@@ -6,7 +6,6 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::ptr::NonNull;
 use std::rc::Rc;
-use std::sync::Arc;
 pub type SharedLibrary = Rc<Library>;
 
 pub enum Library {

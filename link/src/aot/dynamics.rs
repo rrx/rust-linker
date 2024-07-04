@@ -25,24 +25,9 @@ struct TrackSymbolIndex {
     symbol: ReadSymbol,
 }
 
-pub struct Dynamics {
-    // ordered list
-    strings: Vec<String>,
-    // hash of index
-    string_hash: HashMap<String, TrackStringIndex>,
-
-    // ordered list
-    symbols: Vec<String>,
-    symbol_hash: HashMap<String, TrackSymbolIndex>,
-
+pub struct Relocations {
     r_got: Vec<(CodeRelocation, ReadSymbol)>,
     r_gotplt: Vec<(CodeRelocation, ReadSymbol)>,
-
-    // plt entries
-    plt: Vec<ReadSymbol>,
-    pub plt_hash: HashMap<String, ReadSymbol>,
-    pltgot: Vec<ReadSymbol>,
-    pub pltgot_hash: HashMap<String, ReadSymbol>,
 
     pub got_lookup: HashMap<String, usize>,
     pub gotplt_lookup: HashMap<String, usize>,
@@ -53,23 +38,20 @@ pub struct Dynamics {
     gotplt_index: usize,
     plt_index: usize,
     pltgot_index: usize,
+
+    // plt entries
+    //plt: Vec<ReadSymbol>,
+    pub plt_hash: HashMap<String, ReadSymbol>,
+    pub pltgot: Vec<ReadSymbol>,
+    pub pltgot_hash: HashMap<String, ReadSymbol>,
 }
 
-impl Dynamics {
+impl Relocations {
     pub fn new() -> Self {
         Self {
-            strings: vec![],
-            string_hash: HashMap::new(),
-            symbols: vec![],
-            symbol_hash: HashMap::new(),
             r_got: vec![],
             r_gotplt: vec![],
 
-            plt: vec![],
-            plt_hash: HashMap::new(),
-
-            pltgot: vec![],
-            pltgot_hash: HashMap::new(),
             got_index: 0,
             got_lookup: HashMap::new(),
             gotplt_lookup: HashMap::new(),
@@ -78,6 +60,12 @@ impl Dynamics {
             gotplt_index: 3,
             plt_index: 1,
             pltgot_index: 0,
+
+            //plt: vec![],
+            plt_hash: HashMap::new(),
+
+            pltgot: vec![],
+            pltgot_hash: HashMap::new(),
         }
     }
 
@@ -85,6 +73,92 @@ impl Dynamics {
         match kind {
             GotSectionKind::GOT => self.r_got.iter().cloned().collect(),
             GotSectionKind::GOTPLT => self.r_gotplt.iter().cloned().collect(),
+        }
+    }
+
+    pub fn save_relocation(&mut self, symbol: ReadSymbol, r: &CodeRelocation) {
+        let mut add_got = false;
+        let add_gotplt = false;
+        let mut add_plt = false;
+        let mut add_absolute = false;
+
+        if symbol.is_static() {
+            if r.is_got() {
+                add_got = true;
+            }
+        } else {
+            if r.is_got() {
+                add_got = true;
+            }
+
+            if r.is_plt() {
+                add_got = true;
+                add_plt = true;
+            } else if r.r.kind() == object::RelocationKind::Absolute {
+                add_absolute = true;
+            }
+        }
+        log::debug!(target: "symbols", "r: {}, {}, {}, {}", r, add_got, add_gotplt, add_plt);
+
+        if add_plt {
+            if !self.plt_lookup.contains_key(&symbol.name) {
+                //self.plt.push(symbol.clone());
+                self.pltgot.push(symbol.clone());
+                self.plt_lookup
+                    .insert(symbol.name.to_string(), self.plt_index);
+                self.pltgot_lookup
+                    .insert(symbol.name.to_string(), self.pltgot_index);
+                self.plt_index += 1;
+                self.pltgot_index += 1;
+            }
+        }
+
+        if add_got {
+            if !self.got_lookup.contains_key(&symbol.name) {
+                self.r_got.push((r.clone(), symbol.clone()));
+                self.got_lookup
+                    .insert(symbol.name.to_string(), self.got_index);
+                log::debug!(target: "symbols", "ADD_GOT: {}, {}", &symbol.name, self.got_index);
+                self.got_index += 1;
+            }
+        }
+
+        if add_gotplt {
+            if !self.gotplt_lookup.contains_key(&symbol.name) {
+                self.r_gotplt.push((r.clone(), symbol.clone()));
+                self.gotplt_lookup
+                    .insert(symbol.name.to_string(), self.gotplt_index);
+                self.gotplt_index += 1;
+            }
+        }
+
+        if add_absolute {
+            self.r_got.push((r.clone(), symbol.clone()));
+        }
+    }
+}
+
+pub struct Dynamics {
+    // ordered list
+    strings: Vec<String>,
+    // hash of index
+    string_hash: HashMap<String, TrackStringIndex>,
+
+    pub relocations: Relocations,
+
+    // ordered list
+    symbols: Vec<String>,
+    symbol_hash: HashMap<String, TrackSymbolIndex>,
+}
+
+impl Dynamics {
+    pub fn new() -> Self {
+        Self {
+            strings: vec![],
+            string_hash: HashMap::new(),
+            relocations: Relocations::new(),
+            symbols: vec![],
+            symbol_hash: HashMap::new(),
         }
     }
 
@@ -96,9 +170,9 @@ impl Dynamics {
                 None
             }
         } else if r.is_plt() {
-            if let Some(symbol) = self.plt_hash.get(&r.name) {
+            if let Some(symbol) = self.relocations.plt_hash.get(&r.name) {
                 Some(symbol.pointer.clone())
-            } else if let Some(symbol) = self.pltgot_hash.get(&r.name) {
+            } else if let Some(symbol) = self.relocations.pltgot_hash.get(&r.name) {
                 Some(symbol.pointer.clone())
             } else if let Some(track) = self.symbol_hash.get(&r.name) {
                 Some(track.symbol.pointer.clone())
@@ -110,12 +184,12 @@ impl Dynamics {
         }
     }
 
-    pub fn pltgot_objects(&self) -> Vec<ReadSymbol> {
-        self.pltgot.clone()
+    pub fn pltgot_objects_len(&self) -> usize {
+        self.relocations.pltgot_lookup.len()
     }
 
-    pub fn plt_objects(&self) -> Vec<ReadSymbol> {
-        self.plt.clone()
+    pub fn plt_objects_len(&self) -> usize {
+        self.relocations.plt_lookup.len()
     }
 
     pub fn string_get(&self, name: &str) -> StringId {
@@ -151,70 +225,9 @@ impl Dynamics {
             .count()
     }
 
-    pub fn save_relocation(&mut self, symbol: ReadSymbol, r: &CodeRelocation) {
-        let mut add_got = false;
-        let add_gotplt = false;
-        let mut add_plt = false;
-        let mut add_absolute = false;
-
-        if symbol.is_static() {
-            if r.is_got() {
-                add_got = true;
-            }
-        } else {
-            if r.is_got() {
-                add_got = true;
-            }
-
-            if r.is_plt() {
-                add_got = true;
-                add_plt = true;
-            } else if r.r.kind() == object::RelocationKind::Absolute {
-                add_absolute = true;
-            }
-        }
-        log::debug!(target: "symbols", "r: {}, {}, {}, {}", r, add_got, add_gotplt, add_plt);
-
-        if add_plt {
-            if !self.plt_lookup.contains_key(&symbol.name) {
-                self.plt.push(symbol.clone());
-                self.pltgot.push(symbol.clone());
-                self.plt_lookup
-                    .insert(symbol.name.to_string(), self.plt_index);
-                self.pltgot_lookup
-                    .insert(symbol.name.to_string(), self.pltgot_index);
-                self.plt_index += 1;
-                self.pltgot_index += 1;
-            }
-        }
-
-        if add_got {
-            if !self.got_lookup.contains_key(&symbol.name) {
-                self.r_got.push((r.clone(), symbol.clone()));
-                self.got_lookup
-                    .insert(symbol.name.to_string(), self.got_index);
-                log::debug!(target: "symbols", "ADD_GOT: {}, {}", &symbol.name, self.got_index);
-                self.got_index += 1;
-            }
-        }
-
-        if add_gotplt {
-            if !self.gotplt_lookup.contains_key(&symbol.name) {
-                self.r_gotplt.push((r.clone(), symbol.clone()));
-                self.gotplt_lookup
-                    .insert(symbol.name.to_string(), self.gotplt_index);
-                self.gotplt_index += 1;
-            }
-        }
-
-        if add_absolute {
-            self.r_got.push((r.clone(), symbol.clone()));
-        }
-    }
-
     pub fn relocation_add(&mut self, symbol: &ReadSymbol, r: &CodeRelocation) {
         let name = &symbol.name;
-        self.save_relocation(symbol.clone(), r);
+        self.relocations.save_relocation(symbol.clone(), r);
 
         if self.symbol_hash.get(name).is_none() {
             self.symbols.push(symbol.name.clone());
@@ -236,7 +249,7 @@ impl Dynamics {
         w: &mut Writer,
     ) {
         let name = &symbol.name;
-        self.save_relocation(symbol.clone(), r);
+        self.relocations.save_relocation(symbol.clone(), r);
         if self.symbol_hash.get(name).is_none() {
             self.symbol_add(symbol.clone(), w);
         }
@@ -249,8 +262,10 @@ impl Dynamics {
         let string_id;
         let symbol_index;
         if symbol.is_static() {
-            string_id = None;
-            symbol_index = None;
+            string_id = Some(self.string_add(&symbol.name, w));
+            symbol_index = Some(SymbolIndex(w.reserve_dynamic_symbol_index().0));
+            //string_id = None;
+            //symbol_index = None;
             log::debug!(target: "symbols", "ADD STATIC");
         } else {
             string_id = Some(self.string_add(&symbol.name, w));

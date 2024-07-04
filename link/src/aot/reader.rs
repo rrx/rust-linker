@@ -540,7 +540,6 @@ pub fn dump_hash(data: &[u8]) {
 pub fn code_relocation<'a, 'b, A: elf::FileHeader, B: object::ReadRef<'a>>(
     kind: ReadSectionKind,
     b: &elf::ElfFile<'a, A, B>,
-    section: &elf::ElfSection<'a, 'b, A, B>,
     r: LinkRelocation,
     offset: usize,
 ) -> Result<CodeRelocation, Box<dyn Error>> {

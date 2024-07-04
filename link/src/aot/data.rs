@@ -1,9 +1,6 @@
 use super::*;
-use crate::format;
-use crate::format::*;
 use object::write::elf::{SectionIndex, Writer};
 use object::write::StringId;
-use object::SymbolKind;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;

@@ -37,8 +37,11 @@ rule cc-gcc-musl
             -I/usr/include/x86_64-linux-musl \
             -fPIC -c $in -o $out
 
-rule build-link
+rule build-link-release
     command = cargo build --release
+
+rule build-link-debug
+    command = cargo build
 
 rule link
     command = target/release/link -v --link -o $out $in {" ".join(link_files)}
@@ -49,7 +52,8 @@ rule run
 rule diff
     command = diff -q $in
 
-build target/release/link: build-link
+build target/release/link: build-link-release
+build target/debug/link: build-link-debug
 
 """
         )
@@ -98,24 +102,27 @@ def generate_c_testsuite(base, rule, build_type, fp):
         expected_filename = f"{filename}.expected"
         output_result = os.path.join(output, "%05d.c.results" % i)
         assert os.path.exists(expected_filename)
-        link_exe = "target/release/link"
+        link_exe = "target/debug/link"
 
         # skip broken tests
         if i in EXCLUDE_C_TESTSUITE_TESTS:
             i += 1
             continue
 
-        outputs.append(f"{build_type}/{i}")
+        single_build_key = f"{build_type}/{i}"
+        outputs.append(single_build_key)
         fp.write(f"build {output_filename}: {rule} {filename}\n")
         fp.write(f"build {output_exe}: link {output_filename} | {link_exe}\n")
         fp.write(f"build {output_result}: run {output_exe}\n")
         fp.write(
-            f"""build {filename}-{build_type}-diff: diff {filename}.expected {output_result}\n"""
+            f"""build {filename}-{build_type}-diff: diff {filename}.expected {output_result} | {link_exe}\n"""
         )
-        fp.write(f"build {build_type}/{i}: phony {filename} | {output_result}\n")
+        fp.write(
+            f"build {build_type}/{i}: phony {filename} | {output_result} { link_exe }\n"
+        )
         i += 1
 
-    fp.write(f"build testsuite-{build_type}: phony {' '.join(outputs)}\n")
+    fp.write(f"build testsuite-{build_type}: phony {' '.join(outputs)} { link_exe }\n")
     fp.write(f"default testsuite-{build_type}\n")
 
 

@@ -1,3 +1,4 @@
+use super::relocations::RelaDynSection;
 use super::*;
 use object::elf;
 use object::write::elf::{SectionIndex, Writer};

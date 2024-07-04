@@ -262,8 +262,10 @@ impl Dynamics {
         let string_id;
         let symbol_index;
         if symbol.is_static() {
-            string_id = None;
-            symbol_index = None;
+            string_id = Some(self.string_add(&symbol.name, w));
+            symbol_index = Some(SymbolIndex(w.reserve_dynamic_symbol_index().0));
+            //string_id = None;
+            //symbol_index = None;
             log::debug!(target: "symbols", "ADD STATIC");
         } else {
             string_id = Some(self.string_add(&symbol.name, w));

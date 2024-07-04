@@ -149,7 +149,6 @@ musl:
 		-o tmp/musl.exe \
 		build/clang-musl/empty_main.o \
 		/usr/lib/x86_64-linux-musl/libc.so \
-		build/clang-glibc/print_string.o \
 		/usr/lib/x86_64-linux-musl/crt1.o \
 		/usr/lib/x86_64-linux-musl/crti.o \
 		/usr/lib/x86_64-linux-musl/crtn.o

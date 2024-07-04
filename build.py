@@ -44,7 +44,7 @@ rule build-link-debug
     command = cargo build
 
 rule link
-    command = target/release/link -v --link -o $out $in {" ".join(link_files)}
+    command = target/debug/link -v --link -o $out $in {" ".join(link_files)}
 
 rule run
     command = $in > $out
